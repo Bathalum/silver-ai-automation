@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Edit3, Copy, Trash2, LayoutGrid, ArrowUpFromLine } from "lucide-react"
+import { Edit3, Copy, Trash2, LayoutGrid, MoveUp } from "lucide-react"
 import useSpindleStore from "@/lib/stores/spindle-store"
 import {
   ReactFlow,
@@ -125,7 +125,7 @@ export function NodeContextMenu({
               className="w-full justify-start h-8"
               onClick={() => onRemoveFromContainer(nodeId)}
             >
-              <ArrowUpFromLine className="w-4 h-4 mr-2" />
+              <MoveUp className="w-4 h-4 mr-2" />
               Remove from Container
             </Button>
             <Separator />
