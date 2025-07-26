@@ -1,0 +1,155 @@
+---
+description: When implementing code, components, features, pages, file and folder structures in the codebase for frontend and backend.
+alwaysApply: false
+---
+# High-Level Architecture Design Context
+
+This document provides a high-level context for all your projects, serving as the foundational reference for architecture designs, component/feature patterns, and coding best practices. It ensures that every project begins with a consistent, maintainable, and extensible structure. Below, I outline the preferred approaches and principles, followed by specific guidance for frontend and backend implementations.
+
+## 1. Preferred Architecture Designs
+
+All projects should adhere to **Clean Architecture**, a layered approach that separates concerns and keeps business logic independent of external systems. This applies to both frontend and backend, ensuring modularity and testability.
+
+### Clean Architecture Layers
+- **Domain Layer**  
+  - **Purpose**: Holds the core **business logic**, rules, and entities. This is the heart of your application, defining what it does at a fundamental level.
+  - **Key Principle**: Independent of frameworks, databases, or UI—no external dependencies.
+  - **Contains**: Entities (e.g., User, Order), business rules (e.g., validation logic), and pure functions/classes.
+
+- **Application Layer**  
+  - **Purpose**: Orchestrates **use cases** and coordinates data flow between the Domain and Infrastructure Layers. It does **not** contain business logic—that lives in the Domain Layer.
+  - **Key Principle**: Defines application-specific workflows (e.g., "Get User," "Process Order") without implementing the rules themselves.
+  - **Contains**: Use case definitions, service orchestrations, or hooks (frontend).
+
+- **Infrastructure Layer**  
+  - **Purpose**: Handles interactions with the outside world—databases, APIs, file systems, etc.
+  - **Key Principle**: Acts as an adapter, keeping technical details separate from business concerns.
+  - **Contains**: Repositories, API clients, database connections.
+
+- **Presentation Layer (Frontend Only)**  
+  - **Purpose**: Manages the user interface and interactions.
+  - **Key Principle**: Keeps UI logic minimal, relying on the Application Layer for data and workflows.
+  - **Contains**: Components, pages, and views.
+
+### How It Flows
+- Data and control flow **inward**: Presentation → Application → Domain, with Infrastructure providing external support.
+- The Domain Layer is the core, untouched by external changes (e.g., swapping a database or UI framework).
+
+This structure ensures your business logic remains portable and testable, whether you're building a monolithic backend, a microservice, or a frontend app.
+
+## 2. Component and Feature Patterns
+
+To avoid confusion in passing data and ensure modularity, components and features follow distinct patterns:
+
+### Frontend: Component Architecture
+- **Base Components**: Small, reusable UI building blocks (e.g., Button, Input).  
+  - Pass data via **props**, keep stateless where possible.
+- **Composite Components**: Combine Base Components into larger, reusable units (e.g., Form, CardGroup).  
+  - Manage internal state if needed, expose clear interfaces.
+- **Feature Components**: Tie to specific business features (e.g., UserProfile, OrderList).  
+  - Fetch data via Application Layer hooks or services, pass down to children.
+- **Page Components**: Assemble Feature Components into full pages.  
+  - Handle routing and page-level data flow.
+
+- **Data Flow**: Top-down (Page → Feature → Composite → Base), with events bubbling up via callbacks or state management.
+
+### Backend: Modular Design
+- **Modules**: Group related functionality (e.g., User, Payment).  
+  - Each module contains its own Domain, Application, and Infrastructure elements.
+- **Services**: Implement use cases from the Application Layer, calling Domain logic.  
+  - Pass data explicitly via parameters or DTOs (Data Transfer Objects).
+- **Repositories**: Abstract data access in the Infrastructure Layer.  
+  - Return Domain entities to services.
+
+- **Data Flow**: Controllers → Services → Domain → Repositories, with clear boundaries between layers.
+
+This ensures data flows predictably, reducing coupling and making components/features reusable across projects.
+
+## 3. Coding Best Practices
+
+All code should enhance **modularity**, **maintainability**, and **extensibility** by adhering to these principles:
+
+- **DRY (Don't Repeat Yourself)**: Reuse functions, components, and utilities instead of duplicating code.
+- **Separation of Concerns**: Each layer, module, or component has one clear responsibility.
+- **Single Responsibility Principle**: A function or class does one thing well.
+- **Encapsulation**: Hide implementation details, expose only what's necessary.
+- **Reusability**: Design for broad use across features or projects.
+- **Testability**: Write code that's easy to unit test (e.g., pure functions in Domain Layer).
+- **Consistency**: Follow naming conventions, file structures, and patterns outlined below.
+
+These practices ensure your codebase remains clean, scalable, and easy to extend as requirements evolve.
+
+## Frontend Specifics
+
+### File and Folder Structure
+\`\`\`
+/app                           # Next.js App Router root
+├── (auth)/                    # Authentication routes (route group)
+├── (private)/                 # Protected routes (route group)
+│   └── dashboard/             # Dashboard area with features
+├── (public)/                  # Public routes (route group)
+├── api/                       # API routes
+├── lib
+│   ├── domain/                # Entities, business logic
+│   ├── use-cases/             # Application Layer use cases
+│   └── infrastructure/        # API clients, external services
+├── components
+│   ├── ui/                    # Base Components
+│   ├── composites/            # Composite Components
+│   └── features/              # Feature Components
+└── hooks/                     # Custom hooks (Application Layer)
+\`\`\`
+
+### Tech Stack
+- **Framework**: Next.js (React) with App Router for routing and rendering.
+- **Language**: TypeScript for type safety.
+- **Styling**: Tailwind CSS or styled-components.
+- **State Management**: React Hooks (useState, useContext) or Redux.
+- **Form Handling**: React Hook Form with Zod for validation.
+
+### Key Architecture Components
+- **Route Groups**: Organize routes logically without affecting URL structure.
+- **Layouts**: Nested layouts for shared UI between routes while maintaining separation of concerns.
+- **Middleware**: Handle authentication and route protection at the infrastructure layer.
+- **Server Components**: Fetch data directly from the server, reducing client-side code.
+- **Client Components**: Handle interactive UI elements and state management.
+
+### Guidelines
+- Place business logic in `/lib/domain/`.
+- Use hooks in `/hooks/` for Application Layer logic.
+- Implement middleware for cross-cutting concerns like authentication.
+- Keep components in `/components/` focused on UI, fetching data via hooks.
+- Use layouts to share UI between routes while maintaining Clean Architecture boundaries.
+
+## Backend Specifics
+
+### File and Folder Structure
+\`\`\`
+/src
+├── domain
+│   ├── entities/        # Business entities
+│   └── rules/           # Business logic
+├── application
+│   ├── use-cases/       # Use case definitions
+│   └── services/        # Service implementations
+├── infrastructure
+│   ├── repositories/    # Data access
+│   └── external/        # APIs, databases
+└── modules
+    ├── user/            # Example module
+    │   ├── controllers/
+    │   └── routes/
+    └── payment/
+\`\`\`
+
+### Tech Stack
+- **Framework**: NestJS, Express, or FastAPI (Python) for structured APIs.
+- **Language**: TypeScript or Python.
+- **Database**: Supabase, PostgreSQL, or MongoDB.
+- **ORM**: TypeORM, Prisma, or SQLAlchemy.
+- **Microservices**: Optional, using message queues (e.g., RabbitMQ).
+
+### Guidelines
+- Place business logic in `/src/domain/`.
+- Define use cases in `/src/application/use-cases/`, implement in services.
+- Use repositories in `/src/infrastructure/` for data access.
