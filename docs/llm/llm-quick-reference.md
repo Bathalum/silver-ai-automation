@@ -4,11 +4,10 @@
 
 ### Required Documents (Always Include)
 1. **`docs/component-documentation-standards.md`** - Complete template and requirements
-2. **`docs/components/composite-components/feature-modal.md`** - Perfect example to follow
+2. **`docs/components/composite-components/shared-feature-modal.md`** - Perfect example to follow
 3. **`docs/llm-documentation-guide.md`** - Detailed LLM-specific instructions
 
 ### Optional Context Documents
-4. **`docs/shared-feature-modal-architecture.md`** - Component relationships
 5. **`docs/architecture/component-architecture.md`** - Overall patterns
 6. **`docs/README.md`** - Documentation structure
 
