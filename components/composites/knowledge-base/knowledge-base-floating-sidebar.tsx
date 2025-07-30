@@ -217,6 +217,56 @@ export function KnowledgeBaseFloatingSidebar({
           </div>
         </div>
       )}
+
+      {/* Linked Entities Summary */}
+      {currentSOP && (
+        <div className="space-y-4">
+          <h4 className="text-lg font-medium text-gray-900">Linked Entities</h4>
+          <div className="space-y-3">
+            {(linkedFunctionModels?.length || 0) > 0 && (
+              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-600" />
+                  <span className="text-sm font-medium text-gray-900">Function Models</span>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {linkedFunctionModels?.length || 0}
+                </Badge>
+              </div>
+            )}
+            {(linkedEventStorms?.length || 0) > 0 && (
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-900">Event Storms</span>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {linkedEventStorms?.length || 0}
+                </Badge>
+              </div>
+            )}
+            {(linkedSpindles?.length || 0) > 0 && (
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-purple-600" />
+                  <span className="text-sm font-medium text-gray-900">Spindles</span>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {linkedSpindles?.length || 0}
+                </Badge>
+              </div>
+            )}
+            {((linkedFunctionModels?.length || 0) === 0 && 
+              (linkedEventStorms?.length || 0) === 0 && 
+              (linkedSpindles?.length || 0) === 0) && (
+              <div className="text-center py-4 text-gray-500">
+                <Link className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No linked entities</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 

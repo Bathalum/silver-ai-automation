@@ -105,31 +105,7 @@ export function SOPCard({ sop, onEdit, onDelete, onView }: SOPCardProps) {
           </div>
         </div>
 
-        {/* Linked Entities */}
-        {((sop.linkedFunctionModels?.length || 0) > 0 || 
-          (sop.linkedEventStorms?.length || 0) > 0 || 
-          (sop.linkedSpindles?.length || 0) > 0) && (
-          <div className="mb-4">
-            <div className="text-xs text-muted-foreground mb-1">Linked to:</div>
-            <div className="flex flex-wrap gap-1">
-              {(sop.linkedFunctionModels?.length || 0) > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  {sop.linkedFunctionModels?.length || 0} Function Models
-                </Badge>
-              )}
-              {(sop.linkedEventStorms?.length || 0) > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  {sop.linkedEventStorms?.length || 0} Event Storms
-                </Badge>
-              )}
-              {(sop.linkedSpindles?.length || 0) > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  {sop.linkedSpindles?.length || 0} Spindles
-                </Badge>
-              )}
-            </div>
-          </div>
-        )}
+
 
         {/* Actions */}
         <div className="flex items-center justify-between">
