@@ -10,6 +10,7 @@ import { ArrowLeft, Edit, Share, Bookmark, Download, Clock, User, Tag, Eye } fro
 import Link from "next/link"
 import { useSOPById } from "../hooks/use-knowledge-base"
 import { generateTableOfContents } from "@/lib/utils/table-of-contents"
+import { KnowledgeBaseFloatingSidebar } from "@/components/composites/knowledge-base/knowledge-base-floating-sidebar"
 
 export default function SOPDetailPage() {
   const params = useParams()
@@ -80,6 +81,30 @@ export default function SOPDetailPage() {
   }
 
   const tableOfContents = generateTableOfContents(sop.content)
+
+  // Mock linked entities data for demonstration
+  const linkedFunctionModels = [
+    { id: "fm-1", title: "Customer Onboarding Process", description: "Complete customer onboarding workflow", type: "function-model" as const },
+    { id: "fm-2", title: "Order Processing", description: "Order fulfillment and processing steps", type: "function-model" as const }
+  ]
+  
+  const linkedEventStorms = [
+    { id: "es-1", title: "Customer Registration Event", description: "Events triggered during customer registration", type: "event-storm" as const },
+    { id: "es-2", title: "Order Confirmation Event", description: "Order confirmation and notification events", type: "event-storm" as const }
+  ]
+  
+  const linkedSpindles = [
+    { id: "sp-1", title: "Customer Verification Decision", description: "Decision tree for customer verification", type: "spindle" as const },
+    { id: "sp-2", title: "Order Approval Decision", description: "Order approval and validation logic", type: "spindle" as const }
+  ]
+
+  // Mock statistics data
+  const statistics = {
+    totalSOPs: 1,
+    totalViews: sop.readTime * 10, // Mock calculation
+    totalLinkedEntities: linkedFunctionModels.length + linkedEventStorms.length + linkedSpindles.length,
+    lastUpdated: sop.updatedAt
+  }
 
   return (
     <div className="w-full h-full p-6 space-y-6">
@@ -247,6 +272,33 @@ export default function SOPDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Knowledge Base Floating Sidebar */}
+      <KnowledgeBaseFloatingSidebar
+        currentSOP={sop}
+        linkedFunctionModels={linkedFunctionModels}
+        linkedEventStorms={linkedEventStorms}
+        linkedSpindles={linkedSpindles}
+        statistics={statistics}
+        onNavigateToFunctionModel={() => console.log("Navigate to Function Model")}
+        onNavigateToEventStorm={() => console.log("Navigate to Event Storm")}
+        onNavigateToSpindle={() => console.log("Navigate to Spindle")}
+        onOpenFunctionModelDetails={(entity) => {
+          console.log("Opening Function Model details for:", entity)
+          // Here you would open a Function Model specific modal
+          // Example: openFunctionModelModal(entity.id)
+        }}
+        onOpenEventStormDetails={(entity) => {
+          console.log("Opening Event Storm details for:", entity)
+          // Here you would open an Event Storm specific modal
+          // Example: openEventStormModal(entity.id)
+        }}
+        onOpenSpindleDetails={(entity) => {
+          console.log("Opening Spindle details for:", entity)
+          // Here you would open a Spindle specific modal
+          // Example: openSpindleModal(entity.id)
+        }}
+      />
     </div>
   )
 } 

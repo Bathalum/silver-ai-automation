@@ -1,17 +1,8 @@
 import { useState, useEffect } from "react"
-import { getSOPs } from "@/lib/use-cases/get-sops"
+import { getSOPs, getSOPById } from "@/lib/use-cases/get-sops"
 import type { SOP, KnowledgeBaseFilters } from "@/lib/domain/entities/knowledge-base-types"
 
 export function useKnowledgeBase() {
-  // Feature-specific state management for SOPs, filters, loading
-  // Integration with use cases for CRUD operations
-  // Search and filtering logic
-  // Mock data management with realistic content
-  // Category and tag management
-  // Status filtering (draft, published, archived)
-  // URL parameter integration for shareable state
-  // Following the pattern of use-event-storm.ts
-  
   const [sops, setSOPs] = useState<SOP[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<KnowledgeBaseFilters>({
@@ -25,10 +16,10 @@ export function useKnowledgeBase() {
     loadSOPs()
   }, [filters])
 
-  const loadSOPs = () => {
+  const loadSOPs = async () => {
     setLoading(true)
     try {
-      const filteredSOPs = getSOPs(filters)
+      const filteredSOPs = await getSOPs(filters)
       setSOPs(filteredSOPs)
     } catch (error) {
       console.error("Error loading SOPs:", error)
@@ -61,13 +52,6 @@ export function useKnowledgeBase() {
 }
 
 export function useSOPById(id: string) {
-  // Get specific SOP by ID using use cases
-  // Related entities fetching (Function Models, Event Storms, Spindles)
-  // Content parsing and formatting
-  // Table of contents generation
-  // Linked entities resolution
-  // Error handling and loading states
-  
   const [sop, setSOP] = useState<SOP | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -76,13 +60,12 @@ export function useSOPById(id: string) {
     loadSOP()
   }, [id])
 
-  const loadSOP = () => {
+  const loadSOP = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const allSOPs = getSOPs({ search: "", category: "", status: "", tags: [] })
-      const foundSOP = allSOPs.find(s => s.id === id)
+      const foundSOP = await getSOPById(id)
       
       if (foundSOP) {
         setSOP(foundSOP)

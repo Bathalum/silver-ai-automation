@@ -235,6 +235,8 @@ export function KnowledgeBaseDashboard() {
           </Card>
         )}
       </div>
+
+
     </div>
   )
 } 
