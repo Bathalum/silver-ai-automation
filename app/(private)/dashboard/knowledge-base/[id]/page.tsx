@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Save, Eye, Trash2, Plus, X } from "lucide-react"
 import { useSOPById } from "../hooks/use-knowledge-base"
+import { KnowledgeBaseFloatingSidebar } from "@/components/composites/knowledge-base/knowledge-base-floating-sidebar"
 import type { SOP } from "@/lib/domain/entities/knowledge-base-types"
 
 interface SOPEditPageProps {
@@ -136,6 +137,19 @@ export default function SOPEditPage({ params }: SOPEditPageProps) {
 
   return (
     <div className="w-full h-full p-6 space-y-6">
+      {/* Knowledge Base Floating Sidebar */}
+      <KnowledgeBaseFloatingSidebar
+        currentSOPId={params.id}
+        onNavigateToFunctionModel={() => router.push("/dashboard/function-model")}
+        onNavigateToEventStorm={() => router.push("/dashboard/event-storm")}
+        onNavigateToSpindle={() => router.push("/dashboard/spindle")}
+        onOpenFunctionModelDetails={(entity) => router.push(`/dashboard/function-model/${entity.id}`)}
+        onOpenEventStormDetails={(entity) => router.push(`/dashboard/event-storm/${entity.id}`)}
+        onOpenSpindleDetails={(entity) => router.push(`/dashboard/spindle/${entity.id}`)}
+        position="right"
+        variant="floating"
+      />
+      
       {/* Header */}
       <PageHeader
         title={isEditing ? "Edit SOP" : sop.title}

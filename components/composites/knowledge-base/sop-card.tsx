@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Clock, User, Tag, Eye, Edit, ExternalLink, Trash2 } from "lucide-react"
+import { Clock, User, Tag, Eye, Edit, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { SOP } from "@/lib/domain/entities/knowledge-base-types"
@@ -171,18 +171,7 @@ export function SOPCard({ sop, onEdit, onDelete, onView }: SOPCardProps) {
                 <Trash2 className="w-3 h-3" />
               </Button>
             )}
-            <Button
-              variant="default"
-              size="sm"
-              className="h-8 px-3"
-              onClick={(e) => {
-                e.stopPropagation()
-                router.push(`/dashboard/knowledge-base/${sop.id}`)
-              }}
-            >
-              <ExternalLink className="w-3 h-3 mr-1" />
-              View
-            </Button>
+
           </div>
         </div>
       </CardContent>

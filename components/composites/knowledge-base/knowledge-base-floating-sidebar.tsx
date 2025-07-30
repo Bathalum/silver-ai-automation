@@ -20,13 +20,14 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NAVIGATION_TAB_CONFIG } from "@/components/composites/shared/constants"
-import type { SOP, LinkedEntity } from "@/lib/domain/entities/knowledge-base-types"
+import { useKnowledgeBaseSidebar } from "@/hooks/use-knowledge-base-sidebar"
+import type { LinkedEntity } from "@/lib/domain/entities/knowledge-base-types"
 
 export interface KnowledgeBaseFloatingSidebarProps {
   className?: string
   showTooltips?: boolean
-  // Current SOP data for context
-  currentSOP?: SOP | null
+  // Current SOP ID for persistence
+  currentSOPId?: string
   // Navigation callbacks for other features
   onNavigateToFunctionModel?: () => void
   onNavigateToEventStorm?: () => void
@@ -35,17 +36,6 @@ export interface KnowledgeBaseFloatingSidebarProps {
   onOpenFunctionModelDetails?: (entity: LinkedEntity) => void
   onOpenEventStormDetails?: (entity: LinkedEntity) => void
   onOpenSpindleDetails?: (entity: LinkedEntity) => void
-  // Linked entities data
-  linkedFunctionModels?: LinkedEntity[]
-  linkedEventStorms?: LinkedEntity[]
-  linkedSpindles?: LinkedEntity[]
-  // Statistics data
-  statistics?: {
-    totalSOPs: number
-    totalViews: number
-    totalLinkedEntities: number
-    lastUpdated: Date
-  }
   // Position and behavior
   position?: "left" | "right"
   variant?: "floating" | "sheet"
@@ -91,20 +81,24 @@ const getKnowledgeBaseSidebarItems = () => [
 export function KnowledgeBaseFloatingSidebar({
   className,
   showTooltips = true,
-  currentSOP,
+  currentSOPId,
   onNavigateToFunctionModel,
   onNavigateToEventStorm,
   onNavigateToSpindle,
   onOpenFunctionModelDetails,
   onOpenEventStormDetails,
   onOpenSpindleDetails,
-  linkedFunctionModels = [],
-  linkedEventStorms = [],
-  linkedSpindles = [],
-  statistics,
   position = "right",
   variant = "floating"
 }: KnowledgeBaseFloatingSidebarProps) {
+  // Get data from persistence using the custom hook
+  const {
+    currentSOP,
+    linkedFunctionModels,
+    linkedEventStorms,
+    linkedSpindles,
+    statistics
+  } = useKnowledgeBaseSidebar(currentSOPId)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("details")
   const sidebarItems = getKnowledgeBaseSidebarItems()

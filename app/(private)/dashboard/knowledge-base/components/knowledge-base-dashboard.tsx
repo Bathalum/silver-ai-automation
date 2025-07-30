@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 
 import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, BookOpen, FileText, Users, Clock, Edit, Trash2 } from "lucide-react"
+import { Plus, BookOpen } from "lucide-react"
 import { SOPCard } from "@/components/composites/knowledge-base/sop-card"
 import { KnowledgeBaseSearch } from "@/components/composites/knowledge-base/knowledge-base-search"
 import { useRouter } from "next/navigation"
@@ -60,13 +60,6 @@ export function KnowledgeBaseDashboard() {
     }
   }
 
-  const stats = {
-    total: sops.length,
-    published: sops.filter(sop => sop.status === "published").length,
-    draft: sops.filter(sop => sop.status === "draft").length,
-    archived: sops.filter(sop => sop.status === "archived").length
-  }
-
   return (
     <div className="w-full h-full p-6 space-y-6">
       {/* Header */}
@@ -82,61 +75,6 @@ export function KnowledgeBaseDashboard() {
           New SOP
         </Button>
       </PageHeader>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total SOPs</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">
-              All procedures
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Published</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.published}</div>
-            <p className="text-xs text-muted-foreground">
-              Live procedures
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Drafts</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.draft}</div>
-            <p className="text-xs text-muted-foreground">
-              In progress
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Archived</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.archived}</div>
-            <p className="text-xs text-muted-foreground">
-              Retired procedures
-            </p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Search and Filters */}
       <Card>
