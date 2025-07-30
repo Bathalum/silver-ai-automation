@@ -9,14 +9,23 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 interface KnowledgeBaseSearchProps {
   onSearch: (query: string) => void
+  onFilter: (type: 'category' | 'status', value: string) => void
   onClear: () => void
+  filters: {
+    search: string
+    category: string
+    status: string
+    tags: string[]
+  }
   placeholder?: string
   className?: string
 }
 
 export function KnowledgeBaseSearch({ 
   onSearch, 
+  onFilter,
   onClear, 
+  filters,
   placeholder = "Search SOPs...",
   className = "" 
 }: KnowledgeBaseSearchProps) {
@@ -77,11 +86,48 @@ export function KnowledgeBaseSearch({
           {isSearching ? "Searching..." : "Search"}
         </Button>
         
+         {(filters.category || filters.status) && (
+           <Button
+             variant="ghost"
+             size="sm"
+             onClick={() => {
+               onFilter('category', '')
+               onFilter('status', '')
+             }}
+             className="text-muted-foreground"
+           >
+             Clear filters
+           </Button>
+         )}
+         
+         {(filters.search || filters.category || filters.status) && (
+           <Button
+             variant="ghost"
+             size="sm"
+             onClick={() => {
+               onClear()
+               onFilter('category', '')
+               onFilter('status', '')
+             }}
+             className="text-red-600 hover:text-red-700"
+           >
+             Clear all
+           </Button>
+         )}
+        
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="flex items-center gap-2">
               <Filter className="w-4 h-4" />
               Filters
+              {(filters.category || filters.status) && (
+                <span className="ml-1 w-2 h-2 bg-primary rounded-full"></span>
+              )}
+              {(filters.search && (filters.category || filters.status)) && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-100 text-red-700 rounded-full">
+                  {[filters.search, filters.category, filters.status].filter(Boolean).length}
+                </span>
+              )}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-80 p-0" align="start">
@@ -90,15 +136,50 @@ export function KnowledgeBaseSearch({
               <CommandList>
                 <CommandEmpty>No filters found.</CommandEmpty>
                 <CommandGroup heading="Categories">
-                  <CommandItem>Customer Management</CommandItem>
-                  <CommandItem>IT Operations</CommandItem>
-                  <CommandItem>Development</CommandItem>
-                  <CommandItem>Sales & Marketing</CommandItem>
+                  <CommandItem 
+                    onSelect={() => onFilter('category', 'Customer Management')}
+                    className={filters.category === 'Customer Management' ? 'bg-accent' : ''}
+                  >
+                    Customer Management
+                  </CommandItem>
+                  <CommandItem 
+                    onSelect={() => onFilter('category', 'IT Operations')}
+                    className={filters.category === 'IT Operations' ? 'bg-accent' : ''}
+                  >
+                    IT Operations
+                  </CommandItem>
+                  <CommandItem 
+                    onSelect={() => onFilter('category', 'Development')}
+                    className={filters.category === 'Development' ? 'bg-accent' : ''}
+                  >
+                    Development
+                  </CommandItem>
+                  <CommandItem 
+                    onSelect={() => onFilter('category', 'Sales & Marketing')}
+                    className={filters.category === 'Sales & Marketing' ? 'bg-accent' : ''}
+                  >
+                    Sales & Marketing
+                  </CommandItem>
                 </CommandGroup>
                 <CommandGroup heading="Status">
-                  <CommandItem>Published</CommandItem>
-                  <CommandItem>Draft</CommandItem>
-                  <CommandItem>Archived</CommandItem>
+                  <CommandItem 
+                    onSelect={() => onFilter('status', 'published')}
+                    className={filters.status === 'published' ? 'bg-accent' : ''}
+                  >
+                    Published
+                  </CommandItem>
+                  <CommandItem 
+                    onSelect={() => onFilter('status', 'draft')}
+                    className={filters.status === 'draft' ? 'bg-accent' : ''}
+                  >
+                    Draft
+                  </CommandItem>
+                  <CommandItem 
+                    onSelect={() => onFilter('status', 'archived')}
+                    className={filters.status === 'archived' ? 'bg-accent' : ''}
+                  >
+                    Archived
+                  </CommandItem>
                 </CommandGroup>
                 <CommandGroup heading="Popular Tags">
                   <CommandItem>onboarding</CommandItem>

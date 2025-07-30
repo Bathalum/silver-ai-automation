@@ -1,58 +1,114 @@
 "use client"
 
-import { useParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/ui/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Edit, Share, Bookmark, Download, Clock, User, Tag, Eye } from "lucide-react"
-import Link from "next/link"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { ArrowLeft, Save, Eye, Trash2, Plus, X } from "lucide-react"
 import { useSOPById } from "../hooks/use-knowledge-base"
-import { generateTableOfContents } from "@/lib/utils/table-of-contents"
-import { KnowledgeBaseFloatingSidebar } from "@/components/composites/knowledge-base/knowledge-base-floating-sidebar"
+import type { SOP } from "@/lib/domain/entities/knowledge-base-types"
 
-export default function SOPDetailPage() {
-  const params = useParams()
-  const sopId = params.id as string
-  const { sop, loading, error } = useSOPById(sopId)
+interface SOPEditPageProps {
+  params: {
+    id: string
+  }
+}
+
+export default function SOPEditPage({ params }: SOPEditPageProps) {
+  const router = useRouter()
+  const { sop, loading, error, updateSOP, deleteSOP, reload } = useSOPById(params.id)
+  
+  const [formData, setFormData] = useState<Partial<SOP>>({
+    title: "",
+    summary: "",
+    content: "",
+    category: "",
+    status: "draft",
+    tags: [],
+    author: ""
+  })
+  
+  const [isEditing, setIsEditing] = useState(false) // Start in view mode by default
+  const [newTag, setNewTag] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Initialize form data when SOP loads
+  useEffect(() => {
+    if (sop) {
+      setFormData({
+        title: sop.title || "",
+        summary: sop.summary || "",
+        content: sop.content || "",
+        category: sop.category || "",
+        status: sop.status || "draft",
+        tags: sop.tags || [],
+        author: sop.author || ""
+      })
+    }
+  }, [sop])
+
+  const handleSave = async () => {
+    if (!sop) return
+    
+    setIsSaving(true)
+    try {
+      await updateSOP(formData)
+      setIsEditing(false)
+      await reload()
+    } catch (error) {
+      console.error("Error saving SOP:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!sop || !confirm("Are you sure you want to delete this SOP?")) return
+    
+    try {
+      await deleteSOP()
+      router.push("/dashboard/knowledge-base")
+    } catch (error) {
+      console.error("Error deleting SOP:", error)
+    }
+  }
+
+  const addTag = () => {
+    if (newTag.trim() && !formData.tags?.includes(newTag.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        tags: [...(prev.tags || []), newTag.trim()]
+      }))
+      setNewTag("")
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags?.filter(tag => tag !== tagToRemove) || []
+    }))
+  }
+
+  const categories = ["Customer Management", "IT Operations", "Development", "Sales & Marketing"]
+  const statuses = ["draft", "published", "archived"]
 
   if (loading) {
     return (
-      <div className="w-full h-full p-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10" />
+      <div className="w-full h-full p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
           <div className="space-y-2">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-8 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-4 w-4/5" />
-                <Skeleton className="h-4 w-full" />
-              </CardContent>
-            </Card>
-          </div>
-          <div>
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardContent>
-            </Card>
+            <div className="h-4 bg-gray-200 rounded"></div>
+            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
           </div>
         </div>
       </div>
@@ -62,17 +118,15 @@ export default function SOPDetailPage() {
   if (error || !sop) {
     return (
       <div className="w-full h-full p-6">
-        <Card className="text-center py-12">
-          <CardContent>
+        <Card>
+          <CardContent className="text-center py-12">
             <h3 className="text-lg font-medium mb-2">SOP not found</h3>
             <p className="text-muted-foreground mb-4">
-              The SOP you're looking for doesn't exist or has been removed.
+              The SOP you're looking for doesn't exist or has been deleted.
             </p>
-            <Button asChild>
-              <Link href="/dashboard/knowledge-base">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Knowledge Base
-              </Link>
+            <Button onClick={() => router.push("/dashboard/knowledge-base")}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Knowledge Base
             </Button>
           </CardContent>
         </Card>
@@ -80,99 +134,127 @@ export default function SOPDetailPage() {
     )
   }
 
-  const tableOfContents = generateTableOfContents(sop.content)
-
-  // Mock linked entities data for demonstration
-  const linkedFunctionModels = [
-    { id: "fm-1", title: "Customer Onboarding Process", description: "Complete customer onboarding workflow", type: "function-model" as const },
-    { id: "fm-2", title: "Order Processing", description: "Order fulfillment and processing steps", type: "function-model" as const }
-  ]
-  
-  const linkedEventStorms = [
-    { id: "es-1", title: "Customer Registration Event", description: "Events triggered during customer registration", type: "event-storm" as const },
-    { id: "es-2", title: "Order Confirmation Event", description: "Order confirmation and notification events", type: "event-storm" as const }
-  ]
-  
-  const linkedSpindles = [
-    { id: "sp-1", title: "Customer Verification Decision", description: "Decision tree for customer verification", type: "spindle" as const },
-    { id: "sp-2", title: "Order Approval Decision", description: "Order approval and validation logic", type: "spindle" as const }
-  ]
-
-  // Mock statistics data
-  const statistics = {
-    totalSOPs: 1,
-    totalViews: sop.readTime * 10, // Mock calculation
-    totalLinkedEntities: linkedFunctionModels.length + linkedEventStorms.length + linkedSpindles.length,
-    lastUpdated: sop.updatedAt
-  }
-
   return (
     <div className="w-full h-full p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard/knowledge-base">
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-          </Button>
-          <div>
-            <PageHeader
-              title={sop.title}
-              description={sop.summary}
-            />
-          </div>
-        </div>
+      <PageHeader
+        title={isEditing ? "Edit SOP" : sop.title}
+        description={isEditing ? "Update the SOP content and metadata" : sop.summary}
+      >
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Bookmark className="w-4 h-4 mr-2" />
-            Bookmark
+          <Button
+            variant="outline"
+            onClick={() => router.push("/dashboard/knowledge-base")}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
           </Button>
-          <Button variant="outline" size="sm">
-            <Share className="w-4 h-4 mr-2" />
-            Share
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-          <Button size="sm">
-            <Edit className="w-4 h-4 mr-2" />
-            Edit
-          </Button>
+          
+          {!isEditing && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDelete}
+                className="text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </>
+          )}
+          
+          {isEditing && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditing(false)}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? "Saving..." : "Save"}
+              </Button>
+            </>
+          )}
         </div>
-      </div>
+      </PageHeader>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Title */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Badge variant={sop.status === "published" ? "default" : "secondary"}>
-                    {sop.status}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    Version {sop.version}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{sop.readTime} min read</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
-                    <span>v{sop.version}</span>
-                  </div>
-                </div>
-              </div>
+              <CardTitle>Title</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="prose prose-sm max-w-none dark:prose-invert">
-                <pre className="whitespace-pre-wrap font-sans">{sop.content}</pre>
-              </div>
+              {isEditing ? (
+                <Input
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter SOP title..."
+                />
+              ) : (
+                <p className="text-lg font-medium">{sop.title}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <Textarea
+                  value={formData.summary}
+                  onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
+                  placeholder="Enter a brief summary..."
+                  rows={3}
+                />
+              ) : (
+                <p className="text-muted-foreground">{sop.summary}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Content */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Content</CardTitle>
+              <CardDescription>
+                The main content of your Standard Operating Procedure
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <Textarea
+                  value={formData.content}
+                  onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="Enter the SOP content..."
+                  rows={15}
+                  className="font-mono"
+                />
+              ) : (
+                <div className="prose max-w-none">
+                  <pre className="whitespace-pre-wrap font-mono text-sm bg-gray-50 p-4 rounded">
+                    {sop.content}
+                  </pre>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -182,123 +264,142 @@ export default function SOPDetailPage() {
           {/* Metadata */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Details</CardTitle>
+              <CardTitle>Metadata</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">{sop.author}</span>
+              {/* Category */}
+              <div>
+                <Label htmlFor="category">Category</Label>
+                {isEditing ? (
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{sop.category}</p>
+                )}
               </div>
-              <div className="text-sm text-muted-foreground">
-                Created: {sop.createdAt.toLocaleDateString()}
+
+              {/* Status */}
+              <div>
+                <Label htmlFor="status">Status</Label>
+                {isEditing ? (
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge variant="outline" className="capitalize">
+                    {sop.status}
+                  </Badge>
+                )}
               </div>
-              <div className="text-sm text-muted-foreground">
-                Updated: {sop.updatedAt.toLocaleDateString()}
+
+              {/* Author */}
+              <div>
+                <Label htmlFor="author">Author</Label>
+                {isEditing ? (
+                  <Input
+                    value={formData.author}
+                    onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
+                    placeholder="Enter author name..."
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">{sop.author}</p>
+                )}
               </div>
-              <div className="text-sm text-muted-foreground">
-                Category: {sop.category}
+
+              {/* Tags */}
+              <div>
+                <Label>Tags</Label>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        placeholder="Add tag..."
+                        onKeyPress={(e) => e.key === 'Enter' && addTag()}
+                      />
+                      <Button size="sm" onClick={addTag}>
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {formData.tags?.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                          {tag}
+                          <button
+                            onClick={() => removeTag(tag)}
+                            className="ml-1 hover:text-red-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {sop.tags?.map((tag) => (
+                      <Badge key={tag} variant="secondary">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Tags */}
-          {sop.tags.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Tags</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {sop.tags.map((tag, index) => (
-                    <Badge key={index} variant="secondary">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Table of Contents */}
-          {tableOfContents.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Table of Contents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <nav className="space-y-1">
-                  {tableOfContents.map((item) => (
-                    <a
-                      key={item.id}
-                      href={`#${item.id}`}
-                      className={`block text-sm hover:text-primary transition-colors ${
-                        item.level === 1 ? "font-medium" : "ml-4"
-                      }`}
-                    >
-                      {item.title}
-                    </a>
-                  ))}
-                </nav>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Linked Entities */}
-          {(sop.linkedFunctionModels.length > 0 || 
-            sop.linkedEventStorms.length > 0 || 
-            sop.linkedSpindles.length > 0) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Related</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {sop.linkedFunctionModels.length > 0 && (
-                  <div className="text-sm">
-                    <span className="font-medium">Function Models:</span> {sop.linkedFunctionModels.length}
-                  </div>
-                )}
-                {sop.linkedEventStorms.length > 0 && (
-                  <div className="text-sm">
-                    <span className="font-medium">Event Storms:</span> {sop.linkedEventStorms.length}
-                  </div>
-                )}
-                {sop.linkedSpindles.length > 0 && (
-                  <div className="text-sm">
-                    <span className="font-medium">Spindles:</span> {sop.linkedSpindles.length}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          {/* Statistics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Statistics</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Read Time:</span>
+                <span>{sop.readTime} min</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Version:</span>
+                <span>v{sop.version}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Created:</span>
+                <span>{sop.createdAt.toLocaleDateString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Updated:</span>
+                <span>{sop.updatedAt.toLocaleDateString()}</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      {/* Knowledge Base Floating Sidebar */}
-      <KnowledgeBaseFloatingSidebar
-        currentSOP={sop}
-        linkedFunctionModels={linkedFunctionModels}
-        linkedEventStorms={linkedEventStorms}
-        linkedSpindles={linkedSpindles}
-        statistics={statistics}
-        onNavigateToFunctionModel={() => console.log("Navigate to Function Model")}
-        onNavigateToEventStorm={() => console.log("Navigate to Event Storm")}
-        onNavigateToSpindle={() => console.log("Navigate to Spindle")}
-        onOpenFunctionModelDetails={(entity) => {
-          console.log("Opening Function Model details for:", entity)
-          // Here you would open a Function Model specific modal
-          // Example: openFunctionModelModal(entity.id)
-        }}
-        onOpenEventStormDetails={(entity) => {
-          console.log("Opening Event Storm details for:", entity)
-          // Here you would open an Event Storm specific modal
-          // Example: openEventStormModal(entity.id)
-        }}
-        onOpenSpindleDetails={(entity) => {
-          console.log("Opening Spindle details for:", entity)
-          // Here you would open a Spindle specific modal
-          // Example: openSpindleModal(entity.id)
-        }}
-      />
     </div>
   )
 } 

@@ -4,42 +4,60 @@ import { useState } from "react"
 import { PageHeader } from "@/components/ui/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
 import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, BookOpen, FileText, Users, Clock } from "lucide-react"
+import { Plus, BookOpen, FileText, Users, Clock, Edit, Trash2 } from "lucide-react"
 import { SOPCard } from "@/components/composites/knowledge-base/sop-card"
 import { KnowledgeBaseSearch } from "@/components/composites/knowledge-base/knowledge-base-search"
+import { useRouter } from "next/navigation"
 import { useKnowledgeBase } from "../hooks/use-knowledge-base"
+import { useUnifiedNodeStore } from "@/lib/stores/unified-node-store"
 import type { SOP } from "@/lib/domain/entities/knowledge-base-types"
 
 export function KnowledgeBaseDashboard() {
-  const { sops, loading, filters, updateFilters, clearFilters } = useKnowledgeBase()
-  const [selectedCategory, setSelectedCategory] = useState<string>("")
-  const [selectedStatus, setSelectedStatus] = useState<string>("")
-
-  const categories = ["Customer Management", "IT Operations", "Development", "Sales & Marketing"]
-  const statuses = ["published", "draft", "archived"]
+  const router = useRouter()
+  const { 
+    sops, 
+    loading, 
+    filters, 
+    updateFilters, 
+    clearFilters,
+    createSOPNode,
+    updateSOPNode,
+    deleteSOPNode
+  } = useKnowledgeBase()
+  
+  const { selectNode } = useUnifiedNodeStore()
 
   const handleSearch = (query: string) => {
     updateFilters({ search: query })
   }
 
-  const handleCategoryFilter = (category: string) => {
-    const newCategory = selectedCategory === category ? "" : category
-    setSelectedCategory(newCategory)
-    updateFilters({ category: newCategory })
+  const handleFilter = (type: 'category' | 'status', value: string) => {
+    const currentValue = filters[type]
+    const newValue = currentValue === value ? "" : value
+    updateFilters({ [type]: newValue })
   }
 
-  const handleStatusFilter = (status: string) => {
-    const newStatus = selectedStatus === status ? "" : status
-    setSelectedStatus(newStatus)
-    updateFilters({ status: newStatus })
+  const handleCreateSOP = () => {
+    router.push("/dashboard/knowledge-base/new")
   }
 
-  const handleClearFilters = () => {
-    setSelectedCategory("")
-    setSelectedStatus("")
-    clearFilters()
+  const handleEditSOP = (sop: SOP) => {
+    // Select the node for editing
+    selectNode(sop.id)
+    // You could open an edit modal here
+    console.log("Edit SOP:", sop)
+  }
+
+  const handleDeleteSOP = async (sop: SOP) => {
+    if (confirm(`Are you sure you want to delete "${sop.title}"?`)) {
+      try {
+        await deleteSOPNode(sop.id)
+      } catch (error) {
+        console.error("Error deleting SOP:", error)
+      }
+    }
   }
 
   const stats = {
@@ -56,7 +74,10 @@ export function KnowledgeBaseDashboard() {
         title="Knowledge Base"
         description="Manage and organize your Standard Operating Procedures (SOPs)"
       >
-        <Button className="flex items-center gap-2">
+        <Button 
+          className="flex items-center gap-2"
+          onClick={handleCreateSOP}
+        >
           <Plus className="w-4 h-4" />
           New SOP
         </Button>
@@ -128,55 +149,11 @@ export function KnowledgeBaseDashboard() {
         <CardContent className="space-y-4">
           <KnowledgeBaseSearch
             onSearch={handleSearch}
+            onFilter={handleFilter}
             onClear={() => updateFilters({ search: "" })}
+            filters={filters}
             placeholder="Search by title, content, or tags..."
           />
-
-          {/* Category Filters */}
-          <div>
-            <h4 className="text-sm font-medium mb-2">Categories</h4>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <Badge
-                  key={category}
-                  variant={selectedCategory === category ? "default" : "outline"}
-                  className="cursor-pointer hover:bg-primary/10"
-                  onClick={() => handleCategoryFilter(category)}
-                >
-                  {category}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Status Filters */}
-          <div>
-            <h4 className="text-sm font-medium mb-2">Status</h4>
-            <div className="flex flex-wrap gap-2">
-              {statuses.map((status) => (
-                <Badge
-                  key={status}
-                  variant={selectedStatus === status ? "default" : "outline"}
-                  className="cursor-pointer hover:bg-primary/10 capitalize"
-                  onClick={() => handleStatusFilter(status)}
-                >
-                  {status}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Clear Filters */}
-          {(selectedCategory || selectedStatus || filters.search) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearFilters}
-              className="text-muted-foreground"
-            >
-              Clear all filters
-            </Button>
-          )}
         </CardContent>
       </Card>
 
@@ -213,7 +190,8 @@ export function KnowledgeBaseDashboard() {
               <SOPCard
                 key={sop.id}
                 sop={sop}
-                onEdit={(sop) => console.log("Edit SOP:", sop)}
+                onEdit={() => handleEditSOP(sop)}
+                onDelete={() => handleDeleteSOP(sop)}
               />
             ))}
           </div>
@@ -223,11 +201,11 @@ export function KnowledgeBaseDashboard() {
               <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No SOPs found</h3>
               <p className="text-muted-foreground mb-4">
-                {filters.search || selectedCategory || selectedStatus
+                {filters.search || filters.category || filters.status
                   ? "Try adjusting your search criteria or filters."
                   : "Get started by creating your first Standard Operating Procedure."}
               </p>
-              <Button>
+              <Button onClick={handleCreateSOP}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create SOP
               </Button>

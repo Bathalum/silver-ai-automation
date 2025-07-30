@@ -1,37 +1,26 @@
 import type { SOP, UpdateSOPRequest } from "../domain/entities/knowledge-base-types"
 import { validateUpdateSOPRequest } from "../domain/rules/knowledge-base-validation"
+import { SupabaseNodeRepository } from "../infrastructure/unified-node-repository"
+import { unifiedNodeToSOP } from "../domain/entities/unified-node-types"
+import type { BaseNode } from "../domain/entities/unified-node-types"
 
-export const updateSOP = (id: string, updates: UpdateSOPRequest): SOP => {
-  // Application logic for SOP updates
-  // Version control and change tracking
-  // Business rule validation
-  
+const nodeRepository = new SupabaseNodeRepository()
+
+export const updateSOP = async (id: string, updates: UpdateSOPRequest): Promise<BaseNode> => {
   // Validate the updates
   const validation = validateUpdateSOPRequest(updates)
   if (!validation.isValid) {
     throw new Error(`Validation failed: ${validation.errors.join(", ")}`)
   }
 
-  // In a real implementation, this would fetch the existing SOP from the database
-  // For now, we'll create a mock updated SOP
-  const existingSOP: SOP = {
-    id,
-    title: "Existing SOP Title",
-    content: "Existing content",
-    summary: "Existing summary",
-    tags: ["existing", "tags"],
-    category: "Existing Category",
-    version: "1.0",
-    status: "draft",
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01"),
-    author: "Existing Author",
-    linkedFunctionModels: [],
-    linkedEventStorms: [],
-    linkedSpindles: [],
-    searchKeywords: ["existing", "keywords"],
-    readTime: 5
+  // Get existing node
+  const existingNode = await nodeRepository.getNode(id)
+  if (!existingNode || existingNode.type !== 'knowledge-base') {
+    throw new Error('SOP not found')
   }
+
+  // Convert existing node to SOP
+  const existingSOP = unifiedNodeToSOP(existingNode)
 
   // Apply updates
   const updatedSOP: SOP = {
@@ -51,9 +40,22 @@ export const updateSOP = (id: string, updates: UpdateSOPRequest): SOP => {
       : existingSOP.readTime
   }
 
-  // In a real implementation, this would save to the database
-  // For now, we'll just return the updated SOP
-  return updatedSOP
+  // Update the node with new metadata
+  const updatedNode = await nodeRepository.updateNode(id, {
+    name: updatedSOP.title,
+    description: updatedSOP.summary,
+    metadata: {
+      ...existingNode.metadata,
+      knowledgeBase: {
+        sop: updatedSOP,
+        content: updatedSOP.content,
+        category: updatedSOP.category,
+        status: updatedSOP.status
+      }
+    }
+  })
+
+  return updatedNode
 }
 
 function incrementVersion(currentVersion: string): string {

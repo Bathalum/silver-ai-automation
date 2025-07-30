@@ -4,17 +4,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Clock, User, Tag, Eye, Edit, ExternalLink } from "lucide-react"
+import { Clock, User, Tag, Eye, Edit, ExternalLink, Trash2 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import type { SOP } from "@/lib/domain/entities/knowledge-base-types"
 
 interface SOPCardProps {
   sop: SOP
   onEdit?: (sop: SOP) => void
+  onDelete?: (sop: SOP) => void
   onView?: (sop: SOP) => void
 }
 
-export function SOPCard({ sop, onEdit, onView }: SOPCardProps) {
+export function SOPCard({ sop, onEdit, onDelete, onView }: SOPCardProps) {
+  const router = useRouter()
+  
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on action buttons
+    if ((e.target as HTMLElement).closest('button')) {
+      return
+    }
+    router.push(`/dashboard/knowledge-base/${sop.id}`)
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "published":
@@ -38,7 +50,10 @@ export function SOPCard({ sop, onEdit, onView }: SOPCardProps) {
   }
 
   return (
-    <Card className="h-full hover:shadow-md transition-shadow duration-200">
+    <Card 
+      className="h-full hover:shadow-md transition-shadow duration-200 cursor-pointer"
+      onClick={handleCardClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
@@ -57,16 +72,16 @@ export function SOPCard({ sop, onEdit, onView }: SOPCardProps) {
       
       <CardContent className="pt-0">
         {/* Tags */}
-        {sop.tags.length > 0 && (
+        {(sop.tags?.length || 0) > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
-            {sop.tags.slice(0, 3).map((tag, index) => (
+            {sop.tags?.slice(0, 3).map((tag, index) => (
               <Badge key={index} variant="secondary" className="text-xs">
                 {tag}
               </Badge>
             ))}
-            {sop.tags.length > 3 && (
+            {(sop.tags?.length || 0) > 3 && (
               <Badge variant="secondary" className="text-xs">
-                +{sop.tags.length - 3}
+                +{(sop.tags?.length || 0) - 3}
               </Badge>
             )}
           </div>
@@ -91,25 +106,25 @@ export function SOPCard({ sop, onEdit, onView }: SOPCardProps) {
         </div>
 
         {/* Linked Entities */}
-        {(sop.linkedFunctionModels.length > 0 || 
-          sop.linkedEventStorms.length > 0 || 
-          sop.linkedSpindles.length > 0) && (
+        {((sop.linkedFunctionModels?.length || 0) > 0 || 
+          (sop.linkedEventStorms?.length || 0) > 0 || 
+          (sop.linkedSpindles?.length || 0) > 0) && (
           <div className="mb-4">
             <div className="text-xs text-muted-foreground mb-1">Linked to:</div>
             <div className="flex flex-wrap gap-1">
-              {sop.linkedFunctionModels.length > 0 && (
+              {(sop.linkedFunctionModels?.length || 0) > 0 && (
                 <Badge variant="outline" className="text-xs">
-                  {sop.linkedFunctionModels.length} Function Models
+                  {sop.linkedFunctionModels?.length || 0} Function Models
                 </Badge>
               )}
-              {sop.linkedEventStorms.length > 0 && (
+              {(sop.linkedEventStorms?.length || 0) > 0 && (
                 <Badge variant="outline" className="text-xs">
-                  {sop.linkedEventStorms.length} Event Storms
+                  {sop.linkedEventStorms?.length || 0} Event Storms
                 </Badge>
               )}
-              {sop.linkedSpindles.length > 0 && (
+              {(sop.linkedSpindles?.length || 0) > 0 && (
                 <Badge variant="outline" className="text-xs">
-                  {sop.linkedSpindles.length} Spindles
+                  {sop.linkedSpindles?.length || 0} Spindles
                 </Badge>
               )}
             </div>
@@ -134,22 +149,39 @@ export function SOPCard({ sop, onEdit, onView }: SOPCardProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onEdit(sop)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit(sop)
+                }}
                 className="h-8 px-2"
               >
                 <Edit className="w-3 h-3" />
               </Button>
             )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(sop)
+                }}
+                className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            )}
             <Button
               variant="default"
               size="sm"
-              asChild
               className="h-8 px-3"
+              onClick={(e) => {
+                e.stopPropagation()
+                router.push(`/dashboard/knowledge-base/${sop.id}`)
+              }}
             >
-              <Link href={`/dashboard/knowledge-base/${sop.id}`}>
-                <ExternalLink className="w-3 h-3 mr-1" />
-                View
-              </Link>
+              <ExternalLink className="w-3 h-3 mr-1" />
+              View
             </Button>
           </div>
         </div>

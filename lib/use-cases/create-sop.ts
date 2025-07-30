@@ -1,11 +1,12 @@
 import type { SOP, CreateSOPRequest } from "../domain/entities/knowledge-base-types"
 import { validateCreateSOPRequest } from "../domain/rules/knowledge-base-validation"
+import { createKnowledgeBaseNode } from "../domain/entities/unified-node-types"
+import { SupabaseNodeRepository } from "../infrastructure/unified-node-repository"
+import type { BaseNode } from "../domain/entities/unified-node-types"
 
-export const createSOP = (sopData: CreateSOPRequest): SOP => {
-  // Application logic for SOP creation
-  // Business rule validation
-  // Following existing use case patterns
-  
+const nodeRepository = new SupabaseNodeRepository()
+
+export const createSOP = async (sopData: CreateSOPRequest): Promise<BaseNode> => {
   // Validate the request
   const validation = validateCreateSOPRequest(sopData)
   if (!validation.isValid) {
@@ -32,9 +33,24 @@ export const createSOP = (sopData: CreateSOPRequest): SOP => {
     readTime: calculateReadTime(sopData.content)
   }
 
-  // In a real implementation, this would save to the database
-  // For now, we'll just return the created SOP
-  return newSOP
+  // Create unified node for the SOP
+  const node = createKnowledgeBaseNode(
+    'SOP',
+    sopData.title,
+    sopData.summary,
+    { x: 0, y: 0 }, // Default position
+    {
+      sop: newSOP,
+      content: sopData.content,
+      category: sopData.category,
+      status: 'draft'
+    }
+  )
+
+  // Save to unified node system
+  const createdNode = await nodeRepository.createNode(node)
+  
+  return createdNode
 }
 
 function generateId(): string {
