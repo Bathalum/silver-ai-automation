@@ -123,7 +123,7 @@ export default function SOPEditPage({ params }: SOPEditPageProps) {
           <CardContent className="text-center py-12">
             <h3 className="text-lg font-medium mb-2">SOP not found</h3>
             <p className="text-muted-foreground mb-4">
-              The SOP you're looking for doesn't exist or has been deleted.
+              The SOP you&apos;re looking for doesn&apos;t exist or has been deleted.
             </p>
             <Button onClick={() => router.push("/dashboard/knowledge-base")}>
               <ArrowLeft className="w-4 h-4 mr-2" />

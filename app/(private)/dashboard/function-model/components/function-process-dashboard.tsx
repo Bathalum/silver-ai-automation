@@ -3,15 +3,18 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { ReactFlowProvider, ReactFlow, Controls, Background, useNodesState, useEdgesState, type Node } from "reactflow"
 import "reactflow/dist/style.css"
-import { Layers, Zap, Hammer, ArrowLeftRight, Settings } from "lucide-react"
+import { Layers, Zap, Hammer, ArrowLeftRight, Settings, Save, Link, ChevronLeft, ChevronRight } from "lucide-react"
 import { StageNodeModal } from "@/components/composites/stage-node-modal"
 import { ActionModal } from "@/components/composites/action-modal"
 import { FunctionModelModal } from "@/components/composites/function-model-modal"
 import { StageNode, IONode, ActionTableNode, FunctionModelContainerNode } from "./flow-nodes"
+import { SaveLoadPanel } from "@/components/composites/function-model/save-load-panel"
+import { CrossFeatureLinkingPanel } from "@/components/composites/function-model/cross-feature-linking-panel"
 import type { FunctionModel, Stage, ActionItem, DataPort } from "@/lib/domain/entities/function-model-types"
 import type { BackgroundVariant } from "reactflow"
 import { addEdge, type Connection, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge } from "reactflow"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Button } from "@/components/ui/button"
 import type { NodeRelationship } from "@/lib/domain/entities/function-model-types"
 import { IONodeModal } from "@/components/composites/io-node-modal";
 
@@ -22,29 +25,59 @@ interface Flow {
   viewport: { x: number; y: number; zoom: number }
 }
 
+// Helper function to generate UUID
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 // Sample data for initial state
 const sampleFunctionModel: FunctionModel = {
-  id: "func-001",
+  modelId: 'sample-model-id', // Use a consistent ID for sample model
   name: "Function / Process Name",
   description: "1 paragraph per goal that you want to achieve by the end of the process",
-  input: {
-    id: "input-001",
-    name: "Input",
-    description: "Input data port for the process",
-    masterData: ["Master Data: (Customer, Employee, Team Member, Organization)"],
-    referenceData: ["Reference Data: (The way they group the master data)"],
-    transactionData: ["Transaction Data: (biz txn or event that you want to track)"],
+  version: "1.0.0",
+  status: "draft",
+  nodesData: [],
+  edgesData: [],
+  viewportData: { x: 0, y: 0, zoom: 1 },
+  tags: [],
+  metadata: {
+    category: "",
+    dependencies: [],
+    references: [],
+    exportSettings: {
+      includeMetadata: true,
+      includeRelationships: true,
+      format: "json",
+      resolution: "medium"
+    },
+    collaboration: {
+      allowComments: true,
+      allowSuggestions: true,
+      requireApproval: false,
+      autoSave: true,
+      saveInterval: 30
+    }
   },
-  output: {
-    id: "output-001",
-    name: "Output",
-    description: "Output data port for the process",
-    masterData: ["Master Data: (Customer, Employee, Team Member, Organization)"],
-    referenceData: ["Reference Data: (The way they group the master data)"],
-    transactionData: ["Transaction Data: (biz txn or event that you want to track)"],
+  permissions: {
+    canView: true,
+    canEdit: true,
+    canDelete: true,
+    canShare: true,
+    canExport: true,
+    canVersion: true,
+    canCollaborate: true
   },
   relationships: [],
-  stages: [],
+  versionHistory: [],
+  currentVersion: "1.0.0",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  lastSavedAt: new Date()
 }
 
 interface FunctionProcessDashboardProps {
@@ -55,6 +88,8 @@ export function FunctionProcessDashboard({
   functionModel: initialModel = sampleFunctionModel,
 }: FunctionProcessDashboardProps) {
   const [functionModel, setFunctionModel] = useState<FunctionModel>(initialModel)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Modal state management for nested modals
   const [modalStack, setModalStack] = useState<Array<{
@@ -73,6 +108,80 @@ export function FunctionProcessDashboard({
 
   // Add state for Function Model modal
   const [functionModelModalOpen, setFunctionModelModalOpen] = useState(false);
+
+  // Add state for persistence sidebar
+  const [persistenceSidebarOpen, setPersistenceSidebarOpen] = useState(false);
+  const [activePersistenceTab, setActivePersistenceTab] = useState<'save' | 'links'>('save');
+
+  // Load function model on mount
+  useEffect(() => {
+    const loadSavedModel = async () => {
+      // Only try to load if we have a valid modelId (not the sample one)
+      if (functionModel.modelId && functionModel.modelId !== 'sample-model-id') {
+        setIsLoading(true)
+        setLoadError(null)
+        
+        try {
+          console.log('Loading saved model:', functionModel.modelId)
+          const { loadFunctionModel } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
+          const loadedModel = await loadFunctionModel(functionModel.modelId, { includeMetadata: true })
+          console.log('Model loaded successfully:', loadedModel)
+          setFunctionModel(loadedModel)
+          
+          // Update flow data with loaded model
+          setFlow(prev => ({
+            ...prev,
+            name: loadedModel.name,
+            nodes: loadedModel.nodesData || [],
+            edges: loadedModel.edgesData || [],
+            viewport: loadedModel.viewportData || { x: 0, y: 0, zoom: 1 }
+          }))
+        } catch (err) {
+          console.error('Failed to load model:', err)
+          setLoadError(err instanceof Error ? err.message : 'Failed to load model')
+        } finally {
+          setIsLoading(false)
+        }
+      } else {
+        // If we have the sample model, try to load the most recent saved model
+        setIsLoading(true)
+        setLoadError(null)
+        
+        try {
+          console.log('Loading most recent saved model...')
+          const { getAllFunctionModels } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
+          const allModels = await getAllFunctionModels()
+          
+          if (allModels.length > 0) {
+            const mostRecentModel = allModels[0] // Already ordered by created_at desc
+            console.log('Loading most recent model:', mostRecentModel.modelId)
+            const { loadFunctionModel } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
+            const loadedModel = await loadFunctionModel(mostRecentModel.modelId, { includeMetadata: true })
+            console.log('Most recent model loaded successfully:', loadedModel)
+            setFunctionModel(loadedModel)
+            
+            // Update flow data with loaded model
+            setFlow(prev => ({
+              ...prev,
+              name: loadedModel.name,
+              nodes: loadedModel.nodesData || [],
+              edges: loadedModel.edgesData || [],
+              viewport: loadedModel.viewportData || { x: 0, y: 0, zoom: 1 }
+            }))
+          } else {
+            console.log('No saved models found, using sample model')
+          }
+        } catch (err) {
+          console.error('Failed to load most recent model:', err)
+          setLoadError(err instanceof Error ? err.message : 'Failed to load most recent model')
+        } finally {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadSavedModel()
+  }, [functionModel.modelId])
 
   // Get connected actions for a stage using NodeRelationships
   const getConnectedActions = useCallback((stageId: string): ActionItem[] => {
@@ -133,11 +242,22 @@ export function FunctionProcessDashboard({
 
 
   const [flow, setFlow] = useState<Flow>({
-    name: "My Function Model",
-    nodes: [],
-    edges: [],
-    viewport: { x: 0, y: 0, zoom: 1 },
+    name: functionModel.name,
+    nodes: functionModel.nodesData || [],
+    edges: functionModel.edgesData || [],
+    viewport: functionModel.viewportData || { x: 0, y: 0, zoom: 1 },
   })
+
+  // Sync flow state with functionModel
+  useEffect(() => {
+    setFunctionModel(prev => ({
+      ...prev,
+      nodesData: flow.nodes,
+      edgesData: flow.edges,
+      viewportData: flow.viewport,
+      name: flow.name
+    }))
+  }, [flow.nodes, flow.edges, flow.viewport, flow.name])
 
   // Navigate back to stage modal from action modal
   const navigateBackToStage = useCallback((stageId: string) => {
@@ -722,6 +842,28 @@ export function FunctionProcessDashboard({
 
   return (
     <div className="w-full h-full relative">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-sm text-muted-foreground">Loading function model...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {loadError && (
+        <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground px-4 py-2 rounded-md shadow-lg">
+          <p className="text-sm">Failed to load model: {loadError}</p>
+          <button 
+            onClick={() => setLoadError(null)}
+            className="text-xs underline mt-1"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* Floating, inline-editable flow name */}
       <div className="absolute top-4 left-4 z-30 flex flex-col items-start gap-2 min-w-[180px]">
         {isEditingName ? (
@@ -758,6 +900,17 @@ export function FunctionProcessDashboard({
                 </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={8}>Function Model Settings</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setPersistenceSidebarOpen(!persistenceSidebarOpen)}
+                  className="p-1.5 rounded hover:bg-primary/10 group"
+                >
+                  <Save className="w-4 h-4 text-primary group-hover:scale-110" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={8}>Save & Load</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -828,6 +981,105 @@ export function FunctionProcessDashboard({
           <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
         </ReactFlow>
       </ReactFlowProvider>
+
+      {/* Persistence Sidebar */}
+      <div className={`fixed right-0 top-0 h-full bg-white border-l border-gray-200 shadow-lg transition-transform duration-300 z-40 ${
+        persistenceSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+      }`} style={{ width: '400px' }}>
+        <div className="h-full flex flex-col">
+          {/* Sidebar Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold">Persistence</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPersistenceSidebarOpen(false)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActivePersistenceTab('save')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activePersistenceTab === 'save'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Save className="h-4 w-4 inline mr-2" />
+              Save & Load
+            </button>
+            <button
+              onClick={() => setActivePersistenceTab('links')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activePersistenceTab === 'links'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Link className="h-4 w-4 inline mr-2" />
+              Cross-Links
+            </button>
+          </div>
+
+          {/* Sidebar Content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {activePersistenceTab === 'save' && (
+              <SaveLoadPanel
+                modelId={functionModel.modelId}
+                model={functionModel}
+                onModelUpdate={(updatedModel) => {
+                  console.log('Dashboard received updated model:', updatedModel);
+                  console.log('Updated model nodesData:', updatedModel.nodesData);
+                  console.log('Updated model edgesData:', updatedModel.edgesData);
+                  console.log('Updated model viewportData:', updatedModel.viewportData);
+                  
+                  setFunctionModel(updatedModel);
+                  // Update flow data with loaded model
+                  const newFlow = {
+                    name: updatedModel.name,
+                    nodes: updatedModel.nodesData || [],
+                    edges: updatedModel.edgesData || [],
+                    viewport: updatedModel.viewportData || { x: 0, y: 0, zoom: 1 }
+                  };
+                  console.log('Setting new flow:', newFlow);
+                  setFlow(newFlow);
+                }}
+              />
+            )}
+            {activePersistenceTab === 'links' && (
+              <CrossFeatureLinkingPanel
+                modelId={functionModel.modelId}
+                onLinkCreated={(link) => {
+                  console.log('Cross-feature link created:', link);
+                  // Optionally update the model or show notification
+                }}
+                onLinkDeleted={(linkId) => {
+                  console.log('Cross-feature link deleted:', linkId);
+                  // Optionally update the model or show notification
+                }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Persistence Sidebar Toggle Button */}
+      <Button
+        onClick={() => setPersistenceSidebarOpen(!persistenceSidebarOpen)}
+        className="fixed right-4 top-20 z-30 shadow-lg"
+        variant="outline"
+        size="sm"
+      >
+        {persistenceSidebarOpen ? (
+          <ChevronRight className="h-4 w-4" />
+        ) : (
+          <ChevronLeft className="h-4 w-4" />
+        )}
+      </Button>
 
       {/* Render StageNodeModal with enhanced functionality */}
       {selectedStage && (

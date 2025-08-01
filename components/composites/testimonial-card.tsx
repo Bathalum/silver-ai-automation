@@ -14,7 +14,7 @@ export function TestimonialCard({ testimonial }: TestimonialCardProps) {
         <Quote className="absolute top-4 right-4 h-8 w-8 text-blue-100 group-hover:text-blue-200 transition-colors duration-300" />
 
         <blockquote className="text-gray-700 mb-6 italic leading-relaxed group-hover:text-gray-900 transition-colors duration-300">
-          "{testimonial.content}"
+          &ldquo;{testimonial.content}&rdquo;
         </blockquote>
 
         <div className="flex items-center gap-3">
