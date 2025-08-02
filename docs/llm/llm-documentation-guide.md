@@ -1,291 +1,215 @@
-# LLM Documentation Creation Guide
+# LLM Feature Documentation Creation Guide
 
 ## Overview
 
-This guide provides LLMs with everything needed to create comprehensive component documentation following our established standards. Use this guide along with the referenced documents to ensure consistent, high-quality documentation.
+This guide provides LLMs with everything needed to create comprehensive feature documentation following our established standards. Use this guide along with the referenced documents to ensure consistent, high-quality documentation for all features.
 
 ## Required Documents for LLM Context
 
-### 1. Core Standards
-- **`docs/component-documentation-standards.md`** - Complete documentation template and requirements
-- **`docs/architecture/component-architecture.md`** - Component architecture patterns
+### 1. Core Architecture Standards
+- **`docs/architecture/0_high_level_architecture_context.md`** - Foundation for all architectural decisions
+- **`docs/architecture/1_component_architecture.md`** - Component design patterns and principles
+- **`docs/architecture/data-flow-patterns.md`** - Standard data flow implementations
 
-### 2. Example Documentation
-- **`docs/components/composite-components/feature-modal.md`** - Perfect example of standards implementation
-- **`docs/shared-feature-modal-architecture.md`** - Shows component relationships and patterns
+### 2. Feature Documentation Template
+- **`docs/features/function-model/`** - Complete example of the 4-document structure
+  - `overview.md` - High-level feature understanding
+  - `components.md` - Detailed component breakdown
+  - `data-flow.md` - Data and state management
+  - `architecture-compliance.md` - Clean Architecture alignment
 
 ### 3. Project Context
+- **`docs/features/README.md`** - Feature documentation index and integration matrix
 - **`docs/README.md`** - Overall documentation structure and navigation
-- **`docs/architecture/data-flow-patterns.md`** - Data flow patterns in the application
 
-## LLM Documentation Creation Process
+## LLM Feature Documentation Creation Process
 
-### Step 1: Analyze the Component
-Before creating documentation, analyze the component to understand:
+### Step 1: Analyze the Feature
+Before creating documentation, analyze the feature to understand:
 
-1. **Component Type**: Is it a UI, Composite, or Feature component?
-2. **Purpose**: What does it do and why does it exist?
-3. **Dependencies**: What other components does it use?
-4. **Props Interface**: What props does it accept?
-5. **State Management**: How does it manage state?
-6. **Integration Points**: How does it work with other components?
+1. **Feature Purpose**: What business value does it provide?
+2. **User Personas**: Who are the primary and secondary users?
+3. **Key Capabilities**: What are the main functionalities?
+4. **Integration Points**: How does it connect with other features?
+5. **Technical Implementation**: What components, hooks, and data structures are involved?
+6. **Architecture Compliance**: How does it follow Clean Architecture principles?
 
-### Step 2: Determine Documentation Location
-Based on component type, place documentation in the correct folder:
+### Step 2: Create the Four Required Documents
+
+Each feature requires exactly four documents in its directory:
 
 ```
-docs/components/
-├── ui-components/          # Base UI components (Button, Input, etc.)
-├── composite-components/   # Reusable composite components
-└── feature-components/     # Business-specific feature components
+docs/features/[feature-name]/
+├── overview.md              # High-level feature understanding
+├── components.md            # Detailed component breakdown
+├── data-flow.md            # Data and state management
+└── architecture-compliance.md # Clean Architecture alignment
 ```
 
 ### Step 3: Follow the Complete Template Structure
 
-Use the exact structure from `component-documentation-standards.md`:
-
+#### 1. **overview.md** - High-level feature understanding
 ```markdown
-# Component Name
+# [Feature Name] Feature - Overview
 
-## Overview
-[Brief description with key features and purpose]
+## Feature Purpose and Business Value
+[Core purpose and business value]
 
-### Key Features
-- Feature 1: Description
-- Feature 2: Description
-- Feature 3: Description
+## Key Capabilities and Functionality
+[Main capabilities and features]
 
-### When to Use
-- Use case 1
-- Use case 2
+## User Personas and Use Cases
+[Primary and secondary personas with use cases]
 
-### When Not to Use
-- Anti-pattern 1
-- Anti-pattern 2
+## Integration Points with Other Features
+[How it integrates with other features]
 
-## API Reference
+## Success Metrics and KPIs
+[Technical, business, UX, and quality metrics]
 
-### Props Interface
-```typescript
-interface ComponentNameProps {
-  // Complete TypeScript interface
-}
+## Feature Roadmap and Future Enhancements
+[Short, medium, and long-term plans]
+
+## Technical Requirements and Constraints
+[Performance, security, and integration requirements]
 ```
 
-### Props Description
-| Prop | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `propName` | `type` | Yes/No | `default` | Description |
+#### 2. **components.md** - Detailed component breakdown
+```markdown
+# [Feature Name] Feature - Components Documentation
 
-## Usage Examples
+## Complete File and Folder Structure
+[Complete file tree]
 
-### Basic Usage
-```tsx
-// Minimal working example
-```
+## Component Hierarchy
+[Component relationships and hierarchy]
 
-### Advanced Usage
-```tsx
-// Complex example with multiple features
-```
+## Component Responsibilities and Relationships
+[Detailed component descriptions]
 
-### Integration Examples
-```tsx
-// Example with related components
-```
+## Component Data Contracts
+[TypeScript interfaces and data structures]
 
-## Implementation Details
+## Reusable vs Feature-Specific Components
+[Component categorization]
 
-### Component Architecture
-```
-ComponentName
-├── SubComponent1
-├── SubComponent2
-└── SubComponent3
-```
+## Component State Management
+[State management patterns]
 
-### State Management
-- **Local State**: Description
-- **Props State**: Description
-- **External State**: Description
-
-### Performance Considerations
-- **Memoization**: What's memoized
-- **Re-render Triggers**: What causes re-renders
-- **Optimization Tips**: How to optimize
-
-### Error Handling
-- **Validation**: Input validation
-- **Error States**: Error display
-- **Fallbacks**: Default behavior
-
-## Testing Guide
-
-### Unit Tests
-```typescript
-// Complete test examples
-```
-
-### Integration Tests
-```typescript
-// Integration test examples
-```
+## Component Testing Strategy
+[Testing approaches]
 
 ## Performance Considerations
-
-### Bundle Size
-- **Component Size**: ~X KB (gzipped)
-- **Dependencies**: List of dependencies
-- **Tree Shaking**: Whether supported
-
-### Runtime Performance
-- **Render Performance**: O(1) for typical usage
-- **Memory Usage**: Minimal footprint
-- **Re-render Optimization**: Optimization details
-
-### Best Practices
-- **Avoid**: Anti-patterns
-- **Prefer**: Good patterns
-- **Monitor**: What to watch
-
-## Accessibility Documentation
-
-### ARIA Support
-- **Roles**: List of ARIA roles
-- **States**: ARIA states
-- **Properties**: ARIA properties
-
-### Keyboard Navigation
-- **Tab Order**: How tab navigation works
-- **Keyboard Shortcuts**: Available shortcuts
-- **Focus Management**: Focus handling
-
-### Screen Reader Support
-- **Announcements**: What screen readers announce
-- **Landmarks**: Semantic structure
-- **Live Regions**: Dynamic content
-
-### Color & Contrast
-- **Contrast Ratios**: WCAG compliance
-- **Color Independence**: Works without color
-- **High Contrast Mode**: Support details
-
-## Migration & Breaking Changes
-
-### Version History
-| Version | Changes | Migration Guide |
-|---------|---------|-----------------|
-| 1.0.0 | Initial release | - |
-
-### Breaking Changes
-None currently or specific changes with migration examples.
-
-### Migration Steps
-Step-by-step migration instructions if needed.
-
-## Related Components
-
-### Dependencies
-- **Required**: Components this depends on
-- **Optional**: Optional dependencies
-
-### Related Features
-- **Similar Components**: Alternative implementations
-- **Complementary Components**: Components that work together
-- **Parent/Child Relationships**: Component hierarchy
-
----
-
-**Last Updated**: [Date]  
-**Maintained By**: [Team/Person]  
-**Version**: [Version]
+[Optimization strategies]
 ```
 
-## LLM Best Practices
+#### 3. **data-flow.md** - Data and state management
+```markdown
+# [Feature Name] Feature - Data Flow Documentation
 
-### 1. Always Include Complete Examples
-- Provide **working code examples** that can be copied and pasted
-- Include **import statements** and **dependencies**
-- Show **real-world usage patterns**
+## Data Flow Overview
+[High-level data flow description]
 
-### 2. Be Specific and Detailed
-- Use **exact prop names** and **types** from the component
-- Include **default values** and **validation rules**
-- Explain **when and why** to use specific props
+## Data Flow Diagrams
+[Visual flow diagrams]
 
-### 3. Follow the Architecture Patterns
-- Reference the **component architecture** document
-- Show how components **compose together**
-- Explain **data flow** and **state management**
+## State Management Patterns
+[Application and component state management]
 
-### 4. Include Testing Examples
-- Provide **complete test code** that can be run
-- Cover **unit tests**, **integration tests**, and **accessibility tests**
-- Show **testing patterns** and **best practices**
+## API Interactions and Data Transformations
+[Repository and data transformation patterns]
 
-### 5. Consider Performance and Accessibility
-- Always include **performance considerations**
-- Document **accessibility features** and **WCAG compliance**
-- Provide **optimization tips** and **best practices**
+## Cross-Feature Data Sharing
+[Integration with other features]
 
-## Quality Checklist for LLM Output
+## Error Handling and Loading States
+[Error and loading patterns]
 
-Before finalizing documentation, ensure:
-
-- [ ] **Complete API documentation** with all props and types
-- [ ] **Working code examples** that can be executed
-- [ ] **Comprehensive testing examples** with actual test code
-- [ ] **Performance considerations** with specific metrics
-- [ ] **Accessibility documentation** with ARIA details
-- [ ] **Proper file location** in the correct folder
-- [ ] **Consistent formatting** following the template
-- [ ] **Clear navigation** with proper headings
-- [ ] **Related components** and dependencies listed
-- [ ] **Version information** and maintenance details
-
-## Common LLM Mistakes to Avoid
-
-### 1. Incomplete Examples
-❌ **Bad**: "Here's how to use the component..."
-✅ **Good**: Complete, runnable code with imports and context
-
-### 2. Missing API Details
-❌ **Bad**: "The component accepts various props..."
-✅ **Good**: Complete TypeScript interface with all props documented
-
-### 3. Generic Testing
-❌ **Bad**: "Write tests for the component..."
-✅ **Good**: Complete test examples with actual test code
-
-### 4. Missing Context
-❌ **Bad**: "This component does things..."
-✅ **Good**: Explains when to use, when not to use, and how it fits in the architecture
-
-## Example LLM Prompt
-
-```
-Please create comprehensive documentation for [ComponentName] following our established standards.
-
-Required context:
-1. Component source code: [paste component code]
-2. Component type: [UI/Composite/Feature]
-3. Related components: [list related components]
-
-Please follow the complete template structure from component-documentation-standards.md and use feature-modal.md as a reference example.
-
-Include:
-- Complete API documentation with TypeScript interfaces
-- Working code examples (Basic, Advanced, Integration)
-- Comprehensive testing examples
-- Performance considerations
-- Accessibility documentation
-- Proper file location and naming
-
-Ensure all examples are complete, runnable, and follow our component architecture patterns.
+## Data Flow Optimization
+[Performance optimization strategies]
 ```
 
-## Conclusion
+#### 4. **architecture-compliance.md** - Clean Architecture alignment
+```markdown
+# [Feature Name] Feature - Architecture Compliance Documentation
 
-By following this guide and using the complete documentation package, LLMs can create consistent, comprehensive, and maintainable component documentation that meets our high standards for developer experience and code maintainability.
+## Clean Architecture Implementation
+[How the feature implements Clean Architecture]
 
-Remember: **Quality over quantity**. It's better to have complete, accurate documentation for fewer components than incomplete documentation for many components. 
+## Component Architecture Compliance
+[Component hierarchy and relationships]
+
+## Testing Strategy Compliance
+[Testing approaches]
+
+## Architecture Benefits
+[Maintainability, testability, scalability, flexibility]
+```
+
+## LLM Documentation Creation Process
+
+### Step 1: Feature Discovery
+1. Identify the feature to document
+2. Analyze the codebase structure
+3. Understand the feature's purpose and scope
+4. Map integration points with other features
+
+### Step 2: Create Documentation Structure
+1. Create the feature directory: `docs/features/[feature-name]/`
+2. Create all four required documents
+3. Follow the exact template structure from Function Model example
+
+### Step 3: Populate Each Document
+1. **overview.md**: Start with business value and user personas
+2. **components.md**: Document all components, their relationships, and data contracts
+3. **data-flow.md**: Map data flow, state management, and API interactions
+4. **architecture-compliance.md**: Validate Clean Architecture implementation
+
+### Step 4: Update Integration Matrix
+1. Update `docs/features/README.md` with new feature information
+2. Add feature to the integration matrix
+3. Document cross-feature relationships
+
+## Quality Standards
+
+### Completeness
+- All four documents must be present for each feature
+- Each document must follow the exact template structure
+- No missing sections or placeholder content
+
+### Accuracy
+- Documentation must match actual implementation
+- Code examples must be complete and runnable
+- Architecture compliance must be validated
+
+### Consistency
+- Follow established patterns and terminology
+- Use consistent formatting and structure
+- Maintain cross-references between documents
+
+### Maintainability
+- Regular updates as features evolve
+- Version control for documentation changes
+- Integration with development workflow
+
+## Integration with Development Workflow
+
+### For New Features
+1. Create documentation during feature development
+2. Validate architecture compliance
+3. Update integration matrix
+4. Review with team members
+
+### For Existing Features
+1. Review current implementation
+2. Identify gaps in documentation
+3. Update to match actual implementation
+4. Verify architecture compliance
+
+### For Feature Updates
+1. Update relevant documentation files
+2. Maintain consistency across all four documents
+3. Update integration matrix if relationships change
+4. Verify architecture compliance
+
+This comprehensive approach ensures that both human developers and AI agents can understand, implement, and maintain features effectively while maintaining architectural consistency across the platform. 

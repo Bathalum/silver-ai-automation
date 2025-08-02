@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Grid3X3, List, Search, Filter } from 'lucide-react'
-import { FunctionModelCard } from './function-model-card'
+import { AlertCircle, Search, Filter, Plus } from 'lucide-react'
+import { FunctionModelTableRow } from './function-model-table-row'
 import { FunctionModelFilters } from './function-model-filters'
+import { NodeTypeIndicator } from './node-type-indicator'
 import type { FunctionModel, FunctionModelFilters as Filters } from '@/lib/domain/entities/function-model-types'
 
 interface FunctionModelListProps {
@@ -23,8 +24,6 @@ interface FunctionModelListProps {
   searchQuery?: string
 }
 
-type ViewMode = 'grid' | 'list'
-
 export function FunctionModelList({
   models,
   loading,
@@ -37,7 +36,6 @@ export function FunctionModelList({
   filters = {},
   searchQuery = ''
 }: FunctionModelListProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortBy, setSortBy] = useState<'name' | 'lastSavedAt' | 'version'>('lastSavedAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   
@@ -86,40 +84,36 @@ export function FunctionModelList({
   }
   
   return (
-    <div className="space-y-6">
-      {/* Header with controls */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-bold">Function Models</h2>
-          <span className="text-sm text-muted-foreground">
-            ({sortedModels.length} of {models.length})
-          </span>
+    <div className="flex flex-col min-h-screen bg-background text-foreground">
+      {/* Header */}
+      <div className="border-b border-border p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-semibold">Function Models</h1>
+            <p className="text-muted-foreground text-sm">Node-based automation workflows</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {sortedModels.length} models
+            </span>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          {/* View mode toggle */}
-          <div className="flex items-center border rounded-md">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className="rounded-r-none"
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="rounded-l-none"
-            >
-              <List className="h-4 w-4" />
-            </Button>
+
+        {/* Search and Filter Controls */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3 h-3" />
+            <Input
+              placeholder="Search models..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+              className="pl-7 h-8 text-xs"
+            />
           </div>
           
           {/* Sort controls */}
           <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-32 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -133,60 +127,63 @@ export function FunctionModelList({
             variant="outline"
             size="sm"
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="h-8 text-xs"
           >
             {sortOrder === 'asc' ? '↑' : '↓'}
           </Button>
         </div>
       </div>
-      
-      {/* Filters */}
-      <FunctionModelFilters
-        filters={filters}
-        onFiltersChange={onFiltersChange || (() => {})}
-        onSearchChange={onSearchChange || (() => {})}
-        searchQuery={searchQuery}
-      />
-      
+
+      {/* Table Header */}
+      <div className="border-b border-border px-4 py-2 bg-muted/50">
+        <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="col-span-4">Model</div>
+          <div className="col-span-3">Node Flow</div>
+          <div className="col-span-2">Performance</div>
+          <div className="col-span-2">Stats</div>
+          <div className="col-span-1"></div>
+        </div>
+      </div>
+
       {/* Loading state */}
       {loading && (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       )}
-      
+
       {/* Empty state */}
       {!loading && sortedModels.length === 0 && (
-        <div className="text-center py-12">
-          <div className="text-muted-foreground">
-            {searchQuery || Object.keys(filters).length > 0 ? (
-              <>
-                <p className="text-lg font-medium mb-2">No models found</p>
-                <p className="text-sm">Try adjusting your search or filters</p>
-              </>
-            ) : (
-              <>
-                <p className="text-lg font-medium mb-2">No function models yet</p>
-                <p className="text-sm">Create your first function model to get started</p>
-              </>
-            )}
+        <div className="flex-1 flex items-center justify-center bg-background">
+          <div className="text-center">
+            <div className="flex justify-center gap-1 mb-4">
+              <NodeTypeIndicator type="trigger" size="md" />
+              <div className="w-4 h-4 text-muted-foreground self-center">→</div>
+              <NodeTypeIndicator type="action" size="md" />
+              <div className="w-4 h-4 text-muted-foreground self-center">→</div>
+              <NodeTypeIndicator type="data" size="md" />
+            </div>
+            <h3 className="text-sm font-medium mb-2">No function models found</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              {searchQuery || Object.keys(filters).length > 0
+                ? "Try adjusting your search or filter criteria"
+                : "Create your first node-based automation workflow"}
+            </p>
           </div>
         </div>
       )}
-      
-      {/* Models grid/list */}
+
+      {/* Table Content */}
       {!loading && sortedModels.length > 0 && (
-        <div className={
-          viewMode === 'grid' 
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-            : 'space-y-4'
-        }>
-          {sortedModels.map(model => (
-            <FunctionModelCard
+        <div className="flex-1 overflow-auto">
+          {sortedModels.map((model, index) => (
+            <FunctionModelTableRow
               key={model.modelId}
               model={model}
               onEdit={onModelSelect}
               onDelete={onModelDelete}
               onDuplicate={onModelDuplicate}
+              isAlternate={index % 2 === 1}
             />
           ))}
         </div>

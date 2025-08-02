@@ -68,36 +68,31 @@ export default function FunctionModelListPage() {
   }
   
   return (
-    <div className="w-full h-full p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Function Models</h1>
-            <p className="text-muted-foreground mt-2">
-              Create, manage, and organize your function models
-            </p>
-          </div>
-          <Button onClick={handleCreateNew} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create New Model
-          </Button>
-        </div>
-        
-        {/* List Component */}
-        <FunctionModelList
-          models={models}
-          loading={loading}
-          error={error}
-          onModelSelect={handleModelSelect}
-          onModelDelete={handleModelDelete}
-          onModelDuplicate={handleModelDuplicate}
-          onFiltersChange={updateFilters}
-          onSearchChange={updateSearchQuery}
-          filters={filters}
-          searchQuery={searchQuery}
-        />
+    <div className="w-full h-full">
+      {/* Create New Button - Floating */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button 
+          size="lg" 
+          onClick={handleCreateNew}
+          className="rounded-full shadow-lg"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          New Model
+        </Button>
       </div>
+
+      <FunctionModelList
+        models={models}
+        loading={loading}
+        error={error}
+        onModelSelect={handleModelSelect}
+        onModelDelete={handleModelDelete}
+        onModelDuplicate={handleModelDuplicate}
+        onFiltersChange={updateFilters}
+        onSearchChange={updateSearchQuery}
+        filters={filters}
+        searchQuery={searchQuery}
+      />
     </div>
   )
 } 

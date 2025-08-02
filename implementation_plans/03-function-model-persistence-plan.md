@@ -455,10 +455,10 @@ CHECK (
 );
 ```
 
-### Phase 2: Function Model List View (Week 2)
+### Phase 2: Function Model List View - Table-Based Design (Week 2)
 
 #### 2.1 List View Architecture
-**Objective**: Create a comprehensive list view interface for function models
+**Objective**: Create a comprehensive table-based list view interface for function models with enhanced visual design
 
 **Routing Structure**:
 ```
@@ -479,16 +479,47 @@ CHECK (
 - FunctionModelListHeader                     → Header with create button and stats
 
 // Composite Components
-- FunctionModelCard                           → Individual model card
-- FunctionModelList                           → List container with search/filter
+- FunctionModelTableRow                       → Individual model table row
+- FunctionModelList                           → Table container with search/filter
 - FunctionModelFilters                        → Search and filter controls
+- NodeTypeIndicator                          → Visual node type indicators
+- StatusIndicator                            → Status with icons
 ```
 
-#### 2.2 List View Components Implementation
+#### 2.2 Table-Based List View Components Implementation
 
-**FunctionModelCard Component**:
+**Enhanced Visual Design Strategy**:
+- **Light Theme**: Maintain our existing light theme with clean, professional styling
+- **Table Layout**: Convert from card grid to information-dense table format
+- **Node Type Indicators**: Visual colored icons for different node types
+- **Performance Metrics**: Display success rate, runtime, executions (placeholder data)
+- **Status Indicators**: Enhanced status display with icons
+- **Compact Design**: Information-dense rows with hover effects
+- **Dropdown Actions**: Replace action buttons with dropdown menus
+
+**Node Type Configuration**:
 ```typescript
-interface FunctionModelCardProps {
+const nodeTypeConfig = {
+  stageNode: { icon: Layers, color: "#10b981", bg: "#d1fae5" },
+  actionTableNode: { icon: Table, color: "#3b82f6", bg: "#dbeafe" },
+  ioNode: { icon: ArrowLeftRight, color: "#f59e0b", bg: "#fef3c7" },
+  functionModelNode: { icon: GitBranch, color: "#8b5cf6", bg: "#ede9fe" },
+  trigger: { icon: Zap, color: "#10b981", bg: "#d1fae5" },
+  action: { icon: Play, color: "#3b82f6", bg: "#dbeafe" },
+  condition: { icon: GitBranch, color: "#f59e0b", bg: "#fef3c7" },
+  data: { icon: Database, color: "#8b5cf6", bg: "#ede9fe" },
+  ai: { icon: Brain, color: "#ec4899", bg: "#fce7f3" },
+  webhook: { icon: Globe, color: "#f97316", bg: "#fed7aa" },
+  code: { icon: Code, color: "#6b7280", bg: "#f3f4f6" },
+  message: { icon: MessageSquare, color: "#06b6d4", bg: "#cffafe" },
+  timer: { icon: Clock, color: "#6366f1", bg: "#e0e7ff" },
+  user: { icon: Users, color: "#059669", bg: "#d1fae5" },
+}
+```
+
+**FunctionModelTableRow Component**:
+```typescript
+interface FunctionModelTableRowProps {
   model: FunctionModel
   onEdit: (modelId: string) => void
   onDelete: (modelId: string) => void
@@ -496,12 +527,13 @@ interface FunctionModelCardProps {
 }
 
 // Features:
-- Model name, description, version
-- Status badge (draft/published/archived)
-- Last modified date
-- Node count indicator (from nodesData.length)
-- Action buttons (Edit, Delete, Duplicate)
-- Preview of first few nodes
+- Model name, description, version with status indicator
+- Node flow visualization with type indicators and chevron arrows
+- Performance metrics (success rate, runtime, executions)
+- Statistics (node count, connections, executions)
+- Dropdown menu for actions (Edit, Monitor, Clone, Delete)
+- Hover effects and transitions
+- Responsive design for different screen sizes
 ```
 
 **FunctionModelList Component**:
@@ -512,15 +544,86 @@ interface FunctionModelListProps {
   onModelSelect: (modelId: string) => void
   onModelDelete: (modelId: string) => void
   onModelDuplicate: (modelId: string) => void
+  onFiltersChange?: (filters: FunctionModelFilters) => void
+  onSearchChange?: (query: string) => void
+  filters?: FunctionModelFilters
+  searchQuery?: string
 }
 
 // Features:
-- Grid/list view toggle
-- Search functionality
-- Filter by status, process type, tags
-- Sort by name, date, version
-- Empty state handling
-- Loading states
+- Table header with column labels
+- Search functionality with enhanced UI
+- Filter dropdown for categories
+- Sort by name, date, version, performance
+- Empty state with visual indicators
+- Loading states with skeleton
+- Responsive table design
+```
+
+**NodeTypeIndicator Component**:
+```typescript
+interface NodeTypeIndicatorProps {
+  type: string
+  size?: 'sm' | 'md' | 'lg'
+}
+
+// Features:
+- Colored background with icon
+- Consistent sizing options
+- Tooltip with node type name
+- Accessible design
+```
+
+**StatusIndicator Component**:
+```typescript
+interface StatusIndicatorProps {
+  status: string
+  showIcon?: boolean
+}
+
+// Features:
+- Status-specific colors and icons
+- Draft: FileText icon with gray colors
+- Published: Play icon with green colors
+- Archived: Archive icon with muted colors
+- Consistent styling with our theme
+```
+
+**Enhanced Table Structure**:
+```typescript
+// Table columns layout
+const tableColumns = [
+  { key: 'model', label: 'Model', width: 'col-span-4' },
+  { key: 'nodeFlow', label: 'Node Flow', width: 'col-span-3' },
+  { key: 'performance', label: 'Performance', width: 'col-span-2' },
+  { key: 'stats', label: 'Stats', width: 'col-span-2' },
+  { key: 'actions', label: '', width: 'col-span-1' }
+]
+
+// Row data structure
+interface TableRowData {
+  model: {
+    name: string
+    description: string
+    status: string
+    category: string
+    lastModified: string
+    id: string
+  }
+  nodeFlow: {
+    nodeTypes: string[]
+    nodeCount: number
+    connections: number
+  }
+  performance: {
+    successRate: number
+    avgRuntime: string
+    executions: number
+  }
+  stats: {
+    executions: number
+  }
+}
 ```
 
 **FunctionModelListView Component**:
@@ -530,11 +633,13 @@ interface FunctionModelListViewProps {
 }
 
 // Features:
-- Header with create button and stats
-- Search and filter controls
-- Model list with pagination
-- Loading and error states
+- Header with create button and model count
+- Enhanced search bar with clear button
+- Category filter dropdown
+- Table with alternating row colors
+- Responsive design for mobile
 - Integration with existing hooks
+- Maintain light theme styling
 ```
 
 #### 2.3 Application Layer Enhancements
@@ -544,6 +649,7 @@ interface FunctionModelListViewProps {
 export function useFunctionModelList() {
   const [models, setModels] = useState<FunctionModel[]>([])
   const [loading, setLoading] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<FunctionModelFilters>({})
   const [searchQuery, setSearchQuery] = useState('')
@@ -563,9 +669,9 @@ export function useFunctionModelList() {
     }
   }, [])
   
-  // Search and filter models
+  // Search and filter models with debouncing
   const searchModels = useCallback(async (query: string, filters: FunctionModelFilters) => {
-    setLoading(true)
+    setSearchLoading(true)
     setError(null)
     
     try {
@@ -574,21 +680,94 @@ export function useFunctionModelList() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search models')
     } finally {
-      setLoading(false)
+      setSearchLoading(false)
     }
   }, [])
   
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce(async (query: string, filters: FunctionModelFilters) => {
+      if (query.trim() || Object.keys(filters).length > 0) {
+        await searchModels(query, filters)
+      } else {
+        await loadModels() // Load all if no search/filters
+      }
+    }, 300),
+    [searchModels, loadModels]
+  )
+  
+  // Update filters and trigger search
+  const updateFilters = useCallback((newFilters: FunctionModelFilters) => {
+    setFilters(newFilters)
+    debouncedSearch(searchQuery, newFilters)
+  }, [searchQuery, debouncedSearch])
+  
+  // Update search query and trigger search
+  const updateSearchQuery = useCallback((query: string) => {
+    setSearchQuery(query)
+    debouncedSearch(query, filters)
+  }, [filters, debouncedSearch])
+  
   return {
     models,
-    loading,
+    loading: loading || searchLoading,
     error,
     filters,
     searchQuery,
     loadModels,
     searchModels,
+    updateFilters,
+    updateSearchQuery,
     setFilters,
     setSearchQuery
   }
+}
+```
+
+**Enhanced Performance Data Generation**:
+```typescript
+// Generate placeholder performance data for table display
+export const generatePerformanceData = (model: FunctionModel) => {
+  // Extract node types from model data
+  const nodeTypes = extractNodeTypes(model.nodesData)
+  
+  // Generate realistic performance metrics
+  const performance = {
+    successRate: Math.floor(Math.random() * 20) + 80, // 80-100%
+    avgRuntime: `${(Math.random() * 5 + 1).toFixed(1)}s`,
+    executions: Math.floor(Math.random() * 10000),
+    connections: model.nodesData?.length * 2 || 0
+  }
+  
+  return {
+    nodeTypes,
+    performance,
+    stats: {
+      executions: performance.executions
+    }
+  }
+}
+
+// Extract node types from model data
+const extractNodeTypes = (nodesData: any[]): string[] => {
+  if (!nodesData) return []
+  
+  const types = new Set<string>()
+  nodesData.forEach(node => {
+    if (node.type) {
+      types.add(node.type)
+    }
+    // Extract action types from action table nodes
+    if (node.data?.actions) {
+      node.data.actions.forEach((action: any) => {
+        if (action.type) {
+          types.add(action.type)
+        }
+      })
+    }
+  })
+  
+  return Array.from(types)
 }
 ```
 
@@ -811,39 +990,148 @@ function enhanceModelWithNestedData(
 ### Phase 4: UI Integration and Navigation (Week 4)
 
 #### 4.1 List View Page Implementation
-**Objective**: Create the main list view page
+**Objective**: Create the main table-based list view page
 
 **FunctionModelListPage**:
 ```typescript
-// /app/(private)/dashboard/function-model/page.tsx
+// /app/(private)/dashboard/function-model/list/page.tsx
 export default function FunctionModelListPage() {
-  const { models, loading, error, loadModels } = useFunctionModelList()
   const router = useRouter()
-  
+  const {
+    models,
+    loading,
+    error,
+    filters,
+    searchQuery,
+    loadModels,
+    duplicateModel,
+    deleteModel,
+    updateFilters,
+    updateSearchQuery
+  } = useFunctionModelList()
+
   useEffect(() => {
     loadModels()
   }, [loadModels])
-  
-  const handleCreateNew = () => {
-    router.push('/function-model/new')
+
+  const handleCreateNew = async () => {
+    try {
+      const newModel = await createNewFunctionModel(
+        'Untitled Function Model',
+        'New function model - click to edit description'
+      )
+      router.push(`/dashboard/function-model/${newModel.modelId}`)
+    } catch (err) {
+      console.error('Failed to create new model:', err)
+    }
   }
-  
+
   const handleModelSelect = (modelId: string) => {
-    router.push(`/function-model/${modelId}`)
+    router.push(`/dashboard/function-model/${modelId}`)
   }
-  
+
+  const handleModelDelete = async (modelId: string) => {
+    try {
+      await deleteModel(modelId)
+    } catch (err) {
+      console.error('Failed to delete model:', err)
+    }
+  }
+
+  const handleModelDuplicate = async (modelId: string) => {
+    try {
+      await duplicateModel(modelId)
+    } catch (err) {
+      console.error('Failed to duplicate model:', err)
+    }
+  }
+
   return (
     <div className="w-full h-full p-6">
-      <FunctionModelListView
+      <FunctionModelList
         models={models}
         loading={loading}
         error={error}
-        onCreateNew={handleCreateNew}
         onModelSelect={handleModelSelect}
+        onModelDelete={handleModelDelete}
+        onModelDuplicate={handleModelDuplicate}
+        onFiltersChange={updateFilters}
+        onSearchChange={updateSearchQuery}
+        filters={filters}
+        searchQuery={searchQuery}
       />
     </div>
   )
 }
+```
+
+**Enhanced Table-Based Layout**:
+```typescript
+// Table structure with light theme styling
+<div className="flex flex-col min-h-screen bg-background text-foreground">
+  {/* Header */}
+  <div className="border-b border-border p-4">
+    <div className="flex items-center justify-between mb-4">
+      <div>
+        <h1 className="text-xl font-semibold">Function Models</h1>
+        <p className="text-muted-foreground text-sm">Node-based automation workflows</p>
+      </div>
+      <Button size="sm" onClick={handleCreateNew}>
+        <Plus className="w-3 h-3 mr-1" />
+        New Model
+      </Button>
+    </div>
+
+    {/* Search and Filter Controls */}
+    <div className="flex items-center gap-3">
+      <div className="relative flex-1 max-w-sm">
+        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3 h-3" />
+        <Input
+          placeholder="Search models..."
+          value={searchQuery}
+          onChange={(e) => updateSearchQuery(e.target.value)}
+          className="pl-7 h-8 text-xs"
+        />
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="text-xs h-8">
+            <Filter className="w-3 h-3 mr-1" />
+            {filters.category || 'All Categories'}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          {/* Category options */}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  </div>
+
+  {/* Table Header */}
+  <div className="border-b border-border px-4 py-2 bg-muted/50">
+    <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="col-span-4">Model</div>
+      <div className="col-span-3">Node Flow</div>
+      <div className="col-span-2">Performance</div>
+      <div className="col-span-2">Stats</div>
+      <div className="col-span-1"></div>
+    </div>
+  </div>
+
+  {/* Table Content */}
+  <div className="flex-1 overflow-auto">
+    {models.map((model, index) => (
+      <FunctionModelTableRow
+        key={model.modelId}
+        model={model}
+        onEdit={handleModelSelect}
+        onDelete={handleModelDelete}
+        onDuplicate={handleModelDuplicate}
+        isAlternate={index % 2 === 1}
+      />
+    ))}
+  </div>
+</div>
 ```
 
 #### 4.2 Canvas Page Implementation
@@ -952,17 +1240,21 @@ useEffect(() => {
 
 ### Functional Metrics
 - **Node-Level Linking**: Support for 50+ links per node
-- **List View Performance**: Load 100+ models in <2 seconds
+- **Table View Performance**: Load 100+ models in <2 seconds with smooth scrolling
 - **Navigation Speed**: List → Canvas transition in <1 second
 - **Nested Model Support**: Support for 10+ nested models per function model
 - **Auto-load Success**: 100% success rate for auto-loading last saved version
 - **Cross-feature Linking**: Support for 1000+ cross-feature relationships
+- **Visual Performance**: Smooth hover effects and transitions in table rows
+- **Search Performance**: Debounced search with <300ms delay
 
 ### Technical Metrics
 - **Performance**: <500ms response time for list operations
-- **Scalability**: Support for 10,000+ function models
+- **Scalability**: Support for 10,000+ function models with virtual scrolling
 - **Data Integrity**: 100% data consistency across nested models
 - **Storage Efficiency**: <30% storage overhead for nested relationships
+- **UI Responsiveness**: <16ms frame time for table interactions
+- **Search Efficiency**: Backend search with proper indexing
 
 ## Risk Mitigation
 
@@ -992,12 +1284,17 @@ useEffect(() => {
 - [ ] Create node linking components
 - [ ] Add link visualization to nodes
 
-### Week 2: Function Model List View
-- [ ] Create FunctionModelCard component
-- [ ] Create FunctionModelList component
-- [ ] Create FunctionModelListView component
-- [ ] Update routing structure
-- [ ] Implement list view page
+### Week 2: Function Model List View - Table-Based Design
+- [ ] Create NodeTypeIndicator component with light theme colors
+- [ ] Create StatusIndicator component with icons
+- [ ] Create FunctionModelTableRow component with performance metrics
+- [ ] Update FunctionModelList component for table layout
+- [ ] Enhance search and filter UI for table design
+- [ ] Implement performance data generation utilities
+- [ ] Update routing structure for table view
+- [ ] Implement table-based list view page
+- [ ] Add hover effects and transitions
+- [ ] Ensure responsive design for mobile
 
 ### Week 3: Nested Function Model Support
 - [ ] Enhance node data structure for nested models

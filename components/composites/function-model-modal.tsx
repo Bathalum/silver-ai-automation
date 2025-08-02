@@ -56,16 +56,16 @@ export function FunctionModelModal({
           </h4>
           <div className="space-y-3">
             <EntityFormFields
-              id={functionModel.input.id}
-              name={functionModel.input.name}
-              description={functionModel.input.description}
+              id="input-port"
+              name="Input Port"
+              description="Data input for the function model"
               onUpdateName={(name) => {
-                const updatedInput = { ...functionModel.input, name }
-                onUpdateFunctionModel?.({ ...functionModel, input: updatedInput })
+                // TODO: Update input port name in nodesData
+                console.log('Update input port name:', name)
               }}
               onUpdateDescription={(description) => {
-                const updatedInput = { ...functionModel.input, description }
-                onUpdateFunctionModel?.({ ...functionModel, input: updatedInput })
+                // TODO: Update input port description in nodesData
+                console.log('Update input port description:', description)
               }}
               entityType="Input"
             />
@@ -80,16 +80,16 @@ export function FunctionModelModal({
           </h4>
           <div className="space-y-3">
             <EntityFormFields
-              id={functionModel.output.id}
-              name={functionModel.output.name}
-              description={functionModel.output.description}
+              id="output-port"
+              name="Output Port"
+              description="Data output from the function model"
               onUpdateName={(name) => {
-                const updatedOutput = { ...functionModel.output, name }
-                onUpdateFunctionModel?.({ ...functionModel, output: updatedOutput })
+                // TODO: Update output port name in nodesData
+                console.log('Update output port name:', name)
               }}
               onUpdateDescription={(description) => {
-                const updatedOutput = { ...functionModel.output, description }
-                onUpdateFunctionModel?.({ ...functionModel, output: updatedOutput })
+                // TODO: Update output port description in nodesData
+                console.log('Update output port description:', description)
               }}
               entityType="Output"
             />
@@ -97,23 +97,25 @@ export function FunctionModelModal({
         </div>
       </div>
 
-      {/* Stages Summary */}
+      {/* Nodes Summary */}
       <div className="space-y-4">
         <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <Layers className="w-4 h-4" />
-          Stages ({functionModel.stages.length})
+          Nodes ({functionModel.nodesData?.length || 0})
         </h4>
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {functionModel.stages.map((stage) => (
-              <div key={stage.id} className="bg-white rounded border p-3">
-                <h5 className="font-medium text-sm">{stage.name}</h5>
-                <p className="text-xs text-gray-600 mt-1">{stage.description}</p>
+            {functionModel.nodesData?.map((node) => (
+              <div key={node.id} className="bg-white rounded border p-3">
+                <h5 className="font-medium text-sm">{node.data.label}</h5>
+                <p className="text-xs text-gray-600 mt-1">{node.data.description}</p>
                 <div className="text-xs text-gray-500 mt-2">
-                  {stage.actions.length} actions
+                  Type: {node.type}
                 </div>
               </div>
-            ))}
+            )) || (
+              <div className="text-sm text-gray-500">No nodes found</div>
+            )}
           </div>
         </div>
       </div>
@@ -136,7 +138,7 @@ export function FunctionModelModal({
             </div>
             <div className="flex justify-between text-sm">
               <span>Tags:</span>
-              <span>{functionModel.metadata.tags.join(', ') || 'None'}</span>
+              <span>{functionModel.metadata.tags?.join(', ') || 'None'}</span>
             </div>
           </div>
         </div>
@@ -160,18 +162,16 @@ export function FunctionModelModal({
       {/* Function Model Specific Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
         <div className="bg-blue-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-blue-700">Stages</h4>
-          <p className="text-2xl font-bold text-blue-900">{functionModel.stages.length}</p>
+          <h4 className="text-sm font-medium text-blue-700">Nodes</h4>
+          <p className="text-2xl font-bold text-blue-900">{functionModel.nodesData?.length || 0}</p>
         </div>
         <div className="bg-green-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-green-700">Total Actions</h4>
-          <p className="text-2xl font-bold text-green-900">
-            {functionModel.stages.reduce((total, stage) => total + stage.actions.length, 0)}
-          </p>
+          <h4 className="text-sm font-medium text-green-700">Connections</h4>
+          <p className="text-2xl font-bold text-green-900">{functionModel.edgesData?.length || 0}</p>
         </div>
         <div className="bg-purple-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-purple-700">Data Ports</h4>
-          <p className="text-2xl font-bold text-purple-900">2</p>
+          <h4 className="text-sm font-medium text-purple-700">Status</h4>
+          <p className="text-2xl font-bold text-purple-900 capitalize">{functionModel.status}</p>
         </div>
       </div>
     </div>
