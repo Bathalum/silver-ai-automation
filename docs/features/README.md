@@ -125,7 +125,20 @@ Each feature follows a consistent documentation structure with four core documen
 
 **Documentation**: [Clients Documentation](./clients/) *(Coming Soon)*
 
-### 8. **Config** (`config/`)
+### 8. **Cross-Feature Linking** (`cross-feature-linking/`)
+**Status**: ✅ Complete
+**Description**: Centralized relationship management system for cross-feature connections
+**Key Capabilities**:
+- Universal linking interface for all features
+- Multi-directional relationships (two-way links)
+- Context-aware linking (global, node-level, action-level)
+- Real-time entity search across all features
+- Rich metadata and link strength management
+- Professional modal-based user interface
+
+**Documentation**: [Cross-Feature Linking Documentation](./cross-feature-linking/)
+
+### 9. **Config** (`config/`)
 **Status**: 🔄 Planned
 **Description**: System configuration and settings
 **Key Capabilities**:
@@ -174,6 +187,7 @@ Each feature follows a consistent documentation structure with four core documen
 
 ### Integration Types
 - **✅ Links**: Direct references between entities
+- **✅ Universal Linking**: Centralized cross-feature relationship management
 - **✅ Implements**: One feature implements another's concepts
 - **✅ Triggers**: One feature triggers actions in another
 - **✅ Documents**: One feature documents another's processes

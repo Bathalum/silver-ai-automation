@@ -10,8 +10,7 @@ import { SIDEBAR_ITEMS } from "./shared/constants"
 import { ModeSelector, getRowsForMode, ModeType } from "./shared/mode-selector"
 import { useModalForm } from "@/hooks/use-modal-form"
 import { NavigationTabContent } from "./shared/navigation-tab-content"
-import { NodeLinkingTab } from "./function-model/node-linking-tab"
-import { NestedModelsTab } from "./function-model/nested-models-tab"
+
 import type { Stage, ActionItem, NodeRelationship } from "@/lib/domain/entities/function-model-types"
 
 // Define a minimal Action type inline
@@ -202,26 +201,41 @@ export function StageNodeModal({
               </div>
             )}
             {activeSidebar === "links" && modelId && (
-              <NodeLinkingTab
-                modelId={modelId}
-                nodeId={stage.id}
-                nodeType="stageNode"
-                onCreateLink={async (targetFeature, targetId, linkType, context) => {
-                  // This will be handled by the NodeLinkingTab component
-                  console.log('Creating node link:', { targetFeature, targetId, linkType, context })
-                }}
-              />
+              <div className="space-y-4">
+                <div className="text-center py-8 text-muted-foreground">
+                  <Link className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Cross-Feature Linking</p>
+                  <p className="text-sm">Use the universal linking modal for all cross-feature relationships</p>
+                  <Button 
+                    onClick={() => {
+                      // TODO: Open universal modal for node-level linking
+                      console.log('Open universal modal for node:', stage.id)
+                    }}
+                    className="mt-4"
+                  >
+                    Open Linking Modal
+                  </Button>
+                </div>
+              </div>
             )}
             
             {activeSidebar === "nested-models" && modelId && (
-              <NestedModelsTab
-                modelId={modelId}
-                nodeId={stage.id}
-                onCreateNestedLink={async (targetFeature, targetId, linkType, context) => {
-                  // This will be handled by the NestedModelsTab component
-                  console.log('Creating nested model link:', { targetFeature, targetId, linkType, context })
-                }}
-              />
+              <div className="space-y-4">
+                <div className="text-center py-8 text-muted-foreground">
+                  <GitBranch className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nested Models</p>
+                  <p className="text-sm">Use the universal linking modal for nested model relationships</p>
+                  <Button 
+                    onClick={() => {
+                      // TODO: Open universal modal for nested model linking
+                      console.log('Open universal modal for nested model:', stage.id)
+                    }}
+                    className="mt-4"
+                  >
+                    Open Linking Modal
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </div>

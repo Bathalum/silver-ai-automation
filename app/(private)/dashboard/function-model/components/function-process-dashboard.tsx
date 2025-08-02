@@ -10,7 +10,7 @@ import { ActionModal } from "@/components/composites/action-modal"
 import { FunctionModelModal } from "@/components/composites/function-model-modal"
 import { StageNode, IONode, ActionTableNode, FunctionModelContainerNode } from "./flow-nodes"
 import { SaveLoadPanel } from "@/components/composites/function-model/save-load-panel"
-import { CrossFeatureLinkingPanel } from "@/components/composites/function-model/cross-feature-linking-panel"
+import { CrossFeatureLinkingModal } from "@/components/composites/cross-feature-linking-modal"
 import type { FunctionModel, Stage, ActionItem, DataPort } from "@/lib/domain/entities/function-model-types"
 import type { BackgroundVariant } from "reactflow"
 import { addEdge, type Connection, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge } from "reactflow"
@@ -114,6 +114,9 @@ export function FunctionProcessDashboard({
   // Add state for persistence sidebar
   const [persistenceSidebarOpen, setPersistenceSidebarOpen] = useState(false);
   const [activePersistenceTab, setActivePersistenceTab] = useState<'save' | 'links'>('save');
+
+  // Add state for cross-feature linking modal
+  const [crossFeatureModalOpen, setCrossFeatureModalOpen] = useState(false);
 
   // Load function model on mount
   useEffect(() => {
@@ -1120,17 +1123,16 @@ export function FunctionProcessDashboard({
               />
             )}
             {activePersistenceTab === 'links' && (
-              <CrossFeatureLinkingPanel
-                modelId={functionModel.modelId}
-                onLinkCreated={(link) => {
-                  console.log('Cross-feature link created:', link);
-                  // Optionally update the model or show notification
-                }}
-                onLinkDeleted={(linkId) => {
-                  console.log('Cross-feature link deleted:', linkId);
-                  // Optionally update the model or show notification
-                }}
-              />
+              <div className="p-4">
+                <Button
+                  onClick={() => setCrossFeatureModalOpen(true)}
+                  className="w-full"
+                  variant="outline"
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  Manage Cross-Feature Links
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -1299,6 +1301,20 @@ export function FunctionProcessDashboard({
         onNavigateToKnowledgeBase={() => {
           // TODO: Navigate to Knowledge Base page
           console.log('Navigate to Knowledge Base');
+        }}
+      />
+
+      {/* Render Universal Cross-Feature Linking Modal */}
+      <CrossFeatureLinkingModal
+        open={crossFeatureModalOpen}
+        onOpenChange={setCrossFeatureModalOpen}
+        sourceFeature="function-model"
+        sourceId={functionModel.modelId}
+        onLinkCreated={(link) => {
+          console.log('Cross-feature link created:', link)
+        }}
+        onLinkDeleted={(linkId) => {
+          console.log('Cross-feature link deleted:', linkId)
         }}
       />
 

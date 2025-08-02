@@ -18,6 +18,35 @@ export type FeatureType = 'function-model' | 'knowledge-base' | 'spindle'
 
 export type LinkType = 'documents' | 'implements' | 'references' | 'supports' | 'nested'
 
+// Enhanced link context for universal modal
+export interface UniversalLinkContext {
+  // Global linking
+  global?: {
+    sourceFeature: FeatureType
+    sourceId: string
+  }
+  
+  // Node-level linking
+  node?: {
+    nodeId: string
+    nodeType: 'stageNode' | 'actionTableNode' | 'ioNode'
+    position: { x: number; y: number }
+    viewport: { x: number; y: number; zoom: number }
+  }
+  
+  // Action-level linking
+  action?: {
+    actionId: string
+    actionType: string
+    nodeId: string
+  }
+  
+  // General metadata
+  notes?: string
+  tags?: string[]
+  priority?: 'low' | 'medium' | 'high'
+}
+
 // Link context types for different link types
 export interface DocumentLinkContext {
   section?: string
@@ -201,7 +230,8 @@ export function getLinkDescription(link: CrossFeatureLink): string {
     documents: 'Documents',
     implements: 'Implements',
     references: 'References',
-    supports: 'Supports'
+    supports: 'Supports',
+    nested: 'Nested'
   }
   return `${descriptions[link.linkType]} ${link.targetFeature}`
 }
@@ -211,7 +241,8 @@ export function getLinkIcon(linkType: LinkType): string {
     documents: '📄',
     implements: '⚙️',
     references: '🔗',
-    supports: '🛠️'
+    supports: '🛠️',
+    nested: '🔗'
   }
   return icons[linkType]
 }
@@ -221,7 +252,18 @@ export function getLinkColor(linkType: LinkType): string {
     documents: 'blue',
     implements: 'green',
     references: 'purple',
-    supports: 'orange'
+    supports: 'orange',
+    nested: 'indigo'
   }
   return colors[linkType]
+}
+
+// Utility function to get feature icon
+export function getFeatureIcon(featureType: FeatureType): string {
+  const icons = {
+    'function-model': '📊',
+    'knowledge-base': '📚',
+    'spindle': '⚡'
+  }
+  return icons[featureType]
 } 
