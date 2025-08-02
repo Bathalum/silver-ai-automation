@@ -5,11 +5,13 @@ import { Input } from "../ui/input"
 import { Label } from "../ui/label"
 import { Textarea } from "../ui/textarea"
 import { Badge } from "../ui/badge"
-import { ArrowLeft, ExternalLink } from "lucide-react"
+import { ArrowLeft, ExternalLink, Link, GitBranch } from "lucide-react"
 import { SIDEBAR_ITEMS } from "./shared/constants"
 import { ModeSelector, getRowsForMode, ModeType } from "./shared/mode-selector"
 import { useModalForm } from "@/hooks/use-modal-form"
 import { NavigationTabContent } from "./shared/navigation-tab-content"
+import { NodeLinkingTab } from "./function-model/node-linking-tab"
+import { NestedModelsTab } from "./function-model/nested-models-tab"
 import type { Stage, ActionItem, NodeRelationship } from "@/lib/domain/entities/function-model-types"
 
 // Define a minimal Action type inline
@@ -35,6 +37,8 @@ interface StageNodeModalProps {
   onBackClick?: () => void
   // New: handler to update stage node data
   onUpdateStage?: (updatedStage: Stage) => void
+  // NEW: Props for node-level linking
+  modelId?: string
 }
 
 export function StageNodeModal({ 
@@ -47,7 +51,8 @@ export function StageNodeModal({
   onActionClick,
   showBackButton = false,
   onBackClick,
-  onUpdateStage
+  onUpdateStage,
+  modelId
 }: StageNodeModalProps) {
   // All hooks must be called unconditionally
   const [activeSidebar, setActiveSidebar] = useState("details")
@@ -98,21 +103,38 @@ export function StageNodeModal({
         <div className="flex h-[600px]">
           {/* Sidebar Tabs with icons */}
           <div className="w-16 bg-gray-50 border-r flex flex-col items-center py-4 space-y-2">
-            {SIDEBAR_ITEMS.map((item) => {
-              const Icon = item.icon
-              return (
-                <Button
-                  key={item.id}
-                  variant={activeSidebar === item.id ? "secondary" : "ghost"}
-                  size="sm"
-                  className="w-12 h-12 p-0 flex flex-col items-center justify-center"
-                  onClick={() => setActiveSidebar(item.id)}
-                  title={item.label}
-                >
-                  <Icon className="w-5 h-5" />
-                </Button>
-              )
-            })}
+            {/* Details Tab */}
+            <Button
+              variant={activeSidebar === "details" ? "secondary" : "ghost"}
+              size="sm"
+              className="w-12 h-12 p-0 flex flex-col items-center justify-center"
+              onClick={() => setActiveSidebar("details")}
+              title="Details"
+            >
+              <ExternalLink className="w-5 h-5" />
+            </Button>
+            
+            {/* Links Tab */}
+            <Button
+              variant={activeSidebar === "links" ? "secondary" : "ghost"}
+              size="sm"
+              className="w-12 h-12 p-0 flex flex-col items-center justify-center"
+              onClick={() => setActiveSidebar("links")}
+              title="Links"
+            >
+              <Link className="w-5 h-5" />
+            </Button>
+            
+            {/* Nested Models Tab */}
+            <Button
+              variant={activeSidebar === "nested-models" ? "secondary" : "ghost"}
+              size="sm"
+              className="w-12 h-12 p-0 flex flex-col items-center justify-center"
+              onClick={() => setActiveSidebar("nested-models")}
+              title="Nested Models"
+            >
+              <GitBranch className="w-5 h-5" />
+            </Button>
           </div>
 
           {/* Main Content */}
@@ -179,31 +201,26 @@ export function StageNodeModal({
                 </div>
               </div>
             )}
-            {activeSidebar === "function-model" && (
-              <NavigationTabContent 
-                tabType="function-model" 
-                onNavigate={() => {}} 
+            {activeSidebar === "links" && modelId && (
+              <NodeLinkingTab
+                modelId={modelId}
+                nodeId={stage.id}
+                nodeType="stageNode"
+                onCreateLink={async (targetFeature, targetId, linkType, context) => {
+                  // This will be handled by the NodeLinkingTab component
+                  console.log('Creating node link:', { targetFeature, targetId, linkType, context })
+                }}
               />
             )}
-
-            {activeSidebar === "event-storm" && (
-              <NavigationTabContent 
-                tabType="event-storm" 
-                onNavigate={() => {}} 
-              />
-            )}
-
-            {activeSidebar === "spindle" && (
-              <NavigationTabContent 
-                tabType="spindle" 
-                onNavigate={() => {}} 
-              />
-            )}
-
-            {activeSidebar === "knowledge-base" && (
-              <NavigationTabContent 
-                tabType="knowledge-base" 
-                onNavigate={() => {}} 
+            
+            {activeSidebar === "nested-models" && modelId && (
+              <NestedModelsTab
+                modelId={modelId}
+                nodeId={stage.id}
+                onCreateNestedLink={async (targetFeature, targetId, linkType, context) => {
+                  // This will be handled by the NestedModelsTab component
+                  console.log('Creating nested model link:', { targetFeature, targetId, linkType, context })
+                }}
               />
             )}
           </div>

@@ -4,6 +4,15 @@
 import type { CrossFeatureLink } from './cross-feature-link-types'
 import type { VersionEntry, ChangeDescription, FunctionModelSnapshot } from './version-control-types'
 
+// NEW: Node-level linking types
+export interface NodeLinkedEntity {
+  entityId: string
+  entityType: 'function-model' | 'knowledge-base' | 'spindle'
+  linkType: 'documents' | 'implements' | 'references' | 'supports' | 'nested'
+  linkContext: Record<string, any>
+  linkId: string // Reference to cross_feature_links table
+}
+
 export interface FunctionModel {
   modelId: string
   name: string
@@ -87,6 +96,9 @@ export interface FunctionModelNode {
   deletable?: boolean
   width?: number
   height?: number
+  
+  // NEW: Node-level linking data
+  linkedEntities?: NodeLinkedEntity[]
 }
 
 export interface FunctionModelEdge {
@@ -155,6 +167,8 @@ export interface ActionItem {
   name: string
   description: string
   type: "action" | "action-group"
+  // NEW: Action-level linking
+  linkedEntities?: NodeLinkedEntity[]
 }
 
 export interface RACIMatrix {

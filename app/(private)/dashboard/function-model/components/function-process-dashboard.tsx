@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { ReactFlowProvider, ReactFlow, Controls, Background, useNodesState, useEdgesState, type Node } from "reactflow"
 import "reactflow/dist/style.css"
-import { Layers, Zap, Hammer, ArrowLeftRight, Settings, Save, Link, ChevronLeft, ChevronRight } from "lucide-react"
+import { Layers, Zap, Hammer, ArrowLeftRight, Settings, Save, Link, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react"
 import { StageNodeModal } from "@/components/composites/stage-node-modal"
 import { ActionModal } from "@/components/composites/action-modal"
 import { FunctionModelModal } from "@/components/composites/function-model-modal"
@@ -87,6 +88,7 @@ interface FunctionProcessDashboardProps {
 export function FunctionProcessDashboard({
   functionModel: initialModel = sampleFunctionModel,
 }: FunctionProcessDashboardProps) {
+  const router = useRouter()
   const [functionModel, setFunctionModel] = useState<FunctionModel>(initialModel)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -703,7 +705,9 @@ export function FunctionProcessDashboard({
   }, [setFlow]);
 
   const [isEditingName, setIsEditingName] = useState(false)
+  const [isEditingDescription, setIsEditingDescription] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -713,15 +717,42 @@ export function FunctionProcessDashboard({
     }
   }, [isEditingName])
 
+  // Focus textarea when entering description edit mode
+  useEffect(() => {
+    if (isEditingDescription && descriptionRef.current) {
+      descriptionRef.current.focus()
+      descriptionRef.current.select()
+    }
+  }, [isEditingDescription])
+
   // Handle name change
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFlow((f) => ({ ...f, name: e.target.value }))
+    const newName = e.target.value
+    setFlow((f) => ({ ...f, name: newName }))
+    // Also update the function model name
+    setFunctionModel(prev => prev ? { ...prev, name: newName } : prev)
+  }
+
+  // Handle description change
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newDescription = e.target.value
+    // Also update the function model description
+    setFunctionModel(prev => prev ? { ...prev, description: newDescription } : prev)
   }
 
   // Handle blur or Enter to finish editing
   const finishEditing = () => setIsEditingName(false)
+  const finishDescriptionEditing = () => setIsEditingDescription(false)
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') finishEditing()
+  }
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && e.ctrlKey) finishDescriptionEditing()
+  }
+
+  // Handle back to list navigation
+  const handleBackToList = () => {
+    router.push('/dashboard/function-model/list')
   }
 
   // Make nodes moveable
@@ -864,8 +895,21 @@ export function FunctionProcessDashboard({
           </button>
         </div>
       )}
-      {/* Floating, inline-editable flow name */}
+      {/* Floating, inline-editable flow name with back arrow */}
       <div className="absolute top-4 left-4 z-30 flex flex-col items-start gap-2 min-w-[180px]">
+        {/* Name row with back arrow */}
+        <div className="flex items-center gap-2">
+          {/* Back arrow */}
+          <button
+            onClick={handleBackToList}
+            className="p-1.5 rounded hover:bg-primary/10 group bg-white/80 shadow border border-gray-200 backdrop-blur-sm"
+            title="Back to List"
+          >
+            <ArrowLeft className="w-4 h-4 text-primary group-hover:scale-110" />
+          </button>
+          
+          {/* Function name */}
+          <div className="flex-1">
         {isEditingName ? (
           <input
             ref={inputRef}
@@ -886,6 +930,31 @@ export function FunctionProcessDashboard({
           >
             {flow.name || 'Untitled Flow'}
           </h2>
+        )}
+          </div>
+        </div>
+        
+        {/* Description editing */}
+        {isEditingDescription ? (
+          <textarea
+            ref={descriptionRef}
+            value={functionModel.description}
+            onChange={handleDescriptionChange}
+            onBlur={finishDescriptionEditing}
+            onKeyDown={handleDescriptionKeyDown}
+            className="text-sm text-gray-600 bg-white/80 rounded px-2 py-1 border border-gray-300 shadow focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            style={{ minWidth: 180, maxWidth: 320, minHeight: 60 }}
+            placeholder="Add description..."
+          />
+        ) : (
+          <p
+            className="text-sm text-gray-600 bg-white/80 rounded px-2 py-1 cursor-pointer select-none border border-transparent hover:border-gray-300 shadow"
+            style={{ minWidth: 180, maxWidth: 320, minHeight: 20 }}
+            title="Click to edit description"
+            onClick={() => setIsEditingDescription(true)}
+          >
+            {functionModel.description || 'Click to add description...'}
+          </p>
         )}
         {/* Floating horizontal icon bar for node types */}
         <TooltipProvider delayDuration={0}>
@@ -1129,6 +1198,7 @@ export function FunctionProcessDashboard({
               return { ...prevFlow, nodes: updatedNodes };
             });
           }}
+          modelId={functionModel.modelId}
         />
       )}
       

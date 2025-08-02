@@ -195,6 +195,72 @@ export const deleteCrossFeatureLink = async (linkId: string): Promise<void> => {
   await functionModelRepository.deleteCrossFeatureLink(linkId)
 }
 
+// NEW: Node-level linking use cases
+export const createNodeLink = async (
+  modelId: string,
+  nodeId: string,
+  targetFeature: string,
+  targetId: string,
+  linkType: string,
+  context?: Record<string, any>
+): Promise<CrossFeatureLink> => {
+  // Validate link parameters
+  if (!modelId || !nodeId || !targetFeature || !targetId || !linkType) {
+    throw new Error('Missing required parameters for node link')
+  }
+  
+  // Create the link
+  const link = await functionModelRepository.createNodeLink(
+    modelId,
+    nodeId,
+    targetFeature,
+    targetId,
+    linkType,
+    context
+  )
+  
+  return link
+}
+
+export const getNodeLinks = async (
+  modelId: string,
+  nodeId: string
+): Promise<CrossFeatureLink[]> => {
+  return await functionModelRepository.getNodeLinks(modelId, nodeId)
+}
+
+export const deleteNodeLink = async (linkId: string): Promise<void> => {
+  await functionModelRepository.deleteNodeLink(linkId)
+}
+
+// NEW: Nested function model use cases
+export const linkFunctionModelToNode = async (
+  parentModelId: string,
+  nodeId: string,
+  childModelId: string,
+  context?: Record<string, any>
+): Promise<CrossFeatureLink> => {
+  // Validate that child model exists
+  const childModel = await functionModelRepository.getById(childModelId)
+  if (!childModel) {
+    throw new Error(`Function Model not found: ${childModelId}`)
+  }
+  
+  // Create nested link
+  const link = await functionModelRepository.linkFunctionModelToNode(
+    parentModelId,
+    nodeId,
+    childModelId,
+    context
+  )
+  
+  return link
+}
+
+export const getNestedFunctionModels = async (modelId: string): Promise<FunctionModel[]> => {
+  return await functionModelRepository.getNestedFunctionModels(modelId)
+}
+
 // Create version snapshot use case
 export const createVersionSnapshot = async (
   model: FunctionModel,

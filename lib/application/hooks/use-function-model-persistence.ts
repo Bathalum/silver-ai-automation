@@ -2,6 +2,18 @@
 // This file provides custom React hooks for Function Model persistence operations
 
 import { useState, useCallback, useEffect } from 'react'
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }
+}
 import type { 
   FunctionModel, 
   SaveOptions, 
@@ -33,7 +45,14 @@ import {
   updateFunctionModelMetadata,
   updateFunctionModelPermissions,
   exportFunctionModel,
-  importFunctionModel
+  importFunctionModel,
+  getAllFunctionModels,
+  // NEW: Node-level linking use cases
+  createNodeLink,
+  getNodeLinks,
+  deleteNodeLink,
+  linkFunctionModelToNode,
+  getNestedFunctionModels
 } from '../use-cases/function-model-persistence-use-cases'
 
 // Function Model persistence hook
@@ -216,6 +235,77 @@ export function useCrossFeatureLinking(sourceId: string, sourceFeature: string) 
     createLink,
     updateLinkContext,
     deleteLink,
+    clearError
+  }
+}
+
+// NEW: Node-level linking hook
+export function useNodeLinking(modelId: string, nodeId: string) {
+  const [links, setLinks] = useState<CrossFeatureLink[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  const loadNodeLinks = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const nodeLinks = await getNodeLinks(modelId, nodeId)
+      setLinks(nodeLinks)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load node links')
+    } finally {
+      setLoading(false)
+    }
+  }, [modelId, nodeId])
+  
+  const createNodeLinkHandler = useCallback(async (
+    targetFeature: string,
+    targetId: string,
+    linkType: string,
+    context?: Record<string, any>
+  ) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const newLink = await createNodeLink(modelId, nodeId, targetFeature, targetId, linkType, context)
+      await loadNodeLinks() // Refresh links
+      return newLink
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create node link')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [modelId, nodeId, loadNodeLinks])
+  
+  const deleteNodeLinkHandler = useCallback(async (linkId: string) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      await deleteNodeLink(linkId)
+      await loadNodeLinks() // Refresh links
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete node link')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [loadNodeLinks])
+  
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
+  
+  return {
+    links,
+    loading,
+    error,
+    loadNodeLinks,
+    createNodeLink: createNodeLinkHandler,
+    deleteNodeLink: deleteNodeLinkHandler,
     clearError
   }
 }
@@ -530,6 +620,139 @@ export function useFunctionModelManagement() {
     updateModelPermissions,
     exportModel,
     importModel,
+    clearError
+  }
+}
+
+// NEW: Function Model list management hook
+export function useFunctionModelList() {
+  const [models, setModels] = useState<FunctionModel[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<FunctionModelFilters>({})
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Load all models
+  const loadModels = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const allModels = await getAllFunctionModels()
+      setModels(allModels)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load models')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  
+  // Search and filter models with debouncing
+  const searchModels = useCallback(async (query: string, filters: FunctionModelFilters) => {
+    setSearchLoading(true)
+    setError(null)
+    
+    try {
+      const results = await searchFunctionModels(query, filters)
+      setModels(results)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search models')
+    } finally {
+      setSearchLoading(false)
+    }
+  }, [])
+  
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce(async (query: string, filters: FunctionModelFilters) => {
+      if (query.trim() || Object.keys(filters).length > 0) {
+        await searchModels(query, filters)
+      } else {
+        await loadModels()
+      }
+    }, 300),
+    [searchModels, loadModels]
+  )
+  
+  // Update filters and trigger search
+  const updateFilters = useCallback((newFilters: FunctionModelFilters) => {
+    setFilters(newFilters)
+    debouncedSearch(searchQuery, newFilters)
+  }, [searchQuery, debouncedSearch])
+  
+  // Update search query and trigger search
+  const updateSearchQuery = useCallback((query: string) => {
+    setSearchQuery(query)
+    debouncedSearch(query, filters)
+  }, [filters, debouncedSearch])
+  
+  // Duplicate model
+  const duplicateModel = useCallback(async (modelId: string) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const originalModel = models.find(m => m.modelId === modelId)
+      if (!originalModel) {
+        throw new Error('Model not found')
+      }
+      
+      const newModel = await createNewFunctionModel(
+        `${originalModel.name} (Copy)`,
+        originalModel.description,
+        {
+          ...originalModel,
+          status: 'draft',
+          version: '1.0.0',
+          currentVersion: '1.0.0',
+          versionHistory: [],
+          tags: [...(originalModel.tags || []), 'duplicate']
+        }
+      )
+      
+      setModels(prev => [newModel, ...prev])
+      return newModel
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to duplicate model')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [models])
+  
+  // Delete model
+  const deleteModel = useCallback(async (modelId: string) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      await deleteFunctionModel(modelId)
+      setModels(prev => prev.filter(model => model.modelId !== modelId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete model')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
+  
+  return {
+    models,
+    loading: loading || searchLoading,
+    error,
+    filters,
+    searchQuery,
+    loadModels,
+    searchModels,
+    duplicateModel,
+    deleteModel,
+    updateFilters,
+    updateSearchQuery,
     clearError
   }
 } 

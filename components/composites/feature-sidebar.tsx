@@ -85,7 +85,7 @@ const getSidebarItems = (featureType: string) => {
         label: "Function Model", 
         icon: Zap,
         description: "Design process flows and business functions",
-        href: "/dashboard/function-model",
+        href: "/dashboard/function-model/list",
         color: "yellow"
       },
       { 
@@ -145,7 +145,7 @@ const getSidebarItems = (featureType: string) => {
         label: "Function Model", 
         icon: Zap,
         description: "Design process flows and business functions",
-        href: "/dashboard/function-model",
+        href: "/dashboard/function-model/list",
         color: "yellow"
       },
       { 
@@ -171,7 +171,7 @@ const getSidebarItems = (featureType: string) => {
         label: "Function Model", 
         icon: Zap,
         description: "Design process flows and business functions",
-        href: "/dashboard/function-model",
+        href: "/dashboard/function-model/list",
         color: "yellow"
       },
       { 

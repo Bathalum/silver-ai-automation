@@ -49,7 +49,7 @@ const navigationItems = [
     children: [
       {
         title: "Function Model",
-        href: "/dashboard/function-model",
+        href: "/dashboard/function-model/list",
         icon: Zap,
       },
       {

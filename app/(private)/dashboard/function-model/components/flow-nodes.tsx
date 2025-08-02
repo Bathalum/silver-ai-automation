@@ -1,8 +1,8 @@
 import { useReactFlow, Handle, Position, type NodeProps } from "reactflow"
-import { Bookmark, Plug } from "lucide-react"
+import { Bookmark, Plug, Link } from "lucide-react"
 import './flow-nodes.css'
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { FileText, Brain, GitBranch, Settings, Layers, Info, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { type NodeData } from "@/lib/domain/entities/function-model-types"
+import { useNodeLinking } from "@/lib/application/hooks/use-function-model-persistence"
 
 // 1:1 copy of StageNode, but for IONode
 export function IONode(props: NodeProps) {
@@ -81,9 +82,12 @@ export function IONode(props: NodeProps) {
 export function StageNode(props: NodeProps) {
   const { data, isConnectable } = props
   const { stage } = data
-
+  
+  // NEW: Load node links for visualization
+  const { links } = useNodeLinking(data.modelId || 'sample-model-id', props.id)
+  
   return (
-    <div className="w-[340px] cursor-pointer">
+    <div className="w-[340px] cursor-pointer relative">
       {/* Left target handle for sibling connections */}
       <Handle 
         type="target" 
@@ -113,6 +117,21 @@ export function StageNode(props: NodeProps) {
           <span className="font-bold text-blue-900 w-full text-center block">{stage?.name || "New Stage"}</span>
         </CardHeader>
       </Card>
+      
+      {/* Link indicators */}
+      {links.length > 0 && (
+        <div className="absolute -top-2 -right-2 flex gap-1">
+          {links.map(link => (
+            <div
+              key={link.linkId}
+              className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center"
+              title={`${link.linkType} ${link.targetFeature}`}
+            >
+              <Link className="w-3 h-3" />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

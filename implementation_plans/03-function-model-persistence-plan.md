@@ -2,7 +2,7 @@
 
 ## Overview
 
-This plan focuses on implementing comprehensive persistence for Function Model entities, following Clean Architecture principles and the established component hierarchy. The implementation will support save/load operations, cross-feature linking, and version control while maintaining alignment with the separate table architecture for different features.
+This plan focuses on implementing comprehensive persistence for Function Model entities, following Clean Architecture principles and the established component hierarchy. The implementation will support save/load operations, cross-feature linking, version control, node-level linking, and a list view interface while maintaining alignment with the separate table architecture for different features.
 
 ## Architecture Alignment
 
@@ -16,7 +16,7 @@ Following the high-level architecture context, this implementation will maintain
 ### Component Architecture Integration
 The implementation will follow the established component hierarchy:
 - **Base Components**: Reusable UI elements for persistence operations
-- **Composite Components**: Save/load panels and version management
+- **Composite Components**: Save/load panels, version management, list components, and node linking components
 - **Feature Components**: Function Model specific persistence logic
 - **Page Components**: Integration with existing dashboard components
 
@@ -30,427 +30,212 @@ The implementation will follow the established component hierarchy:
 ## Current State Analysis
 
 ### ✅ **Existing Infrastructure**
-- Unified node system with Function Model node types (will be migrated to feature-specific tables)
-- React Flow integration for visual representation
-- Basic node metadata storage
-- Cross-feature relationship framework
+- ✅ **Database Schema**: All tables created and functional
+  - `function_models` - Complete with nodes_data, edges_data, viewport_data
+  - `function_model_versions` - Version control with snapshots
+  - `cross_feature_links` - Cross-feature relationship support
+- ✅ **Repository Layer**: Complete SupabaseFunctionModelRepository implementation
+- ✅ **Application Layer**: All use cases implemented (save, load, version control)
+- ✅ **UI Components**: Save/load panels, version dialogs, cross-feature linking
+- ✅ **Integration**: Seamlessly integrated with existing FunctionProcessDashboard
+- ✅ **Persistence**: Save/load functionality working perfectly
+- ✅ **Version Control**: Version loading and management working
+- ✅ **Global Cross-Feature Linking**: Working via sidebar panel
 
-### ⚠️ **Persistence Gaps**
-- No save/load UI interface
-- Missing version control for workflows
-- No export/import functionality
-- Limited collaboration features
-- No workflow templates system
+### ⚠️ **New Requirements**
+- **List View Interface**: Need to create a list view for all function models
+- **Node-Level Linking**: Implement linking functionality within node modals (currently missing)
+- **Nested Function Models**: Support for function models that contain other function models as nodes
+- **Routing Structure**: Separate list view and canvas view routes
+- **Auto-load Functionality**: Load last saved version when clicking on a model
 
 ## Implementation Strategy
 
-### Phase 1: Core Persistence Infrastructure (Week 1)
+### Phase 1: Node-Level Linking Implementation (Week 1)
 
-#### 1.1 Enhanced Function Model Domain Entities
-**Objective**: Extend domain entities to support comprehensive persistence with separate table architecture
+#### 1.1 Node-Level Linking Architecture
+**Objective**: Implement linking functionality within node modals to enable cross-feature relationships at the node level
 
-**Domain Layer Updates**:
+**Current Gap Analysis**:
+- ✅ **Global linking**: Working via `CrossFeatureLinkingPanel` in sidebar
+- ❌ **Node-level linking**: Node modals only have navigation tabs, no linking functionality
+- ❌ **Action-level linking**: No linking within action table rows
+- ❌ **Link visualization**: No visual indicators on nodes showing linked entities
+
+**Linking Strategy**:
 ```typescript
-// Enhanced Function Model entity
-export interface FunctionModel {
-  modelId: string
+// Enhanced node data structure for node-level linking
+interface FunctionModelNode {
+  id: string
+  type: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainer'
+  position: { x: number; y: number }
+  data: NodeData
+  // ... existing properties
+  
+  // NEW: Node-level linking data
+  linkedEntities?: NodeLinkedEntity[]
+}
+
+export interface NodeLinkedEntity {
+  entityId: string
+  entityType: 'function-model' | 'knowledge-base' | 'spindle'
+  linkType: 'documents' | 'implements' | 'references' | 'supports' | 'nested'
+  linkContext: Record<string, any>
+  linkId: string // Reference to cross_feature_links table
+}
+
+export interface ActionItem {
+  id: string
   name: string
   description: string
-  version: string
-  status: 'draft' | 'published' | 'archived'
-  
-  // Visual representation (React Flow data)
-  nodesData: FunctionModelNode[]
-  edgesData: FunctionModelEdge[]
-  viewportData: Viewport
-  
-  // Function Model specific metadata
-  processType?: string
-  complexityLevel?: 'simple' | 'moderate' | 'complex'
-  estimatedDuration?: number // in minutes
-  tags: string[]
-  
-  // Persistence metadata
-  metadata: FunctionModelMetadata
-  permissions: FunctionModelPermissions
-  
-  // Version control
-  versionHistory: VersionEntry[]
-  currentVersion: string
-  
-  // Timestamps
-  createdAt: Date
-  updatedAt: Date
-  lastSavedAt: Date
-}
-
-// Function Model metadata for persistence
-export interface FunctionModelMetadata {
-  category: string
-  dependencies: string[] // IDs of other function models
-  references: string[] // IDs of referenced entities
-  
-  // Export settings
-  exportSettings: {
-    includeMetadata: boolean
-    includeRelationships: boolean
-    format: 'json' | 'xml' | 'yaml' | 'png' | 'svg'
-    resolution: 'low' | 'medium' | 'high'
-  }
-  
-  // Collaboration settings
-  collaboration: {
-    allowComments: boolean
-    allowSuggestions: boolean
-    requireApproval: boolean
-    autoSave: boolean
-    saveInterval: number // in seconds
-  }
-}
-
-// Version control entity
-export interface VersionEntry {
-  version: string
-  timestamp: Date
-  author: string
-  changes: ChangeDescription[]
-  snapshot: FunctionModelSnapshot
-  isPublished: boolean
-}
-
-// Function Model permissions
-export interface FunctionModelPermissions {
-  canView: boolean
-  canEdit: boolean
-  canDelete: boolean
-  canShare: boolean
-  canExport: boolean
-  canVersion: boolean
-  canCollaborate: boolean
-}
-
-// Cross-feature link entity
-export interface CrossFeatureLink {
-  linkId: string
-  sourceFeature: 'function-model' | 'knowledge-base' | 'spindle'
-  sourceId: string
-  targetFeature: 'function-model' | 'knowledge-base' | 'spindle'
-  targetId: string
-  linkType: 'documents' | 'implements' | 'references' | 'supports'
-  linkContext: Record<string, any>
-  createdAt: Date
+  type: "action" | "action-group"
+  // NEW: Action-level linking
+  linkedEntities?: NodeLinkedEntity[]
 }
 ```
 
-#### 1.2 Database Schema for Function Model Persistence
-**Objective**: Design comprehensive database schema with separate tables for each feature
+#### 1.2 Domain Layer Enhancements
+**Objective**: Extend domain entities to support node-level linking
 
-**Database Schema Updates**:
-```sql
--- Function Model persistence table
-CREATE TABLE function_models (
-  model_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
-  status VARCHAR(20) NOT NULL DEFAULT 'draft' 
-    CHECK (status IN ('draft', 'published', 'archived')),
-  
-  -- Visual representation (React Flow data)
-  nodes_data JSONB NOT NULL DEFAULT '[]',
-  edges_data JSONB NOT NULL DEFAULT '[]',
-  viewport_data JSONB NOT NULL DEFAULT '{}',
-  
-  -- Function Model specific metadata
-  process_type VARCHAR(100),
-  complexity_level VARCHAR(50) CHECK (complexity_level IN ('simple', 'moderate', 'complex')),
-  estimated_duration INTEGER, -- in minutes
-  tags TEXT[],
-  
-  -- General metadata and settings
-  metadata JSONB NOT NULL DEFAULT '{}',
-  permissions JSONB NOT NULL DEFAULT '{}',
-  
-  -- Version control
-  current_version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
-  version_count INTEGER NOT NULL DEFAULT 1,
-  
-  -- Timestamps
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  last_saved_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  -- Soft delete
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  deleted_by UUID REFERENCES auth.users(id),
-  
-  -- Constraints
-  CONSTRAINT function_models_name_version_unique 
-    UNIQUE (name, version) WHERE deleted_at IS NULL
-);
-
--- Function Model versions table
-CREATE TABLE function_model_versions (
-  version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  model_id UUID NOT NULL REFERENCES function_models(model_id) ON DELETE CASCADE,
-  version_number VARCHAR(50) NOT NULL,
-  version_data JSONB NOT NULL,
-  change_summary VARCHAR(1000),
-  author_id UUID REFERENCES auth.users(id),
-  is_published BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  UNIQUE(model_id, version_number)
-);
-
--- Cross-feature links table
-CREATE TABLE cross_feature_links (
-  link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source_feature VARCHAR(50) NOT NULL CHECK (source_feature IN ('function-model', 'knowledge-base', 'spindle')),
-  source_id UUID NOT NULL,
-  target_feature VARCHAR(50) NOT NULL CHECK (target_feature IN ('function-model', 'knowledge-base', 'spindle')),
-  target_id UUID NOT NULL,
-  link_type VARCHAR(50) NOT NULL CHECK (link_type IN ('documents', 'implements', 'references', 'supports')),
-  link_context JSONB DEFAULT '{}',
-  link_strength DECIMAL(3,2) DEFAULT 1.0,
-  created_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  -- Prevent self-linking
-  CONSTRAINT no_self_link CHECK (source_id != target_id OR source_feature != target_feature)
-);
-
--- Indexes for performance
-CREATE INDEX idx_function_models_status ON function_models(status);
-CREATE INDEX idx_function_models_created_at ON function_models(created_at DESC);
-CREATE INDEX idx_function_models_metadata_gin ON function_models USING GIN (metadata);
-CREATE INDEX idx_function_models_tags ON function_models USING GIN (tags);
-CREATE INDEX idx_function_model_versions_model_id ON function_model_versions(model_id);
-CREATE INDEX idx_function_model_versions_version ON function_model_versions(version_number DESC);
-CREATE INDEX idx_cross_feature_links_source ON cross_feature_links(source_feature, source_id);
-CREATE INDEX idx_cross_feature_links_target ON cross_feature_links(target_feature, target_id);
-CREATE INDEX idx_cross_feature_links_type ON cross_feature_links(link_type);
-```
-
-#### 1.3 Repository Layer Implementation
-**Objective**: Implement comprehensive repository pattern for Function Model persistence
-
-**Repository Interface**:
+**Enhanced Cross-Feature Link Types**:
 ```typescript
-// Function Model repository interface
+// lib/domain/entities/cross-feature-link-types.ts
+export type LinkType = 'documents' | 'implements' | 'references' | 'supports' | 'nested'
+
+// NEW: Node-specific link context
+export interface NodeLinkContext {
+  nodeId: string
+  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode'
+  actionId?: string // For action table nodes
+  position: { x: number; y: number }
+  viewport: { x: number; y: number; zoom: number }
+}
+```
+
+#### 1.3 Infrastructure Layer Enhancements
+**Objective**: Add repository methods for node-level linking
+
+**Enhanced Repository Methods**:
+```typescript
+// lib/infrastructure/repositories/function-model-repository.ts
 export interface FunctionModelRepository {
-  // CRUD operations
-  create(model: FunctionModel): Promise<FunctionModel>
-  getById(id: string): Promise<FunctionModel | null>
-  update(id: string, updates: Partial<FunctionModel>): Promise<FunctionModel>
-  delete(id: string): Promise<void>
+  // ... existing methods
   
-  // Version control
-  saveVersion(modelId: string, version: VersionEntry): Promise<void>
-  getVersion(modelId: string, version: string): Promise<FunctionModel | null>
-  getVersionHistory(modelId: string): Promise<VersionEntry[]>
-  publishVersion(modelId: string, version: string): Promise<void>
+  // NEW: Node-level linking methods
+  createNodeLink(
+    modelId: string,
+    nodeId: string,
+    targetFeature: string,
+    targetId: string,
+    linkType: string,
+    context?: Record<string, any>
+  ): Promise<CrossFeatureLink>
   
-  // Cross-feature linking
-  createCrossFeatureLink(link: CrossFeatureLink): Promise<CrossFeatureLink>
-  getCrossFeatureLinks(sourceId: string, sourceFeature: string): Promise<CrossFeatureLink[]>
-  getLinkedEntities(targetId: string, targetFeature: string): Promise<CrossFeatureLink[]>
-  updateLinkContext(linkId: string, context: Record<string, any>): Promise<void>
-  deleteCrossFeatureLink(linkId: string): Promise<void>
+  getNodeLinks(modelId: string, nodeId: string): Promise<CrossFeatureLink[]>
   
-  // Search and filtering
-  search(query: string, filters: FunctionModelFilters): Promise<FunctionModel[]>
-  getByUser(userId: string): Promise<FunctionModel[]>
-  getByCategory(category: string): Promise<FunctionModel[]>
-  getByProcessType(processType: string): Promise<FunctionModel[]>
+  deleteNodeLink(linkId: string): Promise<void>
+  
+  // NEW: Nested function model methods
+  getNestedFunctionModels(modelId: string): Promise<FunctionModel[]>
+  
+  linkFunctionModelToNode(
+    parentModelId: string,
+    nodeId: string,
+    childModelId: string,
+    context?: Record<string, any>
+  ): Promise<CrossFeatureLink>
 }
 ```
 
-### Phase 2: Application Layer Implementation (Week 2)
+#### 1.4 Application Layer Enhancements
+**Objective**: Create use cases and hooks for node-level linking
 
-#### 2.1 Use Cases for Function Model Persistence
-**Objective**: Implement comprehensive use cases for persistence operations
-
-**Use Cases Implementation**:
+**New Use Cases**:
 ```typescript
-// Save Function Model use case
-export const saveFunctionModel = async (
-  model: FunctionModel,
-  options: SaveOptions = {}
-): Promise<FunctionModel> => {
-  // Validate model data
-  validateFunctionModel(model)
-  
-  // Update metadata
-  model.metadata.lastSavedAt = new Date()
-  model.metadata.version = incrementVersion(model.metadata.version)
-  
-  // Save to repository
-  const savedModel = await functionModelRepository.update(model.modelId, model)
-  
-  // Create version snapshot if auto-versioning is enabled
-  if (options.autoVersion) {
-    await createVersionSnapshot(savedModel, options.changeSummary)
-  }
-  
-  return savedModel
-}
+// lib/application/use-cases/function-model-persistence-use-cases.ts
 
-// Load Function Model use case
-export const loadFunctionModel = async (
-  id: string,
-  version?: string
-): Promise<FunctionModel> => {
-  // Load from repository
-  const model = version 
-    ? await functionModelRepository.getVersion(id, version)
-    : await functionModelRepository.getById(id)
-  
-  if (!model) {
-    throw new Error(`Function Model not found: ${id}`)
-  }
-  
-  // Validate permissions
-  validateUserPermissions(model, 'view')
-  
-  // Update last accessed
-  await updateLastAccessed(model.modelId)
-  
-  return model
-}
-
-// Create cross-feature link use case
-export const createCrossFeatureLink = async (
-  sourceFeature: string,
-  sourceId: string,
+// NEW: Node-level linking use cases
+export const createNodeLink = async (
+  modelId: string,
+  nodeId: string,
   targetFeature: string,
   targetId: string,
   linkType: string,
   context?: Record<string, any>
 ): Promise<CrossFeatureLink> => {
   // Validate link parameters
-  validateCrossFeatureLink(sourceFeature, sourceId, targetFeature, targetId)
-  
-  // Check for existing links to prevent duplicates
-  const existingLinks = await functionModelRepository.getCrossFeatureLinks(sourceId, sourceFeature)
-  const duplicate = existingLinks.find(link => 
-    link.targetFeature === targetFeature && link.targetId === targetId
-  )
-  
-  if (duplicate) {
-    throw new Error('Cross-feature link already exists')
-  }
+  validateNodeLink(modelId, nodeId, targetFeature, targetId, linkType)
   
   // Create the link
-  const link: CrossFeatureLink = {
-    linkId: generateUUID(),
-    sourceFeature,
-    sourceId,
+  const link = await functionModelRepository.createNodeLink(
+    modelId,
+    nodeId,
     targetFeature,
     targetId,
     linkType,
-    linkContext: context || {},
-    createdAt: new Date()
+    context
+  )
+  
+  return link
+}
+
+export const getNodeLinks = async (
+  modelId: string,
+  nodeId: string
+): Promise<CrossFeatureLink[]> => {
+  return await functionModelRepository.getNodeLinks(modelId, nodeId)
+}
+
+// NEW: Nested function model use cases
+export const linkFunctionModelToNode = async (
+  parentModelId: string,
+  nodeId: string,
+  childModelId: string,
+  context?: Record<string, any>
+): Promise<CrossFeatureLink> => {
+  // Validate that child model exists
+  const childModel = await functionModelRepository.getById(childModelId)
+  if (!childModel) {
+    throw new Error(`Function Model not found: ${childModelId}`)
   }
   
-  return await functionModelRepository.createCrossFeatureLink(link)
+  // Create nested link
+  const link = await functionModelRepository.linkFunctionModelToNode(
+    parentModelId,
+    nodeId,
+    childModelId,
+    context
+  )
+  
+  return link
 }
 ```
 
-#### 2.2 Custom Hooks for Persistence
-**Objective**: Implement React hooks for Function Model persistence operations
-
-**Custom Hooks**:
+**Enhanced Hooks**:
 ```typescript
-// Function Model persistence hook
-export function useFunctionModelPersistence(modelId: string) {
-  const [model, setModel] = useState<FunctionModel | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [autoSave, setAutoSave] = useState(true)
-  const [saveInterval, setSaveInterval] = useState(30) // seconds
-  
-  // Load function model
-  const loadModel = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const loadedModel = await loadFunctionModel(modelId)
-      setModel(loadedModel)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load model')
-    } finally {
-      setLoading(false)
-    }
-  }, [modelId])
-  
-  // Save function model
-  const saveModel = useCallback(async (options?: SaveOptions) => {
-    if (!model) return
-    
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const savedModel = await saveFunctionModel(model, options)
-      setModel(savedModel)
-      return savedModel
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save model')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [model])
-  
-  // Auto-save functionality
-  useEffect(() => {
-    if (!autoSave || !model) return
-    
-    const interval = setInterval(() => {
-      saveModel({ autoVersion: false })
-    }, saveInterval * 1000)
-    
-    return () => clearInterval(interval)
-  }, [autoSave, model, saveInterval, saveModel])
-  
-  return {
-    model,
-    loading,
-    error,
-    loadModel,
-    saveModel,
-    autoSave,
-    setAutoSave,
-    saveInterval,
-    setSaveInterval
-  }
-}
+// lib/application/hooks/use-function-model-persistence.ts
 
-// Cross-feature linking hook
-export function useCrossFeatureLinking(sourceId: string, sourceFeature: string) {
+// NEW: Node-level linking hook
+export function useNodeLinking(modelId: string, nodeId: string) {
   const [links, setLinks] = useState<CrossFeatureLink[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  // Load cross-feature links
-  const loadLinks = useCallback(async () => {
+  const loadNodeLinks = useCallback(async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const loadedLinks = await functionModelRepository.getCrossFeatureLinks(sourceId, sourceFeature)
-      setLinks(loadedLinks)
+      const nodeLinks = await getNodeLinks(modelId, nodeId)
+      setLinks(nodeLinks)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load links')
+      setError(err instanceof Error ? err.message : 'Failed to load node links')
     } finally {
       setLoading(false)
     }
-  }, [sourceId, sourceFeature])
+  }, [modelId, nodeId])
   
-  // Create new link
-  const createLink = useCallback(async (
+  const createNodeLink = useCallback(async (
     targetFeature: string,
     targetId: string,
     linkType: string,
@@ -460,268 +245,805 @@ export function useCrossFeatureLinking(sourceId: string, sourceFeature: string) 
     setError(null)
     
     try {
-      const newLink = await createCrossFeatureLink(sourceFeature, sourceId, targetFeature, targetId, linkType, context)
-      await loadLinks() // Refresh links
+      const newLink = await createNodeLink(modelId, nodeId, targetFeature, targetId, linkType, context)
+      await loadNodeLinks() // Refresh links
       return newLink
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create link')
+      setError(err instanceof Error ? err.message : 'Failed to create node link')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [sourceFeature, sourceId, loadLinks])
+  }, [modelId, nodeId, loadNodeLinks])
   
   return {
     links,
     loading,
     error,
-    loadLinks,
-    createLink
+    loadNodeLinks,
+    createNodeLink
   }
 }
 ```
 
-### Phase 3: UI Components for Persistence (Week 3)
+#### 1.5 Presentation Layer Enhancements
+**Objective**: Replace navigation tabs with linking functionality in node modals
 
-#### 3.1 Save/Load UI Components
-**Objective**: Create comprehensive UI components for Function Model persistence
-
-**Component Architecture**:
+**Enhanced Node Modals**:
 ```typescript
-// Save/Load Panel Component
-export function FunctionModelSaveLoadPanel({ modelId }: { modelId: string }) {
-  const { model, loading, error, saveModel, autoSave, setAutoSave } = 
-    useFunctionModelPersistence(modelId)
+// components/composites/stage-node-modal.tsx
+// Replace navigation tabs with linking functionality
+
+export function StageNodeModal({ 
+  isOpen, 
+  onClose, 
+  stage,
+  modelId, // NEW: Pass modelId for linking
+  // ... existing props
+}: StageNodeModalProps) {
+  const { links, loading, createNodeLink } = useNodeLinking(modelId, stage.id)
   
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
-  const [loadDialogOpen, setLoadDialogOpen] = useState(false)
+  // Replace navigation tabs with linking tabs
+  const sidebarItems = [
+    { id: "details", label: "Details", icon: FileText },
+    { id: "links", label: "Links", icon: Link }, // NEW: Links tab
+    { id: "nested-models", label: "Nested Models", icon: GitBranch }, // NEW: Nested models
+  ]
   
   return (
-    <div className="function-model-save-load-panel">
-      <div className="panel-header">
-        <h3>Save & Load</h3>
-        <div className="auto-save-controls">
-          <Switch
-            checked={autoSave}
-            onCheckedChange={setAutoSave}
-            label="Auto-save"
-          />
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl h-[80vh]">
+        <div className="flex h-full">
+          {/* Sidebar */}
+          <div className="w-64 border-r p-4">
+            {sidebarItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveSidebar(item.id)}
+                className={`w-full text-left p-2 rounded ${
+                  activeSidebar === item.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                }`}
+              >
+                <item.icon className="w-4 h-4 inline mr-2" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Main Content */}
+          <div className="flex-1 p-6">
+            {activeSidebar === "details" && (
+              // ... existing details content
+            )}
+            
+            {activeSidebar === "links" && (
+              <NodeLinkingTab
+                links={links}
+                loading={loading}
+                onCreateLink={createNodeLink}
+                nodeType="stageNode"
+                nodeId={stage.id}
+              />
+            )}
+            
+            {activeSidebar === "nested-models" && (
+              <NestedModelsTab
+                modelId={modelId}
+                nodeId={stage.id}
+                onCreateNestedLink={createNodeLink}
+              />
+            )}
+          </div>
         </div>
-      </div>
-      
-      <div className="panel-content">
-        <Button onClick={() => setSaveDialogOpen(true)}>
-          Save Model
-        </Button>
-        
-        <Button onClick={() => setLoadDialogOpen(true)} variant="outline">
-          Load Version
-        </Button>
-        
-        {error && (
-          <Alert variant="destructive">
-            {error}
-          </Alert>
-        )}
-      </div>
-      
-      <SaveModelDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        onSave={saveModel}
-        model={model}
-      />
-      
-      <LoadModelDialog
-        open={loadDialogOpen}
-        onOpenChange={setLoadDialogOpen}
-        modelId={modelId}
-      />
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
+```
 
-// Cross-Feature Linking Panel Component
-export function CrossFeatureLinkingPanel({ modelId }: { modelId: string }) {
-  const { links, loading, error, loadLinks, createLink } = 
-    useCrossFeatureLinking(modelId, 'function-model')
-  
+**New Linking Components**:
+```typescript
+// components/composites/function-model/node-linking-tab.tsx
+interface NodeLinkingTabProps {
+  links: CrossFeatureLink[]
+  loading: boolean
+  onCreateLink: (targetFeature: string, targetId: string, linkType: string, context?: Record<string, any>) => Promise<void>
+  nodeType: string
+  nodeId: string
+}
+
+export function NodeLinkingTab({
+  links,
+  loading,
+  onCreateLink,
+  nodeType,
+  nodeId
+}: NodeLinkingTabProps) {
   const [createLinkDialogOpen, setCreateLinkDialogOpen] = useState(false)
   
-  useEffect(() => {
-    loadLinks()
-  }, [loadLinks])
-  
   return (
-    <div className="cross-feature-linking-panel">
-      <div className="panel-header">
-        <h3>Cross-Feature Links</h3>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Node Links</h3>
         <Button onClick={() => setCreateLinkDialogOpen(true)}>
           Add Link
         </Button>
       </div>
       
-      <div className="panel-content">
-        {loading ? (
-          <LoadingSpinner />
-        ) : (
-          <CrossFeatureLinksList
-            links={links}
-            onDeleteLink={handleDeleteLink}
-          />
-        )}
-        
-        {error && (
-          <Alert variant="destructive">
-            {error}
-          </Alert>
-        )}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {links.length === 0 ? (
+            <p className="text-muted-foreground">No links created yet</p>
+          ) : (
+            links.map(link => (
+              <LinkCard key={link.linkId} link={link} />
+            ))
+          )}
+        </div>
+      )}
       
-      <CreateCrossFeatureLinkDialog
+      <CreateNodeLinkDialog
         open={createLinkDialogOpen}
         onOpenChange={setCreateLinkDialogOpen}
-        onCreateLink={createLink}
+        onCreateLink={onCreateLink}
+        nodeType={nodeType}
+        nodeId={nodeId}
       />
     </div>
   )
 }
 ```
 
-### Phase 4: Integration and Advanced Features (Week 4)
-
-#### 4.1 Integration with Existing Components
-**Objective**: Integrate persistence features with existing Function Model components
-
-**Integration Points**:
+**Enhanced Node Visualization**:
 ```typescript
-// Enhanced Function Process Dashboard
-export function FunctionProcessDashboard({ modelId }: { modelId: string }) {
-  const { model, loading, error, saveModel } = useFunctionModelPersistence(modelId)
-  const { nodes, edges, onNodesChange, onEdgesChange } = useReactFlow()
-  
-  // Auto-save on changes
-  useEffect(() => {
-    if (model && (nodes.length > 0 || edges.length > 0)) {
-      const timeoutId = setTimeout(() => {
-        saveModel({ autoVersion: false })
-      }, 2000) // Debounce auto-save
-      
-      return () => clearTimeout(timeoutId)
-    }
-  }, [nodes, edges, model, saveModel])
+// components/composites/function-model/flow-nodes.tsx
+// Add link indicators to nodes
+
+export function StageNode(props: NodeProps) {
+  const { id, data, isConnectable } = props
+  const { links } = useNodeLinking(data.modelId, id)
   
   return (
-    <div className="function-process-dashboard">
-      <div className="dashboard-header">
-        <h1>{model?.name || 'Function Model'}</h1>
-        <div className="persistence-controls">
-          <FunctionModelSaveLoadPanel modelId={modelId} />
-          <CrossFeatureLinkingPanel modelId={modelId} />
+    <div className="relative">
+      {/* Existing node content */}
+      <div className="bg-white border-2 border-gray-300 rounded-lg p-4 shadow-sm">
+        {/* ... existing content */}
+      </div>
+      
+      {/* Link indicators */}
+      {links.length > 0 && (
+        <div className="absolute -top-2 -right-2 flex gap-1">
+          {links.map(link => (
+            <div
+              key={link.linkId}
+              className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center"
+              title={`${link.linkType} ${link.targetFeature}`}
+            >
+              {getLinkIcon(link.linkType)}
+            </div>
+          ))}
         </div>
-      </div>
-      
-      <div className="dashboard-content">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          // ... other props
-        />
-      </div>
-      
-      {loading && <LoadingOverlay />}
-      {error && <ErrorAlert error={error} />}
+      )}
     </div>
   )
 }
 ```
 
+#### 1.6 Database Schema Updates
+**Objective**: Enhance existing cross-feature links table for node-level linking
+
+**Database Schema Updates**:
+```sql
+-- Add node-specific context to existing table
+ALTER TABLE cross_feature_links 
+ADD COLUMN node_context JSONB DEFAULT '{}';
+
+-- Add index for node-level queries
+CREATE INDEX idx_cross_feature_links_node_context 
+ON cross_feature_links USING GIN (node_context);
+
+-- Add constraint for node links
+ALTER TABLE cross_feature_links 
+ADD CONSTRAINT node_link_context_check 
+CHECK (
+  (node_context->>'nodeId' IS NOT NULL) OR 
+  (node_context = '{}'::jsonb)
+);
+```
+
+### Phase 2: Function Model List View (Week 2)
+
+#### 2.1 List View Architecture
+**Objective**: Create a comprehensive list view interface for function models
+
+**Routing Structure**:
+```
+/function-model                    → List view (all models)
+/function-model/new               → Create new model
+/function-model/[modelId]         → Edit specific model (canvas)
+/function-model/[modelId]/version/[version] → Load specific version
+```
+
+**Component Architecture**:
+```typescript
+// Page Components
+- /function-model/page.tsx                    → FunctionModelListPage
+- /function-model/[modelId]/page.tsx          → FunctionModelCanvasPage
+
+// Feature Components
+- FunctionModelListView                       → Main list view container
+- FunctionModelListHeader                     → Header with create button and stats
+
+// Composite Components
+- FunctionModelCard                           → Individual model card
+- FunctionModelList                           → List container with search/filter
+- FunctionModelFilters                        → Search and filter controls
+```
+
+#### 2.2 List View Components Implementation
+
+**FunctionModelCard Component**:
+```typescript
+interface FunctionModelCardProps {
+  model: FunctionModel
+  onEdit: (modelId: string) => void
+  onDelete: (modelId: string) => void
+  onDuplicate: (modelId: string) => void
+}
+
+// Features:
+- Model name, description, version
+- Status badge (draft/published/archived)
+- Last modified date
+- Node count indicator (from nodesData.length)
+- Action buttons (Edit, Delete, Duplicate)
+- Preview of first few nodes
+```
+
+**FunctionModelList Component**:
+```typescript
+interface FunctionModelListProps {
+  models: FunctionModel[]
+  loading: boolean
+  onModelSelect: (modelId: string) => void
+  onModelDelete: (modelId: string) => void
+  onModelDuplicate: (modelId: string) => void
+}
+
+// Features:
+- Grid/list view toggle
+- Search functionality
+- Filter by status, process type, tags
+- Sort by name, date, version
+- Empty state handling
+- Loading states
+```
+
+**FunctionModelListView Component**:
+```typescript
+interface FunctionModelListViewProps {
+  onCreateNew: () => void
+}
+
+// Features:
+- Header with create button and stats
+- Search and filter controls
+- Model list with pagination
+- Loading and error states
+- Integration with existing hooks
+```
+
+#### 2.3 Application Layer Enhancements
+
+**Enhanced List Management Hook**:
+```typescript
+export function useFunctionModelList() {
+  const [models, setModels] = useState<FunctionModel[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<FunctionModelFilters>({})
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Load all models
+  const loadModels = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const allModels = await getAllFunctionModels()
+      setModels(allModels)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load models')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  
+  // Search and filter models
+  const searchModels = useCallback(async (query: string, filters: FunctionModelFilters) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const results = await searchFunctionModels(query, filters)
+      setModels(results)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search models')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  
+  return {
+    models,
+    loading,
+    error,
+    filters,
+    searchQuery,
+    loadModels,
+    searchModels,
+    setFilters,
+    setSearchQuery
+  }
+}
+```
+
+### Phase 3: Nested Function Model Support (Week 3)
+
+#### 3.1 Nested Function Model Architecture
+**Objective**: Support function models that contain other function models as nodes
+
+**Current Data Structure Analysis**:
+From the Supabase data, we can see that `nodes_data` contains React Flow nodes with:
+- `stageNode` - Contains actions that can reference other function models
+- `actionTableNode` - Contains actions that can link to other function models
+- `ioNode` - Input/output nodes
+- All nodes have `metadata` field for additional data
+
+**Nested Function Model Strategy**:
+```typescript
+// Enhanced node data structure for nested function models
+interface FunctionModelNode {
+  id: string
+  type: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelNode'
+  data: {
+    // ... existing data
+    linkedFunctionModel?: {
+      modelId: string
+      name: string
+      version: string
+      status: string
+      lastSavedAt: Date
+    }
+    // For action table nodes
+    actions?: ActionItem[]
+  }
+  // ... React Flow properties
+}
+
+interface ActionItem {
+  actionRowId: string
+  title: string
+  description: string
+  type: string
+  raci: RACIMatrix
+  linkedFunctionModel?: {
+    modelId: string
+    name: string
+    version: string
+  }
+  linkedSpindleTether?: {
+    tetherId: string
+    name: string
+  }
+}
+```
+
+#### 3.2 Cross-Feature Linking for Nested Models
+**Objective**: Implement proper linking between function models and their nested components
+
+**Linking Strategy**:
+```typescript
+// When a function model is linked as a node or action
+interface FunctionModelLink {
+  sourceModelId: string
+  sourceNodeId: string
+  sourceActionId?: string // For action table nodes
+  targetModelId: string
+  linkType: 'nested' | 'reference' | 'dependency'
+  context: {
+    nodeType: string
+    position: { x: number, y: number }
+    viewport: Viewport
+  }
+}
+
+// Store in cross_feature_links table
+{
+  source_feature: 'function-model',
+  source_id: 'source-model-uuid',
+  target_feature: 'function-model', 
+  target_id: 'target-model-uuid',
+  link_type: 'nested',
+  link_context: {
+    nodeId: 'node-uuid',
+    actionId: 'action-uuid', // optional
+    nodeType: 'stageNode',
+    position: { x: 100, y: 200 }
+  }
+}
+```
+
+#### 3.3 Enhanced Persistence for Nested Models
+**Objective**: Ensure nested function models are properly saved and loaded
+
+**Save Strategy**:
+```typescript
+// When saving a function model with nested models
+export const saveFunctionModelWithNested = async (
+  model: FunctionModel,
+  options: SaveOptions = {}
+): Promise<FunctionModel> => {
+  // 1. Save the main model
+  const savedModel = await saveFunctionModel(model, options)
+  
+  // 2. Extract and save cross-feature links for nested models
+  const nestedLinks = extractNestedModelLinks(model)
+  
+  for (const link of nestedLinks) {
+    await createNewCrossFeatureLink(
+      'function-model',
+      model.modelId,
+      'function-model', 
+      link.targetModelId,
+      'nested',
+      link.context
+    )
+  }
+  
+  return savedModel
+}
+
+// Extract nested model links from nodes and actions
+function extractNestedModelLinks(model: FunctionModel): FunctionModelLink[] {
+  const links: FunctionModelLink[] = []
+  
+  for (const node of model.nodesData) {
+    // Check for linked function models in node data
+    if (node.data.linkedFunctionModel) {
+      links.push({
+        sourceModelId: model.modelId,
+        sourceNodeId: node.id,
+        targetModelId: node.data.linkedFunctionModel.modelId,
+        linkType: 'nested',
+        context: {
+          nodeType: node.type,
+          position: node.position,
+          viewport: model.viewportData
+        }
+      })
+    }
+    
+    // Check for linked function models in actions
+    if (node.type === 'actionTableNode' && node.data.actions) {
+      for (const action of node.data.actions) {
+        if (action.linkedFunctionModel) {
+          links.push({
+            sourceModelId: model.modelId,
+            sourceNodeId: node.id,
+            sourceActionId: action.actionRowId,
+            targetModelId: action.linkedFunctionModel.modelId,
+            linkType: 'nested',
+            context: {
+              nodeType: node.type,
+              position: node.position,
+              viewport: model.viewportData
+            }
+          })
+        }
+      }
+    }
+  }
+  
+  return links
+}
+```
+
+**Load Strategy**:
+```typescript
+// When loading a function model, also load nested model references
+export const loadFunctionModelWithNested = async (
+  modelId: string,
+  options: LoadOptions = {}
+): Promise<FunctionModel> => {
+  // 1. Load the main model
+  const model = await loadFunctionModel(modelId, options)
+  
+  // 2. Load cross-feature links for nested models
+  const nestedLinks = await getCrossFeatureLinks(modelId, 'function-model')
+  
+  // 3. Enhance node data with nested model information
+  const enhancedModel = enhanceModelWithNestedData(model, nestedLinks)
+  
+  return enhancedModel
+}
+
+// Enhance model nodes with nested function model data
+function enhanceModelWithNestedData(
+  model: FunctionModel, 
+  nestedLinks: CrossFeatureLink[]
+): FunctionModel {
+  const enhancedNodes = model.nodesData.map(node => {
+    // Find links for this node
+    const nodeLinks = nestedLinks.filter(link => 
+      link.linkContext?.nodeId === node.id
+    )
+    
+    if (nodeLinks.length > 0) {
+      // Enhance node with nested model data
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          nestedModels: nodeLinks.map(link => ({
+            modelId: link.targetId,
+            linkType: link.linkType,
+            context: link.linkContext
+          }))
+        }
+      }
+    }
+    
+    return node
+  })
+  
+  return {
+    ...model,
+    nodesData: enhancedNodes
+  }
+}
+```
+
+### Phase 4: UI Integration and Navigation (Week 4)
+
+#### 4.1 List View Page Implementation
+**Objective**: Create the main list view page
+
+**FunctionModelListPage**:
+```typescript
+// /app/(private)/dashboard/function-model/page.tsx
+export default function FunctionModelListPage() {
+  const { models, loading, error, loadModels } = useFunctionModelList()
+  const router = useRouter()
+  
+  useEffect(() => {
+    loadModels()
+  }, [loadModels])
+  
+  const handleCreateNew = () => {
+    router.push('/function-model/new')
+  }
+  
+  const handleModelSelect = (modelId: string) => {
+    router.push(`/function-model/${modelId}`)
+  }
+  
+  return (
+    <div className="w-full h-full p-6">
+      <FunctionModelListView
+        models={models}
+        loading={loading}
+        error={error}
+        onCreateNew={handleCreateNew}
+        onModelSelect={handleModelSelect}
+      />
+    </div>
+  )
+}
+```
+
+#### 4.2 Canvas Page Implementation
+**Objective**: Create the canvas page for individual model editing
+
+**FunctionModelCanvasPage**:
+```typescript
+// /app/(private)/dashboard/function-model/[modelId]/page.tsx
+export default function FunctionModelCanvasPage({ 
+  params 
+}: { 
+  params: { modelId: string } 
+}) {
+  return (
+    <div className="w-full h-full">
+      <FunctionProcessDashboard 
+        functionModel={{ modelId: params.modelId }}
+      />
+    </div>
+  )
+}
+```
+
+#### 4.3 Enhanced FunctionProcessDashboard
+**Objective**: Update existing dashboard to support auto-loading
+
+**Auto-load Enhancement**:
+```typescript
+// Enhanced auto-load functionality in FunctionProcessDashboard
+useEffect(() => {
+  const loadSavedModel = async () => {
+    if (functionModel.modelId && functionModel.modelId !== 'sample-model-id') {
+      setIsLoading(true)
+      setLoadError(null)
+      
+      try {
+        // Load the specific model with nested data
+        const { loadFunctionModelWithNested } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
+        const loadedModel = await loadFunctionModelWithNested(functionModel.modelId, { 
+          includeMetadata: true 
+        })
+        
+        setFunctionModel(loadedModel)
+        
+        // Update flow data with loaded model
+        setFlow(prev => ({
+          ...prev,
+          name: loadedModel.name,
+          nodes: loadedModel.nodesData || [],
+          edges: loadedModel.edgesData || [],
+          viewport: loadedModel.viewportData || { x: 0, y: 0, zoom: 1 }
+        }))
+      } catch (err) {
+        console.error('Failed to load model:', err)
+        setLoadError(err instanceof Error ? err.message : 'Failed to load model')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
+  
+  loadSavedModel()
+}, [functionModel.modelId])
+```
+
+### Phase 5: Testing and Optimization (Week 5)
+
+#### 5.1 Comprehensive Testing
+**Objective**: Ensure all functionality works correctly
+
+**Test Scenarios**:
+1. **Node-Level Linking Tests**:
+   - Create links from stage nodes to other features
+   - Create links from action table nodes to function models
+   - Create links from I/O nodes to knowledge base
+   - Visual indicators on nodes showing linked entities
+   
+2. **List View Tests**:
+   - Load all function models
+   - Search and filter functionality
+   - Create new model
+   - Navigate to canvas view
+   
+3. **Nested Model Tests**:
+   - Create function model with nested models
+   - Save and load nested models
+   - Cross-feature linking for nested models
+   - Version control with nested models
+   
+4. **Integration Tests**:
+   - List view → Canvas view navigation
+   - Auto-load functionality
+   - Error handling
+   - Performance with large datasets
+
+#### 5.2 Performance Optimization
+**Objective**: Ensure optimal performance for list view and nested models
+
+**Optimization Strategies**:
+1. **Virtual Scrolling**: For large lists of function models
+2. **Lazy Loading**: Load nested model data on demand
+3. **Caching**: Cache frequently accessed models
+4. **Pagination**: Implement pagination for large datasets
+
 ## Success Metrics
 
 ### Functional Metrics
-- **Save Success Rate**: >99% successful save operations
-- **Load Performance**: <2 second load time for complex models
-- **Version Control**: Support for 100+ versions per model
-- **Cross-Feature Linking**: Support for 1000+ cross-feature relationships
-- **Multiple Models**: Support for 100+ function models per user
+- **Node-Level Linking**: Support for 50+ links per node
+- **List View Performance**: Load 100+ models in <2 seconds
+- **Navigation Speed**: List → Canvas transition in <1 second
+- **Nested Model Support**: Support for 10+ nested models per function model
+- **Auto-load Success**: 100% success rate for auto-loading last saved version
+- **Cross-feature Linking**: Support for 1000+ cross-feature relationships
 
 ### Technical Metrics
-- **Performance**: <500ms response time for save/load operations
+- **Performance**: <500ms response time for list operations
 - **Scalability**: Support for 10,000+ function models
-- **Data Integrity**: 100% data consistency across operations
-- **Storage Efficiency**: <30% storage overhead for version control
+- **Data Integrity**: 100% data consistency across nested models
+- **Storage Efficiency**: <30% storage overhead for nested relationships
 
 ## Risk Mitigation
 
 ### Technical Risks
-1. **Data Loss**: Implement comprehensive backup and version control
-2. **Performance Issues**: Use efficient data structures and caching
-3. **Concurrency Conflicts**: Implement optimistic locking and conflict resolution
-4. **Storage Growth**: Implement data archiving and cleanup strategies
+1. **Node-Level Linking Complexity**: Implement clear linking strategy and validation
+2. **Nested Model Complexity**: Implement clear linking strategy and validation
+3. **Performance Issues**: Use efficient data structures and lazy loading
+4. **Data Consistency**: Implement proper transaction handling for nested saves
+5. **Storage Growth**: Monitor and optimize nested relationship storage
 
 ### User Experience Risks
-1. **Complexity**: Provide intuitive UI with progressive disclosure
-2. **Data Loss**: Implement auto-save and recovery mechanisms
-3. **Cross-Feature Navigation**: Provide clear navigation between linked features
-4. **Version Management**: Provide clear version history and rollback options
+1. **Navigation Complexity**: Provide clear breadcrumbs and navigation
+2. **Data Loss**: Maintain existing auto-save and recovery mechanisms
+3. **Nested Model Management**: Provide clear UI for managing nested relationships
+4. **List View Usability**: Implement intuitive search, filter, and sort
+5. **Link Management**: Provide clear UI for managing node-level links
 
 ## Timeline and Milestones
 
-### Week 1: Core Persistence Infrastructure
-- [ ] Create function_models table
-- [ ] Create function_model_versions table
-- [ ] Create cross_feature_links table
-- [ ] Implement basic CRUD operations
-- [ ] Test save/load functionality
+### Week 1: Node-Level Linking Implementation
+- [ ] Enhance domain entities for node-level linking
+- [ ] Update repository with node-specific methods
+- [ ] Add database schema enhancements
+- [ ] Create node-level linking use cases
+- [ ] Implement enhanced hooks
+- [ ] Replace navigation tabs with linking tabs in node modals
+- [ ] Create node linking components
+- [ ] Add link visualization to nodes
 
-### Week 2: Application Layer Implementation
-- [ ] Use cases for persistence operations
-- [ ] Custom hooks for state management
-- [ ] Version control implementation
-- [ ] Cross-feature linking implementation
+### Week 2: Function Model List View
+- [ ] Create FunctionModelCard component
+- [ ] Create FunctionModelList component
+- [ ] Create FunctionModelListView component
+- [ ] Update routing structure
+- [ ] Implement list view page
 
-### Week 3: UI Components
-- [ ] Save/load UI components
-- [ ] Version control UI components
-- [ ] Cross-feature linking UI components
-- [ ] Integration with existing components
+### Week 3: Nested Function Model Support
+- [ ] Enhance node data structure for nested models
+- [ ] Implement nested model linking strategy
+- [ ] Update save/load functionality for nested models
+- [ ] Enhance cross-feature linking for nested models
 
-### Week 4: Integration and Advanced Features
-- [ ] Integration with existing components
+### Week 4: UI Integration and Navigation
+- [ ] Update FunctionModelListPage
+- [ ] Create FunctionModelCanvasPage
+- [ ] Enhance FunctionProcessDashboard auto-load
+- [ ] Implement navigation between list and canvas
+
+### Week 5: Testing and Optimization
+- [ ] Comprehensive testing of all functionality
 - [ ] Performance optimization
-- [ ] Comprehensive testing
-- [ ] Documentation and training
+- [ ] Error handling improvements
+- [ ] Documentation updates
 
 ## Conclusion
 
-This Function Model persistence implementation plan provides a comprehensive approach to building robust save/load functionality with cross-feature linking and version control. The focus on separate tables for each feature ensures better performance, clarity, and scalability while maintaining alignment with Clean Architecture principles.
+This enhanced Function Model persistence implementation plan builds upon the existing robust foundation to add node-level linking, list view functionality, and nested function model support. The plan maintains all existing functionality while adding new capabilities that support the "function model that has function model action steps, or stages" requirement.
 
-The phased approach allows for incremental implementation while maintaining system stability. The emphasis on user experience, performance, and cross-feature integration ensures that the persistence features become a core strength of the platform.
+The implementation follows Clean Architecture principles and maintains the established component hierarchy. The node-level linking and nested model support leverages the existing cross-feature linking infrastructure while adding specialized handling for function model relationships.
 
-## Reference: Other Enhanced Features (Not Implemented in MVP)
+The phased approach ensures that existing functionality remains stable while new features are incrementally added and tested.
 
-### Template Management System
-- Function Model templates for reusable processes
-- Template gallery and categorization
-- Template sharing and collaboration
-- Template version control
+## Current Implementation Status
 
-### Collaboration Features
-- Real-time collaboration on Function Models
-- Comment and suggestion system
-- Approval workflows
-- Activity tracking and notifications
+### ✅ **COMPLETED (95%)**
+- ✅ **Database Schema**: All tables created and functional
+- ✅ **Repository Layer**: Complete implementation
+- ✅ **Application Layer**: All use cases implemented
+- ✅ **UI Components**: Save/load, version control, cross-feature linking
+- ✅ **Integration**: Seamlessly integrated with existing dashboard
+- ✅ **Persistence**: Save/load functionality working perfectly
+- ✅ **Version Control**: Version loading and management working
+- ✅ **Global Cross-Feature Linking**: Working via sidebar panel
 
-### Export/Import System
-- Multiple export formats (JSON, XML, YAML, PNG, SVG)
-- Import from external sources
-- Export templates and configurations
-- Batch export operations
+### 🚧 **IN PROGRESS**
+- **Node-Level Linking**: Phase 1 implementation
+- **List View Interface**: Phase 2 planning
+- **Nested Function Models**: Phase 3 planning
+- **Enhanced Navigation**: Phase 4 preparation
 
-### Advanced Analytics
-- Function Model usage analytics
-- Process complexity analysis
-- Cross-feature relationship analytics
-- Performance metrics and insights 
+### 📋 **PLANNED**
+- **Performance Optimization**: Phase 5
+- **Comprehensive Testing**: Phase 5
+- **Documentation Updates**: Phase 5 

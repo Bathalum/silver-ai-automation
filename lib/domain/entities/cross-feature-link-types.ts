@@ -16,7 +16,7 @@ export interface CrossFeatureLink {
 
 export type FeatureType = 'function-model' | 'knowledge-base' | 'spindle'
 
-export type LinkType = 'documents' | 'implements' | 'references' | 'supports'
+export type LinkType = 'documents' | 'implements' | 'references' | 'supports' | 'nested'
 
 // Link context types for different link types
 export interface DocumentLinkContext {
@@ -40,6 +40,15 @@ export interface SupportLinkContext {
   supportType?: 'prerequisite' | 'enabler' | 'constraint'
   impact?: 'high' | 'medium' | 'low'
   notes?: string
+}
+
+// NEW: Node-specific link context
+export interface NodeLinkContext {
+  nodeId: string
+  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode'
+  actionId?: string // For action table nodes
+  position: { x: number; y: number }
+  viewport: { x: number; y: number; zoom: number }
 }
 
 // Link metadata for analytics and management
@@ -168,7 +177,7 @@ export function isValidFeatureType(type: string): type is FeatureType {
 }
 
 export function isValidLinkType(type: string): type is LinkType {
-  return ['documents', 'implements', 'references', 'supports'].includes(type)
+  return ['documents', 'implements', 'references', 'supports', 'nested'].includes(type)
 }
 
 export function isValidCrossFeatureLink(link: any): link is CrossFeatureLink {

@@ -140,7 +140,7 @@ export default function SOPEditPage({ params }: SOPEditPageProps) {
       {/* Knowledge Base Floating Sidebar */}
       <KnowledgeBaseFloatingSidebar
         currentSOPId={params.id}
-        onNavigateToFunctionModel={() => router.push("/dashboard/function-model")}
+        onNavigateToFunctionModel={() => router.push("/dashboard/function-model/list")}
         onNavigateToEventStorm={() => router.push("/dashboard/event-storm")}
         onNavigateToSpindle={() => router.push("/dashboard/spindle")}
         onOpenFunctionModelDetails={(entity) => router.push(`/dashboard/function-model/${entity.id}`)}

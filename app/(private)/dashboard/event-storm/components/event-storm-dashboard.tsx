@@ -979,7 +979,7 @@ function EventStormDashboardContent({
               });
             }}
             onNavigateToFunctionModel={() => {
-              window.location.href = "/dashboard/function-model"
+              window.location.href = "/dashboard/function-model/list"
             }}
             onNavigateToEventStorm={() => {
               window.location.href = "/dashboard/event-storm"

@@ -38,6 +38,30 @@ export interface FunctionModelRepository {
   updateLinkContext(linkId: string, context: Record<string, any>): Promise<void>
   deleteCrossFeatureLink(linkId: string): Promise<void>
   
+  // NEW: Node-level linking methods
+  createNodeLink(
+    modelId: string,
+    nodeId: string,
+    targetFeature: string,
+    targetId: string,
+    linkType: string,
+    context?: Record<string, any>
+  ): Promise<CrossFeatureLink>
+  
+  getNodeLinks(modelId: string, nodeId: string): Promise<CrossFeatureLink[]>
+  
+  deleteNodeLink(linkId: string): Promise<void>
+  
+  // NEW: Nested function model methods
+  getNestedFunctionModels(modelId: string): Promise<FunctionModel[]>
+  
+  linkFunctionModelToNode(
+    parentModelId: string,
+    nodeId: string,
+    childModelId: string,
+    context?: Record<string, any>
+  ): Promise<CrossFeatureLink>
+  
   // Search and filtering
   search(query: string, filters: FunctionModelFilters): Promise<FunctionModel[]>
   getByUser(userId: string): Promise<FunctionModel[]>
@@ -432,6 +456,104 @@ export class SupabaseFunctionModelRepository implements FunctionModelRepository 
     if (error) {
       throw new Error(`Failed to delete cross-feature link: ${error.message}`)
     }
+  }
+
+  // NEW: Node-level linking methods
+  async createNodeLink(
+    modelId: string,
+    nodeId: string,
+    targetFeature: string,
+    targetId: string,
+    linkType: string,
+    context?: Record<string, any>
+  ): Promise<CrossFeatureLink> {
+    const nodeContext = {
+      nodeId,
+      nodeType: context?.nodeType || 'stageNode',
+      actionId: context?.actionId,
+      position: context?.position || { x: 0, y: 0 },
+      viewport: context?.viewport || { x: 0, y: 0, zoom: 1 }
+    }
+
+    const { data, error } = await this.supabase
+      .from('cross_feature_links')
+      .insert({
+        source_feature: 'function-model',
+        source_id: modelId,
+        target_feature: targetFeature,
+        target_id: targetId,
+        link_type: linkType,
+        link_context: context || {},
+        node_context: nodeContext,
+        link_strength: 1.0
+      })
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to create node link: ${error.message}`)
+    }
+
+    return this.mapCrossFeatureLinkFromDatabase(data)
+  }
+
+  async getNodeLinks(modelId: string, nodeId: string): Promise<CrossFeatureLink[]> {
+    const { data, error } = await this.supabase
+      .from('cross_feature_links')
+      .select('*')
+      .eq('source_feature', 'function-model')
+      .eq('source_id', modelId)
+      .eq('node_context->>nodeId', nodeId)
+
+    if (error) {
+      throw new Error(`Failed to get node links: ${error.message}`)
+    }
+
+    return data.map(this.mapCrossFeatureLinkFromDatabase)
+  }
+
+  async deleteNodeLink(linkId: string): Promise<void> {
+    return this.deleteCrossFeatureLink(linkId)
+  }
+
+  // NEW: Nested function model methods
+  async getNestedFunctionModels(modelId: string): Promise<FunctionModel[]> {
+    const { data, error } = await this.supabase
+      .from('cross_feature_links')
+      .select('target_id')
+      .eq('source_feature', 'function-model')
+      .eq('source_id', modelId)
+      .eq('link_type', 'nested')
+
+    if (error) {
+      throw new Error(`Failed to get nested function models: ${error.message}`)
+    }
+
+    const nestedModels: FunctionModel[] = []
+    for (const link of data) {
+      const model = await this.getById(link.target_id)
+      if (model) {
+        nestedModels.push(model)
+      }
+    }
+
+    return nestedModels
+  }
+
+  async linkFunctionModelToNode(
+    parentModelId: string,
+    nodeId: string,
+    childModelId: string,
+    context?: Record<string, any>
+  ): Promise<CrossFeatureLink> {
+    return this.createNodeLink(
+      parentModelId,
+      nodeId,
+      'function-model',
+      childModelId,
+      'nested',
+      context
+    )
   }
 
   // Search and Filtering Operations
