@@ -7,7 +7,8 @@ app/(private)/dashboard/function-model/
 ├── components/
 │   ├── flow-nodes.css
 │   ├── flow-nodes.tsx
-│   └── function-process-dashboard.tsx
+│   ├── function-process-dashboard.tsx (LEGACY)
+│   └── function-process-dashboard-enhanced.tsx (NEW - Partially Implemented)
 ├── list/
 │   └── page.tsx
 ├── [modelId]/
@@ -32,35 +33,36 @@ components/composites/function-model/
 lib/
 ├── application/
 │   ├── hooks/
-│   │   ├── use-function-model-nodes.ts (NEW)
-│   │   └── use-function-model-persistence.ts
+│   │   ├── use-function-model-nodes.ts (NEW - Partially Implemented)
+│   │   └── use-function-model-persistence.ts (LEGACY)
 │   └── use-cases/
 │       └── function-model-persistence-use-cases.ts
 ├── domain/
 │   └── entities/
-│       ├── base-node-types.ts (NEW)
+│       ├── base-node-types.ts (NEW - Partially Implemented)
 │       ├── cross-feature-link-types.ts
-│       ├── function-model-node-types.ts (NEW)
-│       ├── function-model-types.ts
-│       ├── node-behavior-types.ts (NEW)
+│       ├── function-model-node-types.ts (NEW - Partially Implemented)
+│       ├── function-model-types.ts (LEGACY)
+│       ├── node-behavior-types.ts (NEW - Partially Implemented)
+│       ├── unified-node-types.ts (NEW - Partially Implemented)
 │       └── version-control-types.ts
 ├── infrastructure/
 │   ├── migrations/
-│   │   └── function-model-node-migration.ts (NEW)
+│   │   └── function-model-node-migration.ts (NEW - Partially Implemented)
 │   └── repositories/
-│       ├── function-model-repository.ts
-│       ├── node-links-repository.ts (NEW)
-│       ├── node-metadata-repository.ts (NEW)
-│       └── unified-node-repository.ts (NEW)
+│       ├── function-model-repository.ts (LEGACY + NEW)
+│       ├── node-links-repository.ts (NEW - Partially Implemented)
+│       ├── node-metadata-repository.ts (NEW - Partially Implemented)
+│       └── unified-node-repository.ts (NEW - Partially Implemented)
 ├── stores/
-│   └── unified-node-store.ts (NEW)
+│   └── unified-node-store.ts (NEW - Partially Implemented)
 └── use-cases/
-    └── unified-node-operations.ts (NEW)
+    └── unified-node-operations.ts (NEW - Partially Implemented)
 ```
 
 ## Component Hierarchy
 
-### Page Components (Top Level)
+### Legacy Implementation (Currently Active)
 ```
 FunctionModelListPage (app/(private)/dashboard/function-model/list/page.tsx)
 ├── FunctionModelList (components/composites/function-model/function-model-list.tsx)
@@ -79,20 +81,11 @@ FunctionModelCanvasPage (app/(private)/dashboard/function-model/[modelId]/page.t
         └── CreateCrossFeatureLinkDialog (components/composites/function-model/create-cross-feature-link-dialog.tsx)
 ```
 
-### Modal Components
+### New Implementation (Partially Implemented)
 ```
-FunctionModelModal (components/composites/function-model/function-model-modal.tsx)
-└── FunctionModelSharedModal (components/composites/shared-feature-modal.tsx)
+FunctionModelListPage → FunctionModelList → FunctionModelTableRow → Base Components
+FunctionModelCanvasPage → FunctionProcessDashboardEnhanced → useFunctionModelNodes → Node Repositories
 
-StageNodeModal (components/composites/stage-node-modal.tsx)
-├── NodeLinkingTab (components/composites/function-model/node-linking-tab.tsx)
-│   └── CreateNodeLinkDialog (components/composites/function-model/create-node-link-dialog.tsx)
-└── NestedModelsTab (components/composites/function-model/nested-models-tab.tsx)
-    └── CreateNestedModelDialog (components/composites/function-model/create-nested-model-dialog.tsx)
-```
-
-### New Node-Based Architecture Components
-```
 UnifiedNodeOperations (lib/use-cases/unified-node-operations.ts)
 ├── FunctionModelNodeMigration (lib/infrastructure/migrations/function-model-node-migration.ts)
 ├── NodeLinksRepository (lib/infrastructure/repositories/node-links-repository.ts)
@@ -103,6 +96,18 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
 ├── BaseNode (lib/domain/entities/base-node-types.ts)
 ├── FunctionModelNode (lib/domain/entities/function-model-node-types.ts)
 └── NodeBehavior (lib/domain/entities/node-behavior-types.ts)
+```
+
+### Modal Components
+```
+FunctionModelModal (components/composites/function-model/function-model-modal.tsx)
+└── FunctionModelSharedModal (components/composites/shared-feature-modal.tsx)
+
+StageNodeModal (components/composites/stage-node-modal.tsx)
+├── NodeLinkingTab (components/composites/function-model/node-linking-tab.tsx)
+│   └── CreateNodeLinkDialog (components/composites/function-model/create-node-link-dialog.tsx)
+└── NestedModelsTab (components/composites/function-model/nested-models-tab.tsx)
+    └── CreateNestedModelDialog (components/composites/function-model/create-nested-model-dialog.tsx)
 ```
 
 ## Component Responsibilities and Relationships
@@ -127,15 +132,35 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
   - Loads specific function model by ID
   - Handles model editing and persistence
   - Manages canvas state and interactions
-  - Integrates with new node-based architecture
+  - **CURRENT**: Uses legacy React Flow implementation
+  - **FUTURE**: Will integrate with new node-based architecture
 - **Props**: `params.modelId` (from Next.js dynamic routing)
-- **Children**: `FunctionProcessDashboard`
+- **Children**: `FunctionProcessDashboard` (legacy) or `FunctionProcessDashboardEnhanced` (new)
 
 ### 2. **Feature Components**
 
-#### `FunctionProcessDashboard` (Enhanced)
+#### `FunctionProcessDashboard` (LEGACY - Currently Active)
 - **Location**: `app/(private)/dashboard/function-model/components/function-process-dashboard.tsx`
 - **Responsibility**: Main canvas component for function model editing
+- **Key Features**:
+  - React Flow canvas integration
+  - Inline name/description editing
+  - Back to list navigation
+  - Floating action buttons
+  - Cross-feature linking sidebar
+  - Node creation and editing
+  - Real-time visual feedback
+- **Props**:
+  ```typescript
+  interface FunctionProcessDashboardProps {
+    functionModel?: FunctionModel
+  }
+  ```
+- **Children**: `FlowNodes`, `SaveLoadPanel`, `CrossFeatureLinkingPanel`
+
+#### `FunctionProcessDashboardEnhanced` (NEW - Partially Implemented)
+- **Location**: `app/(private)/dashboard/function-model/components/function-process-dashboard-enhanced.tsx`
+- **Responsibility**: Enhanced canvas component with node-based architecture
 - **Key Features**:
   - React Flow canvas integration
   - Inline name/description editing
@@ -149,25 +174,27 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
   ```typescript
   interface FunctionProcessDashboardProps {
     functionModel?: FunctionModel
+    migrationState?: MigrationState
+    onMigrationComplete?: (result: MigrationResult) => void
   }
   ```
 - **Children**: `FlowNodes`, `SaveLoadPanel`, `CrossFeatureLinkingPanel`
 
-#### `FlowNodes` (Enhanced)
+#### `FlowNodes` (LEGACY - Currently Active)
 - **Location**: `app/(private)/dashboard/function-model/components/flow-nodes.tsx`
 - **Responsibility**: React Flow node definitions and rendering
 - **Key Features**:
   - Custom node types (StageNode, ActionTableNode, IoNode, FunctionModelContainerNode)
   - Visual indicators for linked entities
   - Node interaction handling
-  - **NEW**: Node behavior visualization
-  - **NEW**: Cross-feature link indicators
+  - Drag-and-drop functionality
+  - Node editing and deletion
 - **Props**: React Flow node props
 - **Children**: Various node type components
 
 ### 3. **New Node-Based Architecture Components**
 
-#### `useFunctionModelNodes` (NEW)
+#### `useFunctionModelNodes` (NEW - Partially Implemented)
 - **Location**: `lib/application/hooks/use-function-model-nodes.ts`
 - **Responsibility**: Comprehensive state management for function model nodes
 - **Key Features**:
@@ -176,68 +203,126 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
   - Cross-feature link management
   - Node behavior configuration
   - Toast notifications for user feedback
+  - Statistics and analytics
+  - Bulk operations
 - **State**:
   ```typescript
   interface FunctionModelNodesState {
     nodes: FunctionModelNode[]
-    links: NodeLinkRecord[]
     metadata: NodeMetadataRecord[]
-    loading: boolean
+    links: NodeLinkRecord[]
+    isLoading: boolean
+    isSaving: boolean
     error: string | null
-    lastSavedAt: Date | null
+    statistics: {
+      totalNodes: number
+      nodesByType: Record<string, number>
+      nodesByExecutionType: Record<string, number>
+      nodesWithSLA: number
+      nodesWithKPIs: number
+    } | null
   }
   ```
 - **Actions**:
   ```typescript
   interface FunctionModelNodesActions {
-    createNode: (nodeType: string, name: string, position: Position, options?: any) => void
-    updateNode: (nodeId: string, updates: Partial<FunctionModelNode>) => void
-    deleteNode: (nodeId: string) => void
-    createNodeLink: (sourceId: string, targetId: string, linkType: string) => void
-    updateNodeLink: (linkId: string, updates: Partial<NodeLinkRecord>) => void
-    deleteNodeLink: (linkId: string) => void
-    saveNodes: () => Promise<void>
-    loadNodes: () => Promise<void>
+    createNode: (nodeType: string, name: string, position: Position, options?: any) => Promise<FunctionModelNode>
+    updateNode: (nodeId: string, updates: Partial<FunctionModelNode>) => Promise<FunctionModelNode>
+    deleteNode: (nodeId: string) => Promise<void>
+    getNode: (nodeId: string) => FunctionModelNode | undefined
+    
+    // Node behavior operations
+    executeNode: (nodeId: string, context?: any) => Promise<any>
+    validateNode: (nodeId: string) => Promise<{ isValid: boolean; errors: string[]; warnings: string[] }>
+    getNodeBehavior: (nodeId: string) => any
+    
+    // Cross-feature linking operations
+    createNodeLink: (targetFeature: string, targetEntityId: string, targetNodeId?: string, linkType?: string, context?: any) => Promise<NodeLinkRecord>
+    getNodeLinks: (nodeId?: string) => NodeLinkRecord[]
+    deleteNodeLink: (linkId: string) => Promise<void>
+    
+    // Metadata operations
+    updateNodeMetadata: (nodeId: string, metadata: Partial<NodeMetadataRecord>) => Promise<void>
+    updateNodeVisualProperties: (nodeId: string, visualProperties: Record<string, any>) => Promise<void>
+    
+    // Search and filtering
+    searchNodes: (query: string) => FunctionModelNode[]
+    getNodesByType: (nodeType: FunctionModelNode['nodeType']) => FunctionModelNode[]
+    getNodesByExecutionType: (executionType: string) => FunctionModelNode[]
+    getNodesWithSLA: () => FunctionModelNode[]
+    getNodesWithKPIs: () => FunctionModelNode[]
+    
+    // Statistics and analytics
+    refreshStatistics: () => Promise<void>
+    
+    // Bulk operations
+    bulkUpdateNodes: (updates: Partial<FunctionModelNode>) => Promise<void>
+    bulkCreateNodes: (nodes: Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<FunctionModelNode[]>
+    
+    // State management
+    refreshNodes: () => Promise<void>
+    clearError: () => void
   }
   ```
 
-#### `FunctionModelNodeMigration` (NEW)
-- **Location**: `lib/infrastructure/migrations/function-model-node-migration.ts`
-- **Responsibility**: Port and adapter for migrating existing function models to new architecture
+#### `useFunctionModelPersistence` (LEGACY - Currently Active)
+- **Location**: `lib/application/hooks/use-function-model-persistence.ts`
+- **Responsibility**: Legacy function model persistence and state management
 - **Key Features**:
-  - Converts old React Flow nodes to new domain entities
-  - Preserves all existing functionality and data
-  - Provides reverse migration for backward compatibility
-  - Validates migration results
-- **Methods**:
+  - Model loading and saving
+  - Auto-save functionality
+  - Version control
+  - Cross-feature linking
+  - Error handling
+- **State**:
   ```typescript
-  static migrateFunctionModel(model: FunctionModel, options?: MigrationOptions): MigrationResult
-  static reverseMigration(nodes: FunctionModelNode[], links: NodeLinkRecord[], modelId: string): FunctionModel
+  interface FunctionModelPersistenceState {
+    model: FunctionModel | null
+    loading: boolean
+    error: string | null
+    autoSave: boolean
+    saveInterval: number
+  }
   ```
-
-#### `UnifiedNodeOperations` (NEW)
-- **Location**: `lib/use-cases/unified-node-operations.ts`
-- **Responsibility**: Facade for cross-feature node operations
-- **Key Features**:
-  - Abstracted node operations across all features
-  - Cross-feature link management
-  - Unified metadata operations
-  - Node behavior execution
-- **Interface**:
+- **Actions**:
   ```typescript
-  interface UnifiedNodeOperations {
-    createNode(featureType: FeatureType, nodeType: string, data: any): Promise<BaseNode>
-    updateNode(nodeId: string, updates: Partial<BaseNode>): Promise<BaseNode>
-    deleteNode(nodeId: string): Promise<void>
-    createNodeLink(sourceId: string, targetId: string, linkType: LinkType): Promise<NodeLinkRecord>
-    getNodeLinks(nodeId: string): Promise<NodeLinkRecord[]>
-    executeNodeBehavior(nodeId: string, behavior: NodeBehavior): Promise<ExecutionResult>
+  interface FunctionModelPersistenceActions {
+    loadModel: (options?: LoadOptions) => Promise<FunctionModel>
+    saveModel: (options?: SaveOptions) => Promise<FunctionModel>
+    updateModel: (updates: Partial<FunctionModel>) => void
+    clearError: () => void
+    setAutoSave: (enabled: boolean) => void
+    setSaveInterval: (interval: number) => void
   }
   ```
 
 ### 4. **Repository Components**
 
-#### `NodeLinksRepository` (NEW)
+#### `FunctionModelRepository` (LEGACY + NEW)
+- **Location**: `lib/infrastructure/repositories/function-model-repository.ts`
+- **Responsibility**: Hybrid repository supporting both legacy and new architectures
+- **Key Features**:
+  - Legacy function model CRUD operations
+  - New node-based operations
+  - Migration support
+  - Statistics and analytics
+- **Methods**:
+  ```typescript
+  // Legacy operations
+  async create(model: Omit<FunctionModel, 'modelId' | 'createdAt' | 'updatedAt' | 'lastSavedAt'>): Promise<FunctionModel>
+  async getById(modelId: string): Promise<FunctionModel | null>
+  async update(modelId: string, updates: Partial<FunctionModel>): Promise<FunctionModel>
+  async delete(modelId: string): Promise<void>
+  
+  // New node-based operations
+  async getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]>
+  async createFunctionModelNode(node: Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode>
+  async updateFunctionModelNode(modelId: string, nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode>
+  async deleteFunctionModelNode(modelId: string, nodeId: string): Promise<void>
+  async getNodeStatistics(modelId: string): Promise<any>
+  ```
+
+#### `NodeLinksRepository` (NEW - Partially Implemented)
 - **Location**: `lib/infrastructure/repositories/node-links-repository.ts`
 - **Responsibility**: Cross-feature node link management
 - **Key Features**:
@@ -248,12 +333,11 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
 - **Methods**:
   ```typescript
   async createNodeLink(link: Omit<NodeLinkRecord, 'linkId' | 'createdAt' | 'updatedAt'>): Promise<NodeLinkRecord>
-  async getNodeLinks(featureType: FeatureType, entityId: string, nodeId?: string): Promise<NodeLinkRecord[]>
-  async updateNodeLink(linkId: string, updates: Partial<NodeLinkRecord>): Promise<NodeLinkRecord>
+  async getNodeLinks(featureType: string, entityId: string, nodeId?: string): Promise<NodeLinkRecord[]>
   async deleteNodeLink(linkId: string): Promise<void>
   ```
 
-#### `NodeMetadataRepository` (NEW)
+#### `NodeMetadataRepository` (NEW - Partially Implemented)
 - **Location**: `lib/infrastructure/repositories/node-metadata-repository.ts`
 - **Responsibility**: Unified node metadata management
 - **Key Features**:
@@ -263,16 +347,47 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
   - AI agent configuration
 - **Methods**:
   ```typescript
-  async createNodeMetadata(metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'>): Promise<NodeMetadataRecord>
-  async getNodeMetadata(nodeId: string): Promise<NodeMetadataRecord | null>
-  async updateNodeMetadata(nodeId: string, updates: Partial<NodeMetadataRecord>): Promise<NodeMetadataRecord>
-  async searchNodes(query: string, featureType?: FeatureType): Promise<NodeMetadataRecord[]>
+  async createMetadata(metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'>): Promise<NodeMetadataRecord>
+  async getMetadataByEntity(featureType: string, entityId: string): Promise<NodeMetadataRecord[]>
+  async updateMetadata(metadataId: string, updates: Partial<NodeMetadataRecord>): Promise<NodeMetadataRecord>
+  async updateVisualProperties(metadataId: string, visualProperties: Record<string, any>): Promise<void>
   ```
 
 ### 5. **Domain Entity Components**
 
-#### `BaseNode` (NEW)
-- **Location**: `lib/domain/entities/base-node-types.ts`
+#### `FunctionModel` (LEGACY - Currently Active)
+- **Location**: `lib/domain/entities/function-model-types.ts`
+- **Responsibility**: Legacy function model data structure
+- **Key Features**:
+  - React Flow compatible data structure
+  - Version control and metadata
+  - Cross-feature relationships
+  - Export/import capabilities
+- **Interface**:
+  ```typescript
+  interface FunctionModel {
+    modelId: string
+    name: string
+    description: string
+    version: string
+    status: 'draft' | 'published' | 'archived'
+    nodesData: Node[]
+    edgesData: Edge[]
+    viewportData: Viewport
+    tags: string[]
+    relationships: NodeRelationship[]
+    metadata: FunctionModelMetadata
+    permissions: FunctionModelPermissions
+    versionHistory: VersionEntry[]
+    currentVersion: string
+    createdAt: Date
+    updatedAt: Date
+    lastSavedAt: Date
+  }
+  ```
+
+#### `BaseNode` (NEW - Partially Implemented)
+- **Location**: `lib/domain/entities/unified-node-types.ts`
 - **Responsibility**: Foundation interface for all nodes across features
 - **Key Features**:
   - Unified node interface
@@ -282,21 +397,19 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
 - **Interface**:
   ```typescript
   interface BaseNode {
-    id: string
-    featureType: FeatureType
+    nodeId: string
+    type: 'function-model' | 'event-storm' | 'spindle' | 'knowledge-base'
     nodeType: string
     name: string
     description: string
-    position: Position
-    visualProperties: VisualProperties
+    position: { x: number; y: number }
     metadata: NodeMetadata
-    status: NodeStatus
     createdAt: Date
     updatedAt: Date
   }
   ```
 
-#### `FunctionModelNode` (NEW)
+#### `FunctionModelNode` (NEW - Partially Implemented)
 - **Location**: `lib/domain/entities/function-model-node-types.ts`
 - **Responsibility**: Function model specific node implementation
 - **Key Features**:
@@ -329,67 +442,59 @@ useFunctionModelNodes (lib/application/hooks/use-function-model-nodes.ts)
   }
   ```
 
-#### `NodeBehavior` (NEW)
-- **Location**: `lib/domain/entities/node-behavior-types.ts`
-- **Responsibility**: Node behavior abstraction system
-- **Key Features**:
-  - Abstract behavior classes for different node types
-  - Validation and execution result interfaces
-  - Behavior factory pattern
-  - Cross-feature behavior compatibility
-- **Classes**:
-  ```typescript
-  abstract class NodeBehavior {
-    abstract validate(node: BaseNode): ValidationResult
-    abstract execute(node: BaseNode, context: any): Promise<ExecutionResult>
-  }
-  
-  class ProcessNodeBehavior extends NodeBehavior
-  class ContentNodeBehavior extends NodeBehavior
-  class IntegrationNodeBehavior extends NodeBehavior
-  ```
-
 ## Component Data Contracts
 
-### New Node-Based Architecture Data Structures
+### Legacy Data Structure (Currently Active)
+```typescript
+interface FunctionModel {
+  modelId: string
+  name: string
+  description: string
+  version: string
+  status: 'draft' | 'published' | 'archived'
+  nodesData: Node[] // React Flow compatible
+  edgesData: Edge[] // React Flow compatible
+  viewportData: Viewport
+  tags: string[]
+  relationships: NodeRelationship[]
+  metadata: FunctionModelMetadata
+  permissions: FunctionModelPermissions
+  versionHistory: VersionEntry[]
+  currentVersion: string
+  createdAt: Date
+  updatedAt: Date
+  lastSavedAt: Date
+}
+```
+
+### New Node-Based Architecture Data Structures (Partially Implemented)
 
 #### Base Node Data Structure
 ```typescript
 interface BaseNode {
-  id: string
-  featureType: FeatureType
+  nodeId: string
+  type: 'function-model' | 'event-storm' | 'spindle' | 'knowledge-base'
   nodeType: string
   name: string
   description: string
-  position: Position
-  visualProperties: VisualProperties
+  position: { x: number; y: number }
   metadata: NodeMetadata
-  status: NodeStatus
   createdAt: Date
   updatedAt: Date
 }
 
-interface VisualProperties {
-  color: string
-  icon: string
-  size: 'small' | 'medium' | 'large'
-  style: Record<string, any>
-  featureSpecific: Record<string, any>
-}
-
 interface NodeMetadata {
+  feature: string
+  version: string
   tags: string[]
-  searchKeywords: string[]
-  crossFeatureLinks: CrossFeatureLinkMetadata[]
   aiAgent?: AIAgentConfig
   vectorEmbedding?: number[]
-}
-
-interface NodeStatus {
-  status: 'active' | 'inactive' | 'error' | 'processing'
-  lastExecuted?: Date
-  executionCount: number
-  errorCount: number
+  graphProperties?: Record<string, any>
+  // Feature-specific data
+  functionModel?: FunctionModelData
+  eventStorm?: EventStormData
+  spindle?: SpindleData
+  knowledgeBase?: KnowledgeBaseData
 }
 ```
 
@@ -422,13 +527,13 @@ interface FunctionModelNode extends BaseNode {
 ```typescript
 interface NodeLinkRecord {
   linkId: string
-  sourceFeature: FeatureType
+  sourceFeature: string
   sourceEntityId: string
   sourceNodeId?: string
-  targetFeature: FeatureType
+  targetFeature: string
   targetEntityId: string
   targetNodeId?: string
-  linkType: LinkType
+  linkType: string
   linkStrength: number
   linkContext: Record<string, any>
   visualProperties: Record<string, any>
@@ -442,7 +547,7 @@ interface NodeLinkRecord {
 ```typescript
 interface NodeMetadataRecord {
   metadataId: string
-  featureType: FeatureType
+  featureType: string
   entityId: string
   nodeId: string
   nodeType: string
@@ -451,30 +556,9 @@ interface NodeMetadataRecord {
   vectorEmbedding?: number[]
   searchKeywords: string[]
   aiAgentConfig?: AIAgentConfig
-  visualProperties: VisualProperties
+  visualProperties: Record<string, any>
   createdAt: Date
   updatedAt: Date
-}
-```
-
-### Legacy Data Structure (For Migration)
-```typescript
-interface FunctionModel {
-  modelId: string
-  name: string
-  description: string
-  version: string
-  status: 'draft' | 'published' | 'archived'
-  nodesData: Node[] // React Flow compatible
-  edgesData: Edge[] // React Flow compatible
-  viewportData: Viewport
-  metadata: FunctionModelMetadata
-  permissions: FunctionModelPermissions
-  versionHistory: VersionEntry[]
-  currentVersion: string
-  createdAt: Date
-  updatedAt: Date
-  lastSavedAt: Date
 }
 ```
 
@@ -488,7 +572,9 @@ interface FunctionModel {
 - **`UnifiedNodeOperations`**: Reusable node operations facade
 
 ### Feature-Specific Components
+- **`FunctionModel`**: Specific to legacy function model feature
 - **`FunctionModelNode`**: Specific to function model feature
+- **`useFunctionModelPersistence`**: Specific to legacy function model persistence
 - **`useFunctionModelNodes`**: Specific to function model node management
 - **`FunctionModelNodeMigration`**: Specific to function model migration
 - **`FunctionProcessDashboard`**: Specific to function model canvas
@@ -496,23 +582,15 @@ interface FunctionModel {
 
 ## Component State Management
 
-### Local State (Component Level)
-- Form inputs and user interactions
-- UI state (modals, dropdowns, loading states)
-- Temporary data (unsaved changes)
-- Migration state and progress
+### Legacy State Management (Currently Active)
+- **Local State**: Form inputs, UI state, temporary data
+- **Application State**: Function model data via `useFunctionModelPersistence`
+- **Global State**: User authentication, application settings
 
-### Application State (Hook Level)
-- Function model node data and persistence
-- Node metadata and cross-feature links
-- Node behavior configuration
-- Auto-save functionality and intervals
-
-### Global State (Store Level)
-- User authentication and permissions
-- Application-wide settings
-- Cross-feature navigation state
-- Unified node store for cross-feature operations
+### New State Management (Partially Implemented)
+- **Local State**: Form inputs and user interactions
+- **Application State**: Function model node data via `useFunctionModelNodes`
+- **Global State**: User authentication, application settings, unified node store
 
 ## Component Testing Strategy
 
@@ -560,4 +638,28 @@ interface FunctionModel {
 - Optimized image and asset loading
 - Migration layer code splitting
 
-This component documentation provides a comprehensive view of the Function Model feature's enhanced component architecture with the new node-based system, enabling both human developers and AI agents to understand the implementation details and relationships. 
+## Current Implementation Status
+
+### ✅ **Fully Implemented**
+- Legacy React Flow canvas with drag-and-drop functionality
+- Basic node types (Stage, Action, IO, Container)
+- Node creation, editing, and deletion
+- Cross-feature linking modal system
+- Version control and model persistence
+- Basic node metadata system
+
+### 🔄 **Partially Implemented**
+- **Node-Based Architecture**: Core types and hooks exist, but not fully integrated
+- **Enhanced Node Management**: `useFunctionModelNodes` hook implemented but not used in main canvas
+- **Migration Layer**: Types and interfaces exist, but migration logic not fully implemented
+- **Cross-Feature Linking**: Basic linking exists, but advanced features not implemented
+- **Node Behavior System**: Framework exists, but execution not fully implemented
+
+### ❌ **Not Implemented**
+- **Workflow Execution**: No execution engine
+- **AI Integration**: No AI agent implementation
+- **Advanced Analytics**: No performance monitoring
+- **Real-time Collaboration**: No collaborative editing
+- **Advanced Export/Import**: Limited to JSON format
+
+This component documentation provides a comprehensive view of the Function Model feature's current component architecture with both the legacy React Flow implementation and the new node-based system, enabling both human developers and AI agents to understand the implementation details and relationships. 

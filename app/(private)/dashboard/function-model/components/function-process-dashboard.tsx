@@ -252,6 +252,15 @@ export function FunctionProcessDashboard({
             }))
           } else {
             console.log('No saved models found, using sample model')
+            // Ensure the flow state is properly set with sample model data
+            console.log('Setting flow with sample model data:', functionModel.nodesData)
+            setFlow(prev => ({
+              ...prev,
+              name: functionModel.name,
+              nodes: functionModel.nodesData || [],
+              edges: functionModel.edgesData || [],
+              viewport: functionModel.viewportData || { x: 0, y: 0, zoom: 1 }
+            }))
           }
         } catch (err) {
           console.error('Failed to load most recent model:', err)
@@ -329,6 +338,8 @@ export function FunctionProcessDashboard({
     edges: functionModel.edgesData || [],
     viewport: functionModel.viewportData || { x: 0, y: 0, zoom: 1 },
   })
+
+
 
   // Sync flow state with functionModel
   useEffect(() => {
@@ -1092,24 +1103,31 @@ export function FunctionProcessDashboard({
           </div>
         </TooltipProvider>
       </div>
+
+
       <ReactFlowProvider>
-        <ReactFlow
-          nodes={flow.nodes}
-          edges={flow.edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          isValidConnection={isValidConnection}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.1 }}
-          className="w-full h-full"
-          onEdgeContextMenu={onEdgeContextMenu}
-          onNodeClick={handleNodeClick}
-        >
-          <Controls />
-          <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
-        </ReactFlow>
+        <div className="w-full h-full">
+          <ReactFlow
+            nodes={flow.nodes}
+            edges={flow.edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.1 }}
+            className="w-full h-full"
+            onEdgeContextMenu={onEdgeContextMenu}
+            onNodeClick={handleNodeClick}
+            onInit={(instance) => {
+              console.log('ReactFlow initialized')
+            }}
+          >
+            <Controls />
+            <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
+          </ReactFlow>
+        </div>
       </ReactFlowProvider>
 
       {/* Persistence Sidebar */}
@@ -1160,7 +1178,12 @@ export function FunctionProcessDashboard({
             {activePersistenceTab === 'save' && (
               <SaveLoadPanel
                 modelId={functionModel.modelId}
-                model={functionModel}
+                model={{
+                  ...functionModel,
+                  nodesData: flow.nodes,
+                  edgesData: flow.edges,
+                  viewportData: flow.viewport
+                }}
                 onModelUpdate={(updatedModel) => {
                   console.log('Dashboard received updated model:', updatedModel);
                   console.log('Updated model nodesData:', updatedModel.nodesData);

@@ -62,7 +62,11 @@ export const saveFunctionModel = async (
 
   // Increment version if auto-versioning is enabled
   if (options.autoVersion) {
-    updatedModel.version = incrementVersion(model.version, false)
+    // Get the latest version number to avoid conflicts
+    const versionHistory = await getVersionHistory(model.modelId)
+    const latestVersion = versionHistory.length > 0 ? versionHistory[0].version : model.version
+    
+    updatedModel.version = incrementVersion(latestVersion, false)
     updatedModel.currentVersion = updatedModel.version
     console.log('Version incremented to:', updatedModel.version)
   }
@@ -72,11 +76,9 @@ export const saveFunctionModel = async (
   const savedModel = await functionModelRepository.update(model.modelId, updatedModel)
   console.log('Model saved successfully:', savedModel)
 
-  // Create version snapshot if auto-versioning is enabled
-  if (options.autoVersion) {
-    console.log('Creating version snapshot...')
-    await createVersionSnapshot(savedModel, options.changeSummary || 'Auto-save')
-  }
+  // Always create version snapshot
+  console.log('Creating version snapshot...')
+  await createVersionSnapshot(savedModel, options.changeSummary || 'Manual save')
 
   return savedModel
 }
@@ -88,7 +90,24 @@ export const loadFunctionModel = async (
 ): Promise<FunctionModel> => {
   console.log('loadFunctionModel called with:', { id, options })
   
-  // Load from repository
+  // If a specific version is requested, load that version
+  if (options.version) {
+    console.log('Loading specific version:', options.version)
+    const versionModel = await functionModelRepository.getVersionById(id, options.version)
+    
+    if (!versionModel) {
+      console.error('Version not found:', options.version, 'for model:', id)
+      throw new Error(`Version ${options.version} not found for Function Model: ${id}`)
+    }
+    
+    console.log('Version model loaded from repository:', versionModel)
+    console.log('Version model nodesData:', versionModel.nodesData)
+    console.log('Version model edgesData:', versionModel.edgesData)
+    console.log('Version model viewportData:', versionModel.viewportData)
+    return versionModel
+  }
+  
+  // Load current model from repository
   const model = await functionModelRepository.getById(id)
 
   if (!model) {
@@ -138,55 +157,85 @@ export const createNewCrossFeatureLink = async (
     throw new Error('Missing required link parameters')
   }
 
-  // Create the link (placeholder implementation)
-  const linkData = createCrossFeatureLink(
-    sourceFeature as any,
+  // Create the link using repository
+  const linkData = await functionModelRepository.createCrossFeatureLink(
+    sourceFeature,
     sourceId,
-    targetFeature as any,
+    null, // sourceNodeId - for model-level links
+    targetFeature,
     targetId,
-    linkType as any,
+    null, // targetNodeId - for model-level links
+    linkType,
     context
   )
 
-  // Add missing properties
+  // Convert to CrossFeatureLink format
   const link: CrossFeatureLink = {
-    ...linkData,
-    linkId: `link_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    createdAt: new Date()
+    linkId: linkData.link_id,
+    sourceFeature: linkData.source_feature as any,
+    sourceId: linkData.source_id,
+    targetFeature: linkData.target_feature as any,
+    targetId: linkData.target_id,
+    linkType: linkData.link_type as any,
+    linkStrength: linkData.link_strength,
+    linkContext: linkData.link_context,
+    createdAt: new Date(linkData.created_at),
+    createdBy: linkData.created_by
   }
 
-  // TODO: Implement actual link creation in new architecture
-  console.log('Cross-feature link creation (placeholder):', link)
-  
+  console.log('Cross-feature link created successfully:', link)
   return link
 }
 
-// Get cross-feature links use case (placeholder implementation)
+// Get cross-feature links use case
 export const getCrossFeatureLinks = async (
   sourceId: string,
   sourceFeature: string
 ): Promise<CrossFeatureLink[]> => {
-  // TODO: Implement actual link retrieval in new architecture
-  console.log('Getting cross-feature links (placeholder):', { sourceId, sourceFeature })
-  return []
+  console.log('Getting cross-feature links:', { sourceId, sourceFeature })
+  
+  const linkData = await functionModelRepository.getCrossFeatureLinks(sourceId, sourceFeature)
+  
+  // Convert to CrossFeatureLink format
+  const links: CrossFeatureLink[] = linkData.map((link: any) => ({
+    linkId: link.link_id,
+    sourceFeature: link.source_feature as any,
+    sourceId: link.source_id,
+    targetFeature: link.target_feature as any,
+    targetId: link.target_id,
+    linkType: link.link_type as any,
+    linkStrength: link.link_strength,
+    linkContext: link.link_context,
+    createdAt: new Date(link.created_at),
+    createdBy: link.created_by
+  }))
+  
+  console.log('Cross-feature links loaded:', links)
+  return links
 }
 
-// Update cross-feature link context use case (placeholder implementation)
+// Update cross-feature link context use case
 export const updateCrossFeatureLinkContext = async (
   linkId: string,
   context: Record<string, any>
 ): Promise<void> => {
-  // TODO: Implement actual link context update in new architecture
-  console.log('Updating cross-feature link context (placeholder):', { linkId, context })
+  console.log('Updating cross-feature link context:', { linkId, context })
+  
+  await functionModelRepository.updateCrossFeatureLinkContext(linkId, context)
+  
+  console.log('Cross-feature link context updated successfully')
 }
 
-// Delete cross-feature link use case (placeholder implementation)
+// Delete cross-feature link use case
 export const deleteCrossFeatureLink = async (linkId: string): Promise<void> => {
-  // TODO: Implement actual link deletion in new architecture
-  console.log('Deleting cross-feature link (placeholder):', linkId)
+  console.log('Deleting cross-feature link:', linkId)
+  
+  await functionModelRepository.deleteCrossFeatureLink(linkId)
+  
+  console.log('Cross-feature link deleted successfully')
 }
 
-// Node-level linking use cases (placeholder implementations)
+// Node-level linking use cases
 export const createNodeLink = async (
   modelId: string,
   nodeId: string,
@@ -195,25 +244,34 @@ export const createNodeLink = async (
   linkType: string,
   context?: Record<string, any>
 ): Promise<CrossFeatureLink> => {
-  // TODO: Implement actual node link creation in new architecture
-  console.log('Creating node link (placeholder):', { modelId, nodeId, targetFeature, targetId, linkType, context })
+  console.log('Creating node link:', { modelId, nodeId, targetFeature, targetId, linkType, context })
   
-  const linkData = createCrossFeatureLink(
-    'function-model' as any,
+  const linkData = await functionModelRepository.createCrossFeatureLink(
+    'function-model',
     modelId,
-    targetFeature as any,
+    nodeId, // sourceNodeId - for node-level links
+    targetFeature,
     targetId,
-    linkType as any,
+    null, // targetNodeId - for model-level links
+    linkType,
     context
   )
   
-  // Add missing properties
+  // Convert to CrossFeatureLink format
   const link: CrossFeatureLink = {
-    ...linkData,
-    linkId: `node_link_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    createdAt: new Date()
+    linkId: linkData.link_id,
+    sourceFeature: linkData.source_feature as any,
+    sourceId: linkData.source_id,
+    targetFeature: linkData.target_feature as any,
+    targetId: linkData.target_id,
+    linkType: linkData.link_type as any,
+    linkStrength: linkData.link_strength,
+    linkContext: linkData.link_context,
+    createdAt: new Date(linkData.created_at),
+    createdBy: linkData.created_by
   }
   
+  console.log('Node link created successfully:', link)
   return link
 }
 
@@ -221,9 +279,30 @@ export const getNodeLinks = async (
   modelId: string,
   nodeId: string
 ): Promise<CrossFeatureLink[]> => {
-  // TODO: Implement actual node link retrieval in new architecture
-  console.log('Getting node links (placeholder):', { modelId, nodeId })
-  return []
+  console.log('Getting node links:', { modelId, nodeId })
+  
+  // Get all links for this model and filter by nodeId
+  const linkData = await functionModelRepository.getCrossFeatureLinks(modelId, 'function-model')
+  
+  // Filter links that have the specific nodeId
+  const nodeLinks = linkData.filter((link: any) => link.node_context?.nodeId === nodeId)
+  
+  // Convert to CrossFeatureLink format
+  const links: CrossFeatureLink[] = nodeLinks.map((link: any) => ({
+    linkId: link.link_id,
+    sourceFeature: link.source_feature as any,
+    sourceId: link.source_id,
+    targetFeature: link.target_feature as any,
+    targetId: link.target_id,
+    linkType: link.link_type as any,
+    linkStrength: link.link_strength,
+    linkContext: link.link_context,
+    createdAt: new Date(link.created_at),
+    createdBy: link.created_by
+  }))
+  
+  console.log('Node links loaded:', links)
+  return links
 }
 
 export const deleteNodeLink = async (linkId: string): Promise<void> => {
@@ -266,13 +345,21 @@ export const getNestedFunctionModels = async (modelId: string): Promise<Function
   return []
 }
 
-// Create version snapshot use case (placeholder implementation)
+// Create version snapshot use case
 export const createVersionSnapshot = async (
   model: FunctionModel,
   changeSummary: string
 ): Promise<VersionEntry> => {
-  // TODO: Implement actual version snapshot creation in new architecture
-  console.log('Creating version snapshot (placeholder):', { model: model.modelId, changeSummary })
+  console.log('Creating version snapshot:', { model: model.modelId, changeSummary })
+  
+  // Get the latest version number to avoid conflicts
+  const versionHistory = await getVersionHistory(model.modelId)
+  const latestVersion = versionHistory.length > 0 ? versionHistory[0].version : '1.0.0'
+  
+  // Increment version number to create new version
+  const newVersion = incrementVersion(latestVersion, false) // false = minor version increment
+  
+  console.log('Version increment:', { latestVersion, newVersion })
   
   const changeDescriptionData = createChangeDescription(
     'metadata-changed',
@@ -282,7 +369,7 @@ export const createVersionSnapshot = async (
 
   const snapshotData = createFunctionModelSnapshot(
     model.modelId,
-    model.version,
+    newVersion, // Use new version number
     model.nodesData,
     model.edgesData,
     model.viewportData,
@@ -302,7 +389,7 @@ export const createVersionSnapshot = async (
   )
 
   const versionEntryData = createVersionEntry(
-    model.version,
+    newVersion, // Use new version number
     'current-user',
     [{
       ...changeDescriptionData,
@@ -314,18 +401,53 @@ export const createVersionSnapshot = async (
     }
   )
 
-  return {
+  const versionEntry = {
     ...versionEntryData,
     timestamp: new Date()
   }
+
+  // Save version to database
+  console.log('Saving version to database:', versionEntry)
+  await functionModelRepository.saveVersion(model.modelId, versionEntry)
+  console.log('Version saved successfully')
+
+  return versionEntry
 }
 
 // Get version history use case (placeholder implementation)
 export const getVersionHistory = async (modelId: string): Promise<VersionEntry[]> => {
   console.log('getVersionHistory called with modelId:', modelId)
-  // TODO: Implement actual version history retrieval in new architecture
-  console.log('Getting version history (placeholder):', modelId)
-  return []
+  
+  try {
+    // Load version history from function_model_versions table
+    const versionData = await functionModelRepository.getVersionHistory(modelId)
+
+    console.log('Version data loaded:', versionData)
+
+    // Convert version data to VersionEntry format
+    const versionHistory = (versionData || []).map((version: any) => ({
+      version: version.version,
+      timestamp: new Date(version.timestamp),
+      author: version.author || 'unknown',
+      changes: [], // TODO: Parse changes from version_data if available
+      snapshot: {
+        modelId: version.snapshot?.modelId || '',
+        version: version.version,
+        nodesData: version.snapshot?.nodesData || [],
+        edgesData: version.snapshot?.edgesData || [],
+        viewportData: version.snapshot?.viewportData || {},
+        metadata: version.snapshot?.metadata || {},
+        timestamp: new Date(version.timestamp)
+      },
+      isPublished: version.isPublished || false
+    }))
+
+    console.log('Version history converted:', versionHistory)
+    return versionHistory
+  } catch (err) {
+    console.error('Error in getVersionHistory:', err)
+    throw err
+  }
 }
 
 // Publish version use case (placeholder implementation)

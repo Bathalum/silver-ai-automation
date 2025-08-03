@@ -1,5 +1,9 @@
 ---
-description: When trying to build a component or feature within the app
+description: When creating features, build modular UI components for presentation
+globs:
+  - "components/**/*.tsx"
+  - "app/**/*.tsx"
+  - "lib/application/hooks/**/*.ts"
 alwaysApply: false
 ---
 # Component Architecture

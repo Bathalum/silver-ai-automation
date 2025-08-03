@@ -1,5 +1,8 @@
 ---
-description: When implementing code, components, features, pages, file and folder structures in the codebase for frontend and backend.
+description: When creating features, set up Clean Architecture layers for business logic
+globs:
+  - "lib/domain/**/*.ts"
+  - "lib/application/use-cases/**/*.ts"
 alwaysApply: false
 ---
 # High-Level Architecture Design Context

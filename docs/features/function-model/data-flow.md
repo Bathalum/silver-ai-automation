@@ -6,7 +6,7 @@ The Function Model feature implements a comprehensive data flow architecture tha
 
 ## Data Flow Diagrams
 
-### 1. **List View Data Flow**
+### 1. **List View Data Flow (Currently Active)**
 
 ```
 User Interaction → Page Component → Application Hook → Repository → Database
@@ -16,17 +16,27 @@ Search/Filter → FunctionModelList → useFunctionModelList → FunctionModelRe
 UI Update ← Component State ← Hook State ← Repository Response ← Query Results
 ```
 
-### 2. **Canvas View Data Flow (Enhanced)**
+### 2. **Canvas View Data Flow (Currently Active - Legacy)**
 
 ```
 User Interaction → Canvas Component → Application Hook → Repository → Database
      ↓              ↓                ↓              ↓           ↓
-Node Edit → FunctionProcessDashboard → useFunctionModelNodes → Node Repositories → Supabase
+Node Edit → FunctionProcessDashboard → useFunctionModelPersistence → FunctionModelRepository → Supabase
      ↓              ↓                ↓              ↓           ↓
 UI Update ← Component State ← Hook State ← Repository Response ← Save/Load Operations
 ```
 
-### 3. **Migration Layer Data Flow (NEW)**
+### 3. **Canvas View Data Flow (NEW - Partially Implemented)**
+
+```
+User Interaction → Canvas Component → Application Hook → Repository → Database
+     ↓              ↓                ↓              ↓           ↓
+Node Edit → FunctionProcessDashboardEnhanced → useFunctionModelNodes → Node Repositories → Supabase
+     ↓              ↓                ↓              ↓           ↓
+UI Update ← Component State ← Hook State ← Repository Response ← Save/Load Operations
+```
+
+### 4. **Migration Layer Data Flow (NEW - Partially Implemented)**
 
 ```
 Legacy FunctionModel → Migration Layer → New Node Architecture → Database
@@ -38,17 +48,17 @@ Old Relationships → Link Migration → NodeLinkRecord → node_links
 Old Metadata → Metadata Creation → NodeMetadataRecord → node_metadata
 ```
 
-### 4. **Cross-Feature Linking Data Flow (Enhanced)**
+### 5. **Cross-Feature Linking Data Flow (Currently Active)**
 
 ```
 Node Interaction → Modal Component → Application Hook → Repository → Cross-Feature Table
      ↓              ↓                ↓              ↓           ↓
-Link Creation → NodeLinkingTab → useNodeLinking → NodeLinksRepository → node_links
+Link Creation → NodeLinkingTab → useCrossFeatureLinking → CrossFeatureRepository → cross_feature_links
      ↓              ↓                ↓              ↓           ↓
 UI Update ← Component State ← Hook State ← Repository Response ← Link Data
 ```
 
-### 5. **Unified Node Operations Data Flow (NEW)**
+### 6. **Unified Node Operations Data Flow (NEW - Partially Implemented)**
 
 ```
 Cross-Feature Request → Unified Operations → Feature-Specific Repository → Database
@@ -62,41 +72,86 @@ Response ← Operation Result ← Repository Response ← Query Results
 
 ### 1. **Application Layer State Management**
 
-#### `useFunctionModelNodes` Hook (NEW)
+#### `useFunctionModelPersistence` Hook (LEGACY - Currently Active)
 ```typescript
-interface FunctionModelNodesState {
-  nodes: FunctionModelNode[]
-  links: NodeLinkRecord[]
-  metadata: NodeMetadataRecord[]
+interface FunctionModelPersistenceState {
+  model: FunctionModel | null
   loading: boolean
   error: string | null
-  lastSavedAt: Date | null
-  migrationProgress: MigrationProgress
+  autoSave: boolean
+  saveInterval: number
 }
 
-interface FunctionModelNodesActions {
-  createNode: (nodeType: string, name: string, position: Position, options?: any) => void
-  updateNode: (nodeId: string, updates: Partial<FunctionModelNode>) => void
-  deleteNode: (nodeId: string) => void
-  createNodeLink: (sourceId: string, targetId: string, linkType: string) => void
-  updateNodeLink: (linkId: string, updates: Partial<NodeLinkRecord>) => void
-  deleteNodeLink: (linkId: string) => void
-  saveNodes: () => Promise<void>
-  loadNodes: () => Promise<void>
-  migrateFromLegacy: (legacyModel: FunctionModel) => Promise<MigrationResult>
-  executeNodeBehavior: (nodeId: string, behavior: NodeBehavior) => Promise<ExecutionResult>
-}
-
-interface MigrationProgress {
-  isMigrating: boolean
-  progress: number
-  currentStep: string
-  errors: string[]
-  warnings: string[]
+interface FunctionModelPersistenceActions {
+  loadModel: (options?: LoadOptions) => Promise<FunctionModel>
+  saveModel: (options?: SaveOptions) => Promise<FunctionModel>
+  updateModel: (updates: Partial<FunctionModel>) => void
+  clearError: () => void
+  setAutoSave: (enabled: boolean) => void
+  setSaveInterval: (interval: number) => void
 }
 ```
 
-#### `useFunctionModelList` Hook (Enhanced)
+#### `useFunctionModelNodes` Hook (NEW - Partially Implemented)
+```typescript
+interface FunctionModelNodesState {
+  nodes: FunctionModelNode[]
+  metadata: NodeMetadataRecord[]
+  links: NodeLinkRecord[]
+  isLoading: boolean
+  isSaving: boolean
+  error: string | null
+  statistics: {
+    totalNodes: number
+    nodesByType: Record<string, number>
+    nodesByExecutionType: Record<string, number>
+    nodesWithSLA: number
+    nodesWithKPIs: number
+  } | null
+}
+
+interface FunctionModelNodesActions {
+  // Node operations
+  createNode: (nodeType: string, name: string, position: Position, options?: any) => Promise<FunctionModelNode>
+  updateNode: (nodeId: string, updates: Partial<FunctionModelNode>) => Promise<FunctionModelNode>
+  deleteNode: (nodeId: string) => Promise<void>
+  getNode: (nodeId: string) => FunctionModelNode | undefined
+  
+  // Node behavior operations
+  executeNode: (nodeId: string, context?: any) => Promise<any>
+  validateNode: (nodeId: string) => Promise<{ isValid: boolean; errors: string[]; warnings: string[] }>
+  getNodeBehavior: (nodeId: string) => any
+  
+  // Cross-feature linking operations
+  createNodeLink: (targetFeature: string, targetEntityId: string, targetNodeId?: string, linkType?: string, context?: any) => Promise<NodeLinkRecord>
+  getNodeLinks: (nodeId?: string) => NodeLinkRecord[]
+  deleteNodeLink: (linkId: string) => Promise<void>
+  
+  // Metadata operations
+  updateNodeMetadata: (nodeId: string, metadata: Partial<NodeMetadataRecord>) => Promise<void>
+  updateNodeVisualProperties: (nodeId: string, visualProperties: Record<string, any>) => Promise<void>
+  
+  // Search and filtering
+  searchNodes: (query: string) => FunctionModelNode[]
+  getNodesByType: (nodeType: FunctionModelNode['nodeType']) => FunctionModelNode[]
+  getNodesByExecutionType: (executionType: string) => FunctionModelNode[]
+  getNodesWithSLA: () => FunctionModelNode[]
+  getNodesWithKPIs: () => FunctionModelNode[]
+  
+  // Statistics and analytics
+  refreshStatistics: () => Promise<void>
+  
+  // Bulk operations
+  bulkUpdateNodes: (updates: Partial<FunctionModelNode>) => Promise<void>
+  bulkCreateNodes: (nodes: Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<FunctionModelNode[]>
+  
+  // State management
+  refreshNodes: () => Promise<void>
+  clearError: () => void
+}
+```
+
+#### `useFunctionModelList` Hook (Currently Active)
 ```typescript
 interface FunctionModelListState {
   models: FunctionModel[]
@@ -105,7 +160,6 @@ interface FunctionModelListState {
   filters: FunctionModelFilters
   searchQuery: string
   searchLoading: boolean
-  migrationStatus: MigrationStatus[]
 }
 
 interface FunctionModelListActions {
@@ -115,61 +169,29 @@ interface FunctionModelListActions {
   updateFilters: (filters: FunctionModelFilters) => void
   updateSearchQuery: (query: string) => void
   debouncedSearch: (query: string) => void
-  migrateModel: (modelId: string) => Promise<MigrationResult>
-  getMigrationStatus: (modelId: string) => MigrationStatus
 }
 ```
 
-#### `useFunctionModelPersistence` Hook (Enhanced)
+#### `useCrossFeatureLinking` Hook (Currently Active)
 ```typescript
-interface FunctionModelPersistenceState {
-  currentModel: FunctionModel | null
+interface CrossFeatureLinkingState {
+  links: CrossFeatureLink[]
   loading: boolean
   error: string | null
-  lastSavedAt: Date | null
-  migrationState: MigrationState
 }
 
-interface FunctionModelPersistenceActions {
-  saveFunctionModel: (model: FunctionModel) => Promise<void>
-  loadFunctionModel: (modelId: string) => Promise<FunctionModel>
-  createFunctionModel: (name: string, description: string) => Promise<FunctionModel>
-  updateFunctionModel: (modelId: string, updates: Partial<FunctionModel>) => Promise<void>
-  migrateToNodeArchitecture: (modelId: string) => Promise<MigrationResult>
-  reverseMigration: (modelId: string) => Promise<FunctionModel>
-}
-
-interface MigrationState {
-  isMigrating: boolean
-  migrationProgress: number
-  currentStep: string
-  errors: string[]
-  warnings: string[]
-}
-```
-
-#### `useNodeLinking` Hook (Enhanced)
-```typescript
-interface NodeLinkingState {
-  linkedEntities: NodeLinkedEntity[]
-  loading: boolean
-  error: string | null
-  linkStrength: number
-  linkContext: Record<string, any>
-}
-
-interface NodeLinkingActions {
-  createNodeLink: (link: Omit<CrossFeatureLink, 'linkId' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  removeNodeLink: (linkId: string) => Promise<void>
-  getNodeLinks: (nodeId: string) => Promise<NodeLinkedEntity[]>
-  updateLinkStrength: (linkId: string, strength: number) => Promise<void>
+interface CrossFeatureLinkingActions {
+  loadLinks: () => Promise<void>
+  createLink: (targetFeature: string, targetId: string, linkType: string, context?: Record<string, any>) => Promise<CrossFeatureLink>
   updateLinkContext: (linkId: string, context: Record<string, any>) => Promise<void>
+  deleteLink: (linkId: string) => Promise<void>
+  clearError: () => void
 }
 ```
 
 ### 2. **Component State Management**
 
-#### Local Component State
+#### Local Component State (Currently Active)
 ```typescript
 // Form inputs and user interactions
 const [formData, setFormData] = useState<FormData>({})
@@ -181,17 +203,12 @@ const [isLoading, setIsLoading] = useState(false)
 // Temporary data (unsaved changes)
 const [unsavedChanges, setUnsavedChanges] = useState<Partial<FunctionModel>>({})
 
-// Migration state
-const [migrationState, setMigrationState] = useState<MigrationState>({
-  isMigrating: false,
-  progress: 0,
-  currentStep: '',
-  errors: [],
-  warnings: []
-})
+// React Flow state
+const [nodes, setNodes] = useState<Node[]>([])
+const [edges, setEdges] = useState<Edge[]>([])
 ```
 
-#### Derived State
+#### Derived State (Currently Active)
 ```typescript
 // Computed values from props or other state
 const sortedNodes = useMemo(() => {
@@ -200,36 +217,31 @@ const sortedNodes = useMemo(() => {
   })
 }, [nodes, sortBy, sortOrder])
 
-// Node behavior computation
-const nodeBehaviors = useMemo(() => {
-  return nodes.map(node => ({
-    nodeId: node.id,
-    behavior: getNodeBehavior(node.nodeType),
-    executionType: node.processBehavior?.executionType || 'sequential'
-  }))
-}, [nodes])
-
-// Migration progress computation
-const migrationProgress = useMemo(() => {
+// Node statistics
+const nodeStatistics = useMemo(() => {
   return {
-    totalNodes: legacyModel.nodesData?.length || 0,
-    migratedNodes: nodes.length,
-    progress: (nodes.length / (legacyModel.nodesData?.length || 1)) * 100
+    totalNodes: nodes.length,
+    nodesByType: nodes.reduce((acc, node) => {
+      acc[node.type] = (acc[node.type] || 0) + 1
+      return acc
+    }, {}),
+    nodesWithLinks: nodes.filter(node => 
+      edges.some(edge => edge.source === node.id || edge.target === node.id)
+    ).length
   }
-}, [nodes, legacyModel])
+}, [nodes, edges])
 ```
 
 ## API Interactions and Data Transformations
 
 ### 1. **Repository Layer Interactions**
 
-#### FunctionModelRepository (Enhanced)
+#### FunctionModelRepository (LEGACY + NEW)
 ```typescript
 class FunctionModelRepository {
-  // CRUD Operations
+  // Legacy operations (Currently Active)
   async create(model: Omit<FunctionModel, 'modelId' | 'createdAt' | 'updatedAt' | 'lastSavedAt'>): Promise<FunctionModel>
   async getById(modelId: string): Promise<FunctionModel | null>
-  async getAll(): Promise<FunctionModel[]>
   async update(modelId: string, updates: Partial<FunctionModel>): Promise<FunctionModel>
   async delete(modelId: string): Promise<void>
   
@@ -243,81 +255,39 @@ class FunctionModelRepository {
   async getVersions(modelId: string): Promise<VersionEntry[]>
   async restoreVersion(modelId: string, versionId: string): Promise<FunctionModel>
   
-  // NEW: Node-based operations
-  async getNodeBasedModels(): Promise<FunctionModelNode[]>
-  async migrateModelToNodes(modelId: string): Promise<MigrationResult>
-  async getMigrationStatus(modelId: string): Promise<MigrationStatus>
+  // NEW: Node-based operations (Partially Implemented)
+  async getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]>
+  async createFunctionModelNode(node: Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode>
+  async updateFunctionModelNode(modelId: string, nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode>
+  async deleteFunctionModelNode(modelId: string, nodeId: string): Promise<void>
+  async getNodeStatistics(modelId: string): Promise<any>
 }
 ```
 
-#### NodeLinksRepository (NEW)
+#### NodeLinksRepository (NEW - Partially Implemented)
 ```typescript
 class NodeLinksRepository {
   // Cross-feature linking operations
   async createNodeLink(link: Omit<NodeLinkRecord, 'linkId' | 'createdAt' | 'updatedAt'>): Promise<NodeLinkRecord>
-  async getNodeLinks(featureType: FeatureType, entityId: string, nodeId?: string): Promise<NodeLinkRecord[]>
-  async getLinksByNode(nodeId: string): Promise<NodeLinkedEntity[]>
+  async getNodeLinks(featureType: string, entityId: string, nodeId?: string): Promise<NodeLinkRecord[]>
   async deleteNodeLink(linkId: string): Promise<void>
-  
-  // Node-level linking operations
-  async createNodeLink(nodeId: string, link: NodeLinkedEntity): Promise<void>
-  async getNodeLinks(nodeId: string): Promise<NodeLinkedEntity[]>
-  async removeNodeLink(nodeId: string, linkId: string): Promise<void>
-  
-  // NEW: Advanced link operations
-  async updateLinkStrength(linkId: string, strength: number): Promise<void>
-  async updateLinkContext(linkId: string, context: Record<string, any>): Promise<void>
-  async getLinkStatistics(featureType?: FeatureType): Promise<LinkStatistics>
-  async searchLinks(query: string, featureType?: FeatureType): Promise<NodeLinkRecord[]>
 }
 ```
 
-#### NodeMetadataRepository (NEW)
+#### NodeMetadataRepository (NEW - Partially Implemented)
 ```typescript
 class NodeMetadataRepository {
   // CRUD operations for node metadata
-  async createNodeMetadata(metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'>): Promise<NodeMetadataRecord>
-  async getNodeMetadata(nodeId: string): Promise<NodeMetadataRecord | null>
-  async updateNodeMetadata(nodeId: string, updates: Partial<NodeMetadataRecord>): Promise<NodeMetadataRecord>
-  async deleteNodeMetadata(nodeId: string): Promise<void>
-  
-  // Search and indexing operations
-  async searchNodes(query: string, featureType?: FeatureType): Promise<NodeMetadataRecord[]>
-  async getNodesByTags(tags: string[], featureType?: FeatureType): Promise<NodeMetadataRecord[]>
-  async getNodesByKeywords(keywords: string[], featureType?: FeatureType): Promise<NodeMetadataRecord[]>
-  
-  // NEW: AI and vector operations
-  async updateVectorEmbedding(nodeId: string, embedding: number[]): Promise<void>
-  async searchByVector(query: number[], limit?: number): Promise<NodeMetadataRecord[]>
-  async updateAIAgentConfig(nodeId: string, config: AIAgentConfig): Promise<void>
-  async getAIAgentConfig(nodeId: string): Promise<AIAgentConfig | null>
-}
-```
-
-#### UnifiedNodeRepository (NEW)
-```typescript
-class UnifiedNodeRepository {
-  // Unified node operations across all features
-  async createNode(featureType: FeatureType, nodeType: string, data: any): Promise<BaseNode>
-  async updateNode(nodeId: string, updates: Partial<BaseNode>): Promise<BaseNode>
-  async deleteNode(nodeId: string): Promise<void>
-  async getNode(nodeId: string): Promise<BaseNode | null>
-  
-  // Cross-feature operations
-  async getNodesByFeature(featureType: FeatureType): Promise<BaseNode[]>
-  async getNodesByType(nodeType: string): Promise<BaseNode[]>
-  async searchNodesAcrossFeatures(query: string): Promise<BaseNode[]>
-  
-  // NEW: Behavior execution
-  async executeNodeBehavior(nodeId: string, behavior: NodeBehavior): Promise<ExecutionResult>
-  async validateNodeBehavior(nodeId: string, behavior: NodeBehavior): Promise<ValidationResult>
-  async getNodeBehaviorHistory(nodeId: string): Promise<ExecutionResult[]>
+  async createMetadata(metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'>): Promise<NodeMetadataRecord>
+  async getMetadataByEntity(featureType: string, entityId: string): Promise<NodeMetadataRecord[]>
+  async updateMetadata(metadataId: string, updates: Partial<NodeMetadataRecord>): Promise<NodeMetadataRecord>
+  async updateVisualProperties(metadataId: string, visualProperties: Record<string, any>): Promise<void>
 }
 ```
 
 ### 2. **Data Transformations**
 
-#### Migration Layer Transformations (NEW)
+#### Legacy to New Node Transformation (Partially Implemented)
 ```typescript
 // Legacy to New Node transformation
 function migrateLegacyNode(legacyNode: Node, modelId: string): FunctionModelNode {
@@ -380,7 +350,7 @@ function reverseMigrateNode(node: FunctionModelNode): Node {
 }
 ```
 
-#### Node Behavior Transformations (NEW)
+#### Node Behavior Transformations (Partially Implemented)
 ```typescript
 // Node behavior validation
 function validateNodeBehavior(node: FunctionModelNode, behavior: NodeBehavior): ValidationResult {
@@ -441,19 +411,32 @@ async function executeNodeBehavior(node: FunctionModelNode, context: any): Promi
 
 ## Cross-Feature Data Sharing
 
-### 1. **Knowledge Base Integration (Enhanced)**
+### 1. **Knowledge Base Integration (Currently Active)**
 
 #### Data Flow
 ```
-Function Model Node → NodeLinkingTab → NodeLinksRepository → Knowledge Base
+Function Model Node → NodeLinkingTab → CrossFeatureRepository → Knowledge Base
      ↓                    ↓                    ↓                    ↓
 Node Selection → Link Creation → Link Storage → Document Reference
      ↓                    ↓                    ↓                    ↓
 UI Update ← Link Display ← Link Retrieval ← Document Data
 ```
 
-#### Data Structures (Enhanced)
+#### Data Structures (Currently Active)
 ```typescript
+interface CrossFeatureLink {
+  linkId: string
+  sourceFeature: string
+  sourceId: string
+  targetFeature: string
+  targetId: string
+  linkType: string
+  context: Record<string, any>
+  createdBy: string
+  createdAt: Date
+  updatedAt: Date
+}
+
 interface NodeLinkedEntity {
   entityId: string
   entityType: 'function-model' | 'knowledge-base' | 'spindle'
@@ -467,27 +450,9 @@ interface NodeLinkedEntity {
     accessCount: number
   }
 }
-
-interface KnowledgeBaseLink {
-  nodeId: string
-  documentId: string
-  linkType: 'documents' | 'references'
-  context: {
-    section?: string
-    relevance?: string
-    notes?: string
-    vectorEmbedding?: number[]
-  }
-  strength: number
-  metadata: {
-    lastAccessed: Date
-    accessCount: number
-    aiRelevance: number
-  }
-}
 ```
 
-### 2. **Event Storm Integration (Enhanced)**
+### 2. **Event Storm Integration (Currently Active)**
 
 #### Data Flow
 ```
@@ -498,7 +463,7 @@ Process Design → Event Mapping → Workflow Planning → Execution Configurati
 UI Integration ← Data Synchronization ← Process Documentation ← Behavior Validation
 ```
 
-#### Data Structures (Enhanced)
+#### Data Structures (Currently Active)
 ```typescript
 interface EventStormLink {
   functionModelId: string
@@ -523,7 +488,7 @@ interface EventStormLink {
 }
 ```
 
-### 3. **Spindle Integration (Enhanced)**
+### 3. **Spindle Integration (Currently Active)**
 
 #### Data Flow
 ```
@@ -534,7 +499,7 @@ Event Planning → Node Activation → Process Flow Design → Execution Plannin
 Data Planning ← Result Planning ← Execution Planning ← Behavior Configuration
 ```
 
-#### Data Structures (Enhanced)
+#### Data Structures (Currently Active)
 ```typescript
 interface SpindleLink {
   functionModelId: string
@@ -562,51 +527,9 @@ interface SpindleLink {
 
 ## Error Handling and Loading States
 
-### 1. **Error Handling Patterns (Enhanced)**
+### 1. **Error Handling Patterns (Currently Active)**
 
-#### Migration Layer Error Handling
-```typescript
-async function handleMigrationError(error: any, operation: string): Promise<never> {
-  console.error(`Migration error in ${operation}:`, error)
-  
-  if (error.code === 'MIGRATION_VALIDATION_FAILED') {
-    throw new Error('Migration validation failed - data integrity issues detected')
-  }
-  
-  if (error.code === 'MIGRATION_INCOMPLETE') {
-    throw new Error('Migration incomplete - some data could not be migrated')
-  }
-  
-  if (error.code === 'REVERSE_MIGRATION_FAILED') {
-    throw new Error('Reverse migration failed - cannot restore original format')
-  }
-  
-  throw new Error(`Migration operation failed: ${error.message}`)
-}
-```
-
-#### Node Behavior Error Handling
-```typescript
-async function handleNodeBehaviorError(error: any, nodeId: string, behavior: string): Promise<never> {
-  console.error(`Node behavior error for ${nodeId} in ${behavior}:`, error)
-  
-  if (error.code === 'BEHAVIOR_VALIDATION_FAILED') {
-    throw new Error(`Behavior validation failed for node ${nodeId}`)
-  }
-  
-  if (error.code === 'EXECUTION_TIMEOUT') {
-    throw new Error(`Node execution timed out for ${nodeId}`)
-  }
-  
-  if (error.code === 'DEPENDENCY_MISSING') {
-    throw new Error(`Required dependencies missing for node ${nodeId}`)
-  }
-  
-  throw new Error(`Node behavior error: ${error.message}`)
-}
-```
-
-#### Repository Level Error Handling (Enhanced)
+#### Repository Level Error Handling
 ```typescript
 async function handleRepositoryError(error: any, operation: string): Promise<never> {
   console.error(`Repository error in ${operation}:`, error)
@@ -619,21 +542,38 @@ async function handleRepositoryError(error: any, operation: string): Promise<nev
     throw new Error('Validation failed')
   }
   
-  if (error.code === 'NODE_LINK_CONFLICT') {
-    throw new Error('Node link conflict - link already exists')
-  }
-  
-  if (error.code === 'METADATA_INDEX_FAILED') {
-    throw new Error('Metadata indexing failed')
+  if (error.code === 'CROSS_FEATURE_LINK_CONFLICT') {
+    throw new Error('Cross-feature link conflict - link already exists')
   }
   
   throw new Error(`Database operation failed: ${error.message}`)
 }
 ```
 
-### 2. **Loading State Management (Enhanced)**
+#### Hook Level Error Handling
+```typescript
+async function handleHookError(error: any, operation: string): Promise<never> {
+  console.error(`Hook error in ${operation}:`, error)
+  
+  if (error.code === 'MODEL_NOT_FOUND') {
+    throw new Error('Function model not found')
+  }
+  
+  if (error.code === 'SAVE_FAILED') {
+    throw new Error('Failed to save function model')
+  }
+  
+  if (error.code === 'LOAD_FAILED') {
+    throw new Error('Failed to load function model')
+  }
+  
+  throw new Error(`Hook operation failed: ${error.message}`)
+}
+```
 
-#### Loading States Hierarchy (Enhanced)
+### 2. **Loading State Management (Currently Active)**
+
+#### Loading States Hierarchy
 ```typescript
 interface LoadingStates {
   // Global loading states
@@ -652,156 +592,166 @@ interface LoadingStates {
   // Operation-specific loading states
   nodeEditLoading: boolean
   crossFeatureLinkLoading: boolean
-  
-  // NEW: Migration and node behavior loading states
-  migrationLoading: boolean
-  nodeBehaviorLoading: boolean
-  nodeMetadataLoading: boolean
-  vectorSearchLoading: boolean
 }
 ```
 
-#### Migration Loading State Implementation
+#### Loading State Implementation
 ```typescript
-function useMigrationLoadingStates() {
-  const [migrationStates, setMigrationStates] = useState<Record<string, MigrationState>>({})
+function useLoadingStates() {
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    appLoading: false,
+    functionModelListLoading: false,
+    functionModelCanvasLoading: false,
+    saveLoading: false,
+    loadLoading: false,
+    searchLoading: false,
+    linkLoading: false,
+    nodeEditLoading: false,
+    crossFeatureLinkLoading: false
+  })
   
-  const setMigrationLoading = useCallback((modelId: string, loading: boolean) => {
-    setMigrationStates(prev => ({
+  const setLoading = useCallback((key: keyof LoadingStates, loading: boolean) => {
+    setLoadingStates(prev => ({
       ...prev,
-      [modelId]: {
-        ...prev[modelId],
-        isMigrating: loading,
-        progress: loading ? 0 : prev[modelId]?.progress || 0
-      }
+      [key]: loading
     }))
   }, [])
   
-  const updateMigrationProgress = useCallback((modelId: string, progress: number, step: string) => {
-    setMigrationStates(prev => ({
+  const setMultipleLoading = useCallback((states: Partial<LoadingStates>) => {
+    setLoadingStates(prev => ({
       ...prev,
-      [modelId]: {
-        ...prev[modelId],
-        progress,
-        currentStep: step
-      }
+      ...states
     }))
   }, [])
   
-  const addMigrationError = useCallback((modelId: string, error: string) => {
-    setMigrationStates(prev => ({
-      ...prev,
-      [modelId]: {
-        ...prev[modelId],
-        errors: [...(prev[modelId]?.errors || []), error]
-      }
-    }))
-  }, [])
-  
-  return { migrationStates, setMigrationLoading, updateMigrationProgress, addMigrationError }
+  return { loadingStates, setLoading, setMultipleLoading }
 }
 ```
 
 ## Data Flow Optimization
 
-### 1. **Debouncing and Throttling (Enhanced)**
+### 1. **Debouncing and Throttling (Currently Active)**
 
-#### Node Behavior Execution Throttling
+#### Search Debouncing
 ```typescript
-function useThrottledNodeBehavior(executeBehavior: (nodeId: string, behavior: NodeBehavior) => Promise<ExecutionResult>, delay: number = 1000) {
-  const [pendingExecutions, setPendingExecutions] = useState<Map<string, NodeBehavior>>(new Map())
+function useDebouncedSearch(searchFunction: (query: string) => void, delay: number = 300) {
+  const [searchQuery, setSearchQuery] = useState('')
   
-  const throttledExecute = useMemo(
-    () => throttle(executeBehavior, delay),
-    [executeBehavior, delay]
+  const debouncedSearch = useMemo(
+    () => debounce(searchFunction, delay),
+    [searchFunction, delay]
   )
   
-  const handleNodeBehavior = useCallback((nodeId: string, behavior: NodeBehavior) => {
-    setPendingExecutions(prev => new Map(prev).set(nodeId, behavior))
-    throttledExecute(nodeId, behavior)
-  }, [throttledExecute])
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query)
+    debouncedSearch(query)
+  }, [debouncedSearch])
   
-  return { pendingExecutions, handleNodeBehavior }
+  return { searchQuery, handleSearchChange }
 }
 ```
 
-#### Migration Progress Throttling
+#### Auto-Save Throttling
 ```typescript
-function useThrottledMigrationProgress(updateProgress: (progress: number, step: string) => void, delay: number = 500) {
-  const [pendingProgress, setPendingProgress] = useState<{ progress: number; step: string } | null>(null)
+function useThrottledAutoSave(saveFunction: () => Promise<void>, interval: number = 5000) {
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   
-  const throttledUpdate = useMemo(
-    () => throttle(updateProgress, delay),
-    [updateProgress, delay]
+  const throttledSave = useMemo(
+    () => throttle(saveFunction, interval),
+    [saveFunction, interval]
   )
   
-  const handleProgressUpdate = useCallback((progress: number, step: string) => {
-    setPendingProgress({ progress, step })
-    throttledUpdate(progress, step)
-  }, [throttledUpdate])
+  const handleAutoSave = useCallback(() => {
+    throttledSave()
+    setLastSavedAt(new Date())
+  }, [throttledSave])
   
-  return { pendingProgress, handleProgressUpdate }
+  return { lastSavedAt, handleAutoSave }
 }
 ```
 
-### 2. **Caching Strategies (Enhanced)**
+### 2. **Caching Strategies (Currently Active)**
 
-#### Node Metadata Caching
+#### Model Data Caching
 ```typescript
-function useNodeMetadataCache() {
-  const [metadataCache, setMetadataCache] = useState<Map<string, NodeMetadataRecord>>(new Map())
+function useModelCache() {
+  const [modelCache, setModelCache] = useState<Map<string, FunctionModel>>(new Map())
   
-  const getCachedMetadata = useCallback((nodeId: string) => {
-    return metadataCache.get(nodeId)
-  }, [metadataCache])
+  const getCachedModel = useCallback((modelId: string) => {
+    return modelCache.get(modelId)
+  }, [modelCache])
   
-  const setCachedMetadata = useCallback((nodeId: string, metadata: NodeMetadataRecord) => {
-    setMetadataCache(prev => new Map(prev).set(nodeId, metadata))
+  const setCachedModel = useCallback((modelId: string, model: FunctionModel) => {
+    setModelCache(prev => new Map(prev).set(modelId, model))
   }, [])
   
-  const invalidateMetadataCache = useCallback((nodeId?: string) => {
-    if (nodeId) {
-      setMetadataCache(prev => {
-        const newCache = new Map(prev)
-        newCache.delete(nodeId)
-        return newCache
-      })
-    } else {
-      setMetadataCache(new Map())
-    }
-  }, [])
-  
-  return { getCachedMetadata, setCachedMetadata, invalidateMetadataCache }
-}
-```
-
-#### Migration State Caching
-```typescript
-function useMigrationStateCache() {
-  const [migrationCache, setMigrationCache] = useState<Map<string, MigrationState>>(new Map())
-  
-  const getCachedMigrationState = useCallback((modelId: string) => {
-    return migrationCache.get(modelId)
-  }, [migrationCache])
-  
-  const setCachedMigrationState = useCallback((modelId: string, state: MigrationState) => {
-    setMigrationCache(prev => new Map(prev).set(modelId, state))
-  }, [])
-  
-  const clearMigrationCache = useCallback((modelId?: string) => {
+  const invalidateModelCache = useCallback((modelId?: string) => {
     if (modelId) {
-      setMigrationCache(prev => {
+      setModelCache(prev => {
         const newCache = new Map(prev)
         newCache.delete(modelId)
         return newCache
       })
     } else {
-      setMigrationCache(new Map())
+      setModelCache(new Map())
     }
   }, [])
   
-  return { getCachedMigrationState, setCachedMigrationState, clearMigrationCache }
+  return { getCachedModel, setCachedModel, invalidateModelCache }
 }
 ```
 
-This data flow documentation provides a comprehensive understanding of how data moves through the enhanced Function Model feature with the new node-based architecture, enabling both human developers and AI agents to understand the implementation patterns and optimization strategies. 
+#### Cross-Feature Link Caching
+```typescript
+function useLinkCache() {
+  const [linkCache, setLinkCache] = useState<Map<string, CrossFeatureLink[]>>(new Map())
+  
+  const getCachedLinks = useCallback((entityId: string) => {
+    return linkCache.get(entityId)
+  }, [linkCache])
+  
+  const setCachedLinks = useCallback((entityId: string, links: CrossFeatureLink[]) => {
+    setLinkCache(prev => new Map(prev).set(entityId, links))
+  }, [])
+  
+  const invalidateLinkCache = useCallback((entityId?: string) => {
+    if (entityId) {
+      setLinkCache(prev => {
+        const newCache = new Map(prev)
+        newCache.delete(entityId)
+        return newCache
+      })
+    } else {
+      setLinkCache(new Map())
+    }
+  }, [])
+  
+  return { getCachedLinks, setCachedLinks, invalidateLinkCache }
+}
+```
+
+## Current Implementation Status
+
+### ✅ **Fully Implemented**
+- Legacy React Flow canvas with drag-and-drop functionality
+- Basic node types (Stage, Action, IO, Container)
+- Node creation, editing, and deletion
+- Cross-feature linking modal system
+- Version control and model persistence
+- Basic node metadata system
+
+### 🔄 **Partially Implemented**
+- **Node-Based Architecture**: Core types and hooks exist, but not fully integrated
+- **Enhanced Node Management**: `useFunctionModelNodes` hook implemented but not used in main canvas
+- **Migration Layer**: Types and interfaces exist, but migration logic not fully implemented
+- **Cross-Feature Linking**: Basic linking exists, but advanced features not implemented
+- **Node Behavior System**: Framework exists, but execution not fully implemented
+
+### ❌ **Not Implemented**
+- **Workflow Execution**: No execution engine
+- **AI Integration**: No AI agent implementation
+- **Advanced Analytics**: No performance monitoring
+- **Real-time Collaboration**: No collaborative editing
+- **Advanced Export/Import**: Limited to JSON format
+
+This data flow documentation provides a comprehensive understanding of how data moves through the Function Model feature with both the legacy React Flow implementation and the new node-based architecture, enabling both human developers and AI agents to understand the implementation patterns and optimization strategies. 

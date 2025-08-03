@@ -83,6 +83,9 @@ export function StageNode(props: NodeProps) {
   const { data, isConnectable } = props
   const { stage } = data
   
+  // Debug: Log when StageNode is rendered
+  console.log('StageNode rendered:', { id: props.id, data, stage })
+  
   // NEW: Load node links for visualization
   const { links } = useNodeLinking(data.modelId || 'sample-model-id', props.id)
   
@@ -139,6 +142,9 @@ export function StageNode(props: NodeProps) {
 // ActionTableNode: single node, styled as a table with header, rows, and floating bookmarks
 export function ActionTableNode(props: NodeProps) {
   const { id, data, isConnectable } = props
+  
+  // Debug: Log when ActionTableNode is rendered
+  console.log('ActionTableNode rendered:', { id, data })
   const { mode = "actions", modes = {
     actions: { label: "Actions", rows: [
       { 

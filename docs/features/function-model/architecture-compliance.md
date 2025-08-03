@@ -2,31 +2,61 @@
 
 ## Clean Architecture Implementation
 
-The Function Model feature strictly adheres to Clean Architecture principles, implementing all four layers with clear separation of concerns and dependency inversion. The feature has been enhanced with a unified node-based architecture that maintains Clean Architecture compliance while providing enhanced capabilities.
+The Function Model feature implements Clean Architecture principles with a hybrid approach that combines the existing React Flow-based implementation with a new unified node-based architecture. The feature maintains backward compatibility while providing enhanced capabilities through the new architecture.
 
 ### 1. **Domain Layer Implementation**
 
 #### Location: `lib/domain/entities/`
-The Domain Layer contains the core business entities and rules, completely independent of external frameworks.
+The Domain Layer contains the core business entities and rules, with both legacy and new node-based implementations.
 
-#### Core Entities (Enhanced)
+#### Core Entities (Current Implementation)
 ```typescript
-// lib/domain/entities/base-node-types.ts (NEW)
+// lib/domain/entities/function-model-types.ts (LEGACY)
+export interface FunctionModel {
+  modelId: string
+  name: string
+  description: string
+  version: string
+  status: 'draft' | 'published' | 'archived'
+  
+  // Visual representation (React Flow data)
+  nodesData: Node[]
+  edgesData: Edge[]
+  viewportData: Viewport
+  
+  // Function Model specific metadata
+  processType?: string
+  complexityLevel?: 'simple' | 'moderate' | 'complex'
+  estimatedDuration?: number
+  tags: string[]
+  
+  // Relationships between nodes
+  relationships: NodeRelationship[]
+  
+  // Persistence metadata
+  metadata: FunctionModelMetadata
+  permissions: FunctionModelPermissions
+  versionHistory: VersionEntry[]
+  currentVersion: string
+  createdAt: Date
+  updatedAt: Date
+  lastSavedAt: Date
+}
+
+// lib/domain/entities/unified-node-types.ts (NEW)
 export interface BaseNode {
-  id: string
-  featureType: FeatureType
+  nodeId: string
+  type: 'function-model' | 'event-storm' | 'spindle' | 'knowledge-base'
   nodeType: string
   name: string
   description: string
-  position: Position
-  visualProperties: VisualProperties
+  position: { x: number; y: number }
   metadata: NodeMetadata
-  status: NodeStatus
   createdAt: Date
   updatedAt: Date
 }
 
-// lib/domain/entities/function-model-node-types.ts (NEW)
+// lib/domain/entities/function-model-node-types.ts (NEW - Partially Implemented)
 export interface FunctionModelNode extends BaseNode {
   featureType: 'function-model'
   nodeType: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainer'
@@ -48,27 +78,59 @@ export interface FunctionModelNode extends BaseNode {
     kpis?: KeyPerformanceIndicator[]
   }
 }
-
-// lib/domain/entities/node-behavior-types.ts (NEW)
-export abstract class NodeBehavior {
-  abstract validate(node: BaseNode): ValidationResult
-  abstract execute(node: BaseNode, context: any): Promise<ExecutionResult>
-}
-
-export class ProcessNodeBehavior extends NodeBehavior {
-  validate(node: BaseNode): ValidationResult {
-    // Process-specific validation logic
-  }
-  
-  async execute(node: BaseNode, context: any): Promise<ExecutionResult> {
-    // Process-specific execution logic
-  }
-}
 ```
 
-#### Business Rules (Enhanced)
+#### Business Rules (Current Implementation)
 ```typescript
-// lib/domain/entities/function-model-node-types.ts
+// lib/domain/entities/function-model-types.ts
+export function createFunctionModel(
+  name: string,
+  description: string,
+  options: Partial<FunctionModel> = {}
+): Omit<FunctionModel, 'modelId' | 'createdAt' | 'updatedAt' | 'lastSavedAt'> {
+  return {
+    name,
+    description,
+    version: '1.0.0',
+    status: 'draft',
+    nodesData: [],
+    edgesData: [],
+    viewportData: { x: 0, y: 0, zoom: 1 },
+    tags: [],
+    relationships: [],
+    metadata: {
+      category: '',
+      dependencies: [],
+      references: [],
+      exportSettings: {
+        includeMetadata: true,
+        includeRelationships: true,
+        format: 'json',
+        resolution: 'medium'
+      },
+      collaboration: {
+        allowComments: true,
+        allowSuggestions: true,
+        requireApproval: false,
+        autoSave: true,
+        saveInterval: 30
+      }
+    },
+    permissions: {
+      canView: true,
+      canEdit: true,
+      canDelete: true,
+      canShare: true,
+      canExport: true,
+      canVersion: true,
+      canCollaborate: true
+    },
+    versionHistory: [],
+    currentVersion: '1.0.0'
+  }
+}
+
+// lib/domain/entities/function-model-node-types.ts (NEW - Partially Implemented)
 export function createFunctionModelNode(
   nodeType: FunctionModelNode['nodeType'],
   name: string,
@@ -124,20 +186,6 @@ export function createFunctionModelNode(
     }
   }
 }
-
-export function isValidFunctionModelNode(node: any): node is FunctionModelNode {
-  if (!isValidBaseNode(node)) {
-    return false
-  }
-  
-  return (
-    node.featureType === 'function-model' &&
-    ['stageNode', 'actionTableNode', 'ioNode', 'functionModelContainer'].includes(node.nodeType) &&
-    typeof node.functionModelData === 'object' &&
-    typeof node.processBehavior === 'object' &&
-    typeof node.businessLogic === 'object'
-  )
-}
 ```
 
 ### 2. **Application Layer Implementation**
@@ -145,195 +193,193 @@ export function isValidFunctionModelNode(node: any): node is FunctionModelNode {
 #### Location: `lib/application/`
 The Application Layer orchestrates use cases and coordinates data flow between Domain and Infrastructure layers.
 
-#### Use Cases (Enhanced)
+#### Use Cases (Current Implementation)
 ```typescript
-// lib/application/hooks/use-function-model-nodes.ts (NEW)
-export function useFunctionModelNodes(options: {
-  modelId: string
-  autoSave?: boolean
-  autoSaveInterval?: number
-  enableNodeBehavior?: boolean
-  enableCrossFeatureLinking?: boolean
-}) {
-  const [nodes, setNodes] = useState<FunctionModelNode[]>([])
-  const [links, setLinks] = useState<NodeLinkRecord[]>([])
-  const [metadata, setMetadata] = useState<NodeMetadataRecord[]>([])
+// lib/application/hooks/use-function-model-persistence.ts (LEGACY)
+export function useFunctionModelPersistence(modelId: string) {
+  const [model, setModel] = useState<FunctionModel | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [autoSave, setAutoSave] = useState(true)
+  const [saveInterval, setSaveInterval] = useState(30)
 
-  const createNode = useCallback(async (
-    nodeType: string,
-    name: string,
-    position: Position,
-    options?: any
-  ) => {
-    const newNode = createFunctionModelNode(nodeType as any, name, position, options)
-    setNodes(prev => [...prev, { ...newNode, id: generateUUID() }])
-  }, [])
-
-  const updateNode = useCallback(async (nodeId: string, updates: Partial<FunctionModelNode>) => {
-    setNodes(prev => prev.map(node => 
-      node.id === nodeId ? { ...node, ...updates, updatedAt: new Date() } : node
-    ))
-  }, [])
-
-  const deleteNode = useCallback(async (nodeId: string) => {
-    setNodes(prev => prev.filter(node => node.id !== nodeId))
-    setLinks(prev => prev.filter(link => 
-      link.sourceNodeId !== nodeId && link.targetNodeId !== nodeId
-    ))
-  }, [])
-
-  const createNodeLink = useCallback(async (
-    sourceId: string,
-    targetId: string,
-    linkType: string
-  ) => {
-    const newLink: NodeLinkRecord = {
-      linkId: generateUUID(),
-      sourceFeature: 'function-model',
-      sourceEntityId: options.modelId,
-      sourceNodeId: sourceId,
-      targetFeature: 'function-model',
-      targetEntityId: options.modelId,
-      targetNodeId: targetId,
-      linkType: linkType as LinkType,
-      linkStrength: 1.0,
-      linkContext: {},
-      visualProperties: {},
-      createdAt: new Date(),
-      updatedAt: new Date()
+  const loadModel = useCallback(async (options: LoadOptions = {}) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const loadedModel = await loadFunctionModel(modelId, options)
+      setModel(loadedModel)
+      return loadedModel
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load model'
+      setError(errorMessage)
+      throw new Error(errorMessage)
+    } finally {
+      setLoading(false)
     }
-    setLinks(prev => [...prev, newLink])
-  }, [options.modelId])
+  }, [modelId])
 
-  const executeNodeBehavior = useCallback(async (
-    nodeId: string,
-    behavior: NodeBehavior
-  ): Promise<ExecutionResult> => {
-    const node = nodes.find(n => n.id === nodeId)
-    if (!node) {
-      throw new Error(`Node ${nodeId} not found`)
+  const saveModel = useCallback(async (options: SaveOptions = {}) => {
+    if (!model) {
+      throw new Error('No model to save')
     }
-
-    const validation = behavior.validate(node)
-    if (!validation.isValid) {
-      return {
-        success: false,
-        executionTime: 0,
-        result: null,
-        errors: validation.errors,
-        warnings: validation.warnings
-      }
+    setLoading(true)
+    setError(null)
+    try {
+      const savedModel = await saveFunctionModel(model, options)
+      setModel(savedModel)
+      return savedModel
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save model'
+      setError(errorMessage)
+      throw new Error(errorMessage)
+    } finally {
+      setLoading(false)
     }
-
-    return await behavior.execute(node, { modelId: options.modelId })
-  }, [nodes, options.modelId])
+  }, [model])
 
   return {
-    nodes,
-    links,
-    metadata,
+    model,
     loading,
     error,
-    lastSavedAt,
-    createNode,
-    updateNode,
-    deleteNode,
-    createNodeLink,
-    executeNodeBehavior
+    loadModel,
+    saveModel,
+    updateModel,
+    clearError,
+    autoSave,
+    setAutoSave,
+    saveInterval,
+    setSaveInterval
   }
 }
-```
 
-#### Application Hooks (Enhanced)
-```typescript
-// lib/application/hooks/use-function-model-persistence.ts (Enhanced)
-export function useFunctionModelPersistence() {
-  const [currentModel, setCurrentModel] = useState<FunctionModel | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
-  const [migrationState, setMigrationState] = useState<MigrationState>({
-    isMigrating: false,
-    migrationProgress: 0,
-    currentStep: '',
-    errors: [],
-    warnings: []
+// lib/application/hooks/use-function-model-nodes.ts (NEW - Partially Implemented)
+export function useFunctionModelNodes(options: UseFunctionModelNodesOptions): [FunctionModelNodesState, FunctionModelNodesActions] {
+  const { modelId, autoSave = true, autoSaveInterval = 5000, enableNodeBehavior = true, enableCrossFeatureLinking = true } = options
+  const { toast } = useToast()
+  
+  const [state, setState] = useState<FunctionModelNodesState>({
+    nodes: [],
+    metadata: [],
+    links: [],
+    isLoading: true,
+    isSaving: false,
+    error: null,
+    statistics: null
   })
 
-  const migrateToNodeArchitecture = useCallback(async (modelId: string) => {
-    setLoading(true)
-    setError(null)
+  const functionModelRepository = new FunctionModelRepository()
+  const nodeMetadataRepository = new NodeMetadataRepository()
+  const nodeLinksRepository = new NodeLinksRepository()
+
+  // Load nodes on mount
+  useEffect(() => {
+    loadNodes()
+  }, [modelId])
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (!autoSave) return
+    const interval = setInterval(() => {
+      if (state.nodes.length > 0 && !state.isSaving) {
+        saveNodes()
+      }
+    }, autoSaveInterval)
+    return () => clearInterval(interval)
+  }, [autoSave, autoSaveInterval, state.nodes, state.isSaving])
+
+  const loadNodes = useCallback(async () => {
     try {
-      const result = await FunctionModelNodeMigration.migrateFunctionModel(currentModel!, {
-        preserveExistingData: true,
-        createMetadata: true,
-        createLinks: true,
-        validateAfterMigration: true
+      setState(prev => ({ ...prev, isLoading: true, error: null }))
+      const [nodes, metadata, links, statistics] = await Promise.all([
+        functionModelRepository.getFunctionModelNodes(modelId),
+        nodeMetadataRepository.getMetadataByEntity('function-model', modelId),
+        nodeLinksRepository.getNodeLinks('function-model', modelId),
+        functionModelRepository.getNodeStatistics(modelId)
+      ])
+      setState(prev => ({
+        ...prev,
+        nodes,
+        metadata,
+        links,
+        statistics,
+        isLoading: false
+      }))
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to load nodes',
+        isLoading: false
+      }))
+      toast({
+        title: 'Error',
+        description: 'Failed to load function model nodes',
+        variant: 'destructive'
+      })
+    }
+  }, [modelId, toast])
+
+  // Additional node operations...
+  const createNode = useCallback(async (
+    nodeType: FunctionModelNode['nodeType'],
+    name: string,
+    position: { x: number; y: number },
+    options: Partial<FunctionModelNode> = {}
+  ): Promise<FunctionModelNode> => {
+    try {
+      const newNode = createFunctionModelNode(nodeType, name, position, options)
+      const savedNode = await functionModelRepository.createFunctionModelNode(newNode)
+      
+      // Create metadata for the new node
+      const metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'> = {
+        featureType: 'function-model',
+        entityId: modelId,
+        nodeId: savedNode.id,
+        nodeType: savedNode.nodeType,
+        positionX: savedNode.position.x,
+        positionY: savedNode.position.y,
+        searchKeywords: [name, nodeType, 'function-model'],
+        visualProperties: savedNode.visualProperties
+      }
+      
+      const savedMetadata = await nodeMetadataRepository.createMetadata(metadata)
+      
+      setState(prev => ({
+        ...prev,
+        nodes: [...prev.nodes, savedNode],
+        metadata: [...prev.metadata, savedMetadata]
+      }))
+      
+      toast({
+        title: 'Success',
+        description: `Created ${nodeType} node: ${name}`
       })
       
-      if (result.success) {
-        setMigrationState({
-          isMigrating: false,
-          migrationProgress: 100,
-          currentStep: 'Migration completed',
-          errors: result.errors,
-          warnings: result.warnings
-        })
-      } else {
-        throw new Error(`Migration failed: ${result.errors.join(', ')}`)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Migration failed')
-      throw err
-    } finally {
-      setLoading(false)
+      return savedNode
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create node'
+      setState(prev => ({ ...prev, error: errorMessage }))
+      toast({
+        title: 'Error',
+        description: 'Failed to create node',
+        variant: 'destructive'
+      })
+      throw error
     }
-  }, [currentModel])
+  }, [modelId, toast])
 
-  const reverseMigration = useCallback(async (modelId: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      // Implementation for reverse migration
-      const legacyModel = FunctionModelNodeMigration.reverseMigration(
-        [], // nodes
-        [], // links
-        modelId
-      )
-      setCurrentModel(legacyModel)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reverse migration failed')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  return {
-    currentModel,
-    loading,
-    error,
-    lastSavedAt,
-    migrationState,
-    saveFunctionModel,
-    loadFunctionModel,
-    migrateToNodeArchitecture,
-    reverseMigration
-  }
+  return [state, actions]
 }
 ```
 
 ### 3. **Infrastructure Layer Implementation**
 
 #### Location: `lib/infrastructure/`
-The Infrastructure Layer handles external interfaces and technical concerns, acting as adapters.
+The Infrastructure Layer handles external interfaces and technical concerns, with both legacy and new implementations.
 
-#### Repository Implementation (Enhanced)
+#### Repository Implementation (Current)
 ```typescript
-// lib/infrastructure/repositories/function-model-repository.ts (Enhanced)
+// lib/infrastructure/repositories/function-model-repository.ts (LEGACY)
 export class FunctionModelRepository {
   private supabase: SupabaseClient
 
@@ -355,48 +401,198 @@ export class FunctionModelRepository {
     return mapDbToFunctionModel(data)
   }
 
-  // NEW: Node-based operations
-  async getNodeBasedModels(): Promise<FunctionModelNode[]> {
+  async getById(modelId: string): Promise<FunctionModel | null> {
     const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw new Error(`Failed to get node-based models: ${error.message}`)
-    }
-
-    return data.map(mapDbToFunctionModelNode)
-  }
-
-  async migrateModelToNodes(modelId: string): Promise<MigrationResult> {
-    const model = await this.getById(modelId)
-    if (!model) {
-      throw new Error(`Function model ${modelId} not found`)
-    }
-
-    return FunctionModelNodeMigration.migrateFunctionModel(model)
-  }
-
-  async getMigrationStatus(modelId: string): Promise<MigrationStatus> {
-    const { data, error } = await this.supabase
-      .from('migration_status')
+      .from('function_models')
       .select('*')
       .eq('model_id', modelId)
       .single()
 
     if (error) {
-      return { isMigrated: false, migrationDate: null, errors: [] }
+      if (error.code === 'PGRST116') {
+        return null
+      }
+      throw new Error(`Failed to get function model: ${error.message}`)
     }
 
-    return mapDbToMigrationStatus(data)
+    return mapDbToFunctionModel(data)
+  }
+
+  async update(modelId: string, updates: Partial<FunctionModel>): Promise<FunctionModel> {
+    const { data, error } = await this.supabase
+      .from('function_models')
+      .update(mapFunctionModelToDb(updates))
+      .eq('model_id', modelId)
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to update function model: ${error.message}`)
+    }
+
+    return mapDbToFunctionModel(data)
+  }
+
+  async delete(modelId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('function_models')
+      .delete()
+      .eq('model_id', modelId)
+
+    if (error) {
+      throw new Error(`Failed to delete function model: ${error.message}`)
+    }
+  }
+
+  // NEW: Node-based operations (Partially Implemented)
+  async getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]> {
+    const { data, error } = await this.supabase
+      .from('function_model_nodes')
+      .select('*')
+      .eq('model_id', modelId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      throw new Error(`Failed to get function model nodes: ${error.message}`)
+    }
+
+    return data.map(mapDbToFunctionModelNode)
+  }
+
+  async createFunctionModelNode(node: Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode> {
+    const { data, error } = await this.supabase
+      .from('function_model_nodes')
+      .insert(mapFunctionModelNodeToDb(node))
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to create function model node: ${error.message}`)
+    }
+
+    return mapDbToFunctionModelNode(data)
+  }
+
+  async updateFunctionModelNode(modelId: string, nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode> {
+    const { data, error } = await this.supabase
+      .from('function_model_nodes')
+      .update(mapFunctionModelNodeToDb(updates))
+      .eq('model_id', modelId)
+      .eq('node_id', nodeId)
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to update function model node: ${error.message}`)
+    }
+
+    return mapDbToFunctionModelNode(data)
+  }
+
+  async deleteFunctionModelNode(modelId: string, nodeId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('function_model_nodes')
+      .delete()
+      .eq('model_id', modelId)
+      .eq('node_id', nodeId)
+
+    if (error) {
+      throw new Error(`Failed to delete function model node: ${error.message}`)
+    }
+  }
+
+  async getNodeStatistics(modelId: string): Promise<any> {
+    const { data, error } = await this.supabase
+      .from('function_model_nodes')
+      .select('node_type, process_behavior, business_logic')
+      .eq('model_id', modelId)
+
+    if (error) {
+      throw new Error(`Failed to get node statistics: ${error.message}`)
+    }
+
+    return {
+      totalNodes: data.length,
+      nodesByType: data.reduce((acc, node) => {
+        acc[node.node_type] = (acc[node.node_type] || 0) + 1
+        return acc
+      }, {}),
+      nodesByExecutionType: data.reduce((acc, node) => {
+        const executionType = node.process_behavior?.execution_type || 'sequential'
+        acc[executionType] = (acc[executionType] || 0) + 1
+        return acc
+      }, {}),
+      nodesWithSLA: data.filter(node => node.business_logic?.sla).length,
+      nodesWithKPIs: data.filter(node => node.business_logic?.kpis?.length > 0).length
+    }
   }
 }
-```
 
-#### New Repository Implementations
-```typescript
-// lib/infrastructure/repositories/node-links-repository.ts (NEW)
+// lib/infrastructure/repositories/node-metadata-repository.ts (NEW - Partially Implemented)
+export class NodeMetadataRepository {
+  private supabase: SupabaseClient
+
+  constructor(supabase: SupabaseClient) {
+    this.supabase = supabase
+  }
+
+  async createMetadata(metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'>): Promise<NodeMetadataRecord> {
+    const { data, error } = await this.supabase
+      .from('node_metadata')
+      .insert(mapNodeMetadataToDb(metadata))
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to create node metadata: ${error.message}`)
+    }
+
+    return mapDbToNodeMetadata(data)
+  }
+
+  async getMetadataByEntity(featureType: string, entityId: string): Promise<NodeMetadataRecord[]> {
+    const { data, error } = await this.supabase
+      .from('node_metadata')
+      .select('*')
+      .eq('feature_type', featureType)
+      .eq('entity_id', entityId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      throw new Error(`Failed to get node metadata: ${error.message}`)
+    }
+
+    return data.map(mapDbToNodeMetadata)
+  }
+
+  async updateMetadata(metadataId: string, updates: Partial<NodeMetadataRecord>): Promise<NodeMetadataRecord> {
+    const { data, error } = await this.supabase
+      .from('node_metadata')
+      .update(mapNodeMetadataToDb(updates))
+      .eq('metadata_id', metadataId)
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to update node metadata: ${error.message}`)
+    }
+
+    return mapDbToNodeMetadata(data)
+  }
+
+  async updateVisualProperties(metadataId: string, visualProperties: Record<string, any>): Promise<void> {
+    const { error } = await this.supabase
+      .from('node_metadata')
+      .update({ visual_properties: visualProperties })
+      .eq('metadata_id', metadataId)
+
+    if (error) {
+      throw new Error(`Failed to update visual properties: ${error.message}`)
+    }
+  }
+}
+
+// lib/infrastructure/repositories/node-links-repository.ts (NEW - Partially Implemented)
 export class NodeLinksRepository {
   private supabase: SupabaseClient
 
@@ -418,7 +614,7 @@ export class NodeLinksRepository {
     return mapDbToNodeLink(data)
   }
 
-  async getNodeLinks(featureType: FeatureType, entityId: string, nodeId?: string): Promise<NodeLinkRecord[]> {
+  async getNodeLinks(featureType: string, entityId: string, nodeId?: string): Promise<NodeLinkRecord[]> {
     let queryBuilder = this.supabase
       .from('node_links')
       .select('*')
@@ -437,167 +633,15 @@ export class NodeLinksRepository {
 
     return data.map(mapDbToNodeLink)
   }
-}
 
-// lib/infrastructure/repositories/node-metadata-repository.ts (NEW)
-export class NodeMetadataRepository {
-  private supabase: SupabaseClient
-
-  constructor(supabase: SupabaseClient) {
-    this.supabase = supabase
-  }
-
-  async createNodeMetadata(metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'>): Promise<NodeMetadataRecord> {
-    const { data, error } = await this.supabase
-      .from('node_metadata')
-      .insert(mapNodeMetadataToDb(metadata))
-      .select()
-      .single()
+  async deleteNodeLink(linkId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('node_links')
+      .delete()
+      .eq('link_id', linkId)
 
     if (error) {
-      throw new Error(`Failed to create node metadata: ${error.message}`)
-    }
-
-    return mapDbToNodeMetadata(data)
-  }
-
-  async searchNodes(query: string, featureType?: FeatureType): Promise<NodeMetadataRecord[]> {
-    let queryBuilder = this.supabase
-      .from('node_metadata')
-      .select('*')
-
-    if (featureType) {
-      queryBuilder = queryBuilder.eq('feature_type', featureType)
-    }
-
-    if (query.trim()) {
-      queryBuilder = queryBuilder.or(`search_keywords.ilike.%${query}%`)
-    }
-
-    const { data, error } = await queryBuilder.order('created_at', { ascending: false })
-
-    if (error) {
-      throw new Error(`Failed to search nodes: ${error.message}`)
-    }
-
-    return data.map(mapDbToNodeMetadata)
-  }
-}
-```
-
-#### Migration Layer Implementation (NEW)
-```typescript
-// lib/infrastructure/migrations/function-model-node-migration.ts (NEW)
-export class FunctionModelNodeMigration {
-  static migrateFunctionModel(
-    functionModel: FunctionModel,
-    options: MigrationOptions = {}
-  ): MigrationResult {
-    const {
-      preserveExistingData = true,
-      createMetadata = true,
-      createLinks = true,
-      validateAfterMigration = true
-    } = options
-
-    const result: MigrationResult = {
-      nodes: [],
-      metadata: [],
-      links: [],
-      success: true,
-      errors: [],
-      warnings: []
-    }
-
-    try {
-      // Step 1: Convert existing nodes to new node structure
-      const nodes = this.migrateNodes(functionModel.nodesData || [], functionModel.modelId)
-      result.nodes = nodes
-
-      // Step 2: Create metadata for nodes
-      if (createMetadata) {
-        const metadata = this.createNodeMetadata(nodes, functionModel.modelId)
-        result.metadata = metadata
-      }
-
-      // Step 3: Convert existing relationships to new link structure
-      if (createLinks) {
-        const links = this.migrateRelationships(
-          functionModel.relationships || [],
-          functionModel.modelId
-        )
-        result.links = links
-      }
-
-      // Step 4: Validate migration if requested
-      if (validateAfterMigration) {
-        const validation = this.validateMigration(result, functionModel)
-        if (!validation.success) {
-          result.success = false
-          result.errors.push(...validation.errors)
-        }
-        result.warnings.push(...validation.warnings)
-      }
-
-    } catch (error) {
-      result.success = false
-      result.errors.push(`Migration failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-
-    return result
-  }
-
-  static reverseMigration(
-    nodes: FunctionModelNode[],
-    links: NodeLinkRecord[],
-    modelId: string
-  ): FunctionModel {
-    const nodesData: Node[] = nodes.map(node => this.convertNodeToOriginalFormat(node))
-    const relationships: NodeRelationship[] = links.map(link => this.convertLinkToRelationship(link))
-    
-    return {
-      modelId,
-      name: 'Migrated Model',
-      description: 'Model migrated from node-based architecture',
-      version: '1.0.0',
-      status: 'draft',
-      nodesData,
-      edgesData: [],
-      viewportData: { x: 0, y: 0, zoom: 1 },
-      tags: [],
-      relationships,
-      metadata: {
-        category: '',
-        dependencies: [],
-        references: [],
-        exportSettings: {
-          includeMetadata: true,
-          includeRelationships: true,
-          format: 'json',
-          resolution: 'medium'
-        },
-        collaboration: {
-          allowComments: true,
-          allowSuggestions: true,
-          requireApproval: false,
-          autoSave: true,
-          saveInterval: 30
-        }
-      },
-      permissions: {
-        canView: true,
-        canEdit: true,
-        canDelete: true,
-        canShare: true,
-        canExport: true,
-        canVersion: true,
-        canCollaborate: true
-      },
-      versionHistory: [],
-      currentVersion: '1.0.0',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSavedAt: new Date()
+      throw new Error(`Failed to delete node link: ${error.message}`)
     }
   }
 }
@@ -606,22 +650,15 @@ export class FunctionModelNodeMigration {
 ### 4. **Presentation Layer Implementation**
 
 #### Location: `app/(private)/dashboard/function-model/` and `components/composites/function-model/`
-The Presentation Layer manages UI components and user interactions, keeping UI logic minimal.
+The Presentation Layer manages UI components and user interactions, with both legacy and new implementations.
 
-#### Page Components (Enhanced)
+#### Page Components (Current Implementation)
 ```typescript
-// app/(private)/dashboard/function-model/[modelId]/page.tsx (Enhanced)
+// app/(private)/dashboard/function-model/[modelId]/page.tsx (LEGACY)
 export default function FunctionModelCanvasPage({ params }: { params: { modelId: string } }) {
   const [functionModel, setFunctionModel] = useState<FunctionModel | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [migrationState, setMigrationState] = useState<MigrationState>({
-    isMigrating: false,
-    migrationProgress: 0,
-    currentStep: '',
-    errors: [],
-    warnings: []
-  })
 
   useEffect(() => {
     const loadModel = async () => {
@@ -629,18 +666,6 @@ export default function FunctionModelCanvasPage({ params }: { params: { modelId:
         setLoading(true)
         const model = await loadFunctionModelUseCase(params.modelId)
         setFunctionModel(model)
-        
-        // Check if model needs migration
-        const migrationStatus = await getMigrationStatusUseCase(params.modelId)
-        if (!migrationStatus.isMigrated) {
-          setMigrationState({
-            isMigrating: true,
-            migrationProgress: 0,
-            currentStep: 'Preparing migration...',
-            errors: [],
-            warnings: []
-          })
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load model')
       } finally {
@@ -666,25 +691,12 @@ export default function FunctionModelCanvasPage({ params }: { params: { modelId:
   return (
     <FunctionProcessDashboard
       functionModel={functionModel}
-      migrationState={migrationState}
-      onMigrationComplete={(result) => {
-        setMigrationState({
-          isMigrating: false,
-          migrationProgress: 100,
-          currentStep: 'Migration completed',
-          errors: result.errors,
-          warnings: result.warnings
-        })
-      }}
     />
   )
 }
-```
 
-#### Feature Components (Enhanced)
-```typescript
-// app/(private)/dashboard/function-model/components/function-process-dashboard.tsx (Enhanced)
-export function FunctionProcessDashboard({ 
+// app/(private)/dashboard/function-model/components/function-process-dashboard-enhanced.tsx (NEW - Partially Implemented)
+export function FunctionProcessDashboardEnhanced({ 
   functionModel, 
   migrationState,
   onMigrationComplete 
@@ -816,7 +828,7 @@ export function FunctionProcessDashboard({
       </div>
 
       {/* Migration Status */}
-      {migrationState.isMigrating && (
+      {migrationState?.isMigrating && (
         <div className="p-4 bg-blue-50 border-b">
           <div className="flex items-center gap-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -842,7 +854,7 @@ export function FunctionProcessDashboard({
 
       {/* Floating Action Buttons */}
       <div className="absolute bottom-6 right-6 flex gap-2">
-        <Button onClick={handleSave} disabled={nodesState.loading}>
+        <Button onClick={handleSave} disabled={nodesState.isSaving}>
           <Save className="w-4 h-4 mr-2" />
           Save
         </Button>
@@ -856,77 +868,65 @@ export function FunctionProcessDashboard({
 
 ### 1. **Component Hierarchy Compliance**
 
-The Function Model feature follows the established component hierarchy:
+The Function Model feature follows the established component hierarchy with both legacy and new implementations:
 
-#### Base Components → Composite Components → Feature Components → Page Components
+#### Legacy Implementation
+```
+FunctionModelListPage → FunctionModelList → FunctionModelTableRow → Base Components
+FunctionModelCanvasPage → FunctionProcessDashboard → FlowNodes → Base Components
+```
 
-```typescript
-// Base Components (reusable across features)
-BaseNode
-NodeBehavior
-Button, Input, Modal, etc.
-
-// Composite Components (function-model specific)
-FunctionModelList
-FunctionModelTableRow
-SaveLoadPanel
-CrossFeatureLinkingPanel
-
-// Feature Components (canvas and workflow specific)
-FunctionProcessDashboard
-FlowNodes
-NodeLinkingTab
-
-// Page Components (routing and layout)
-FunctionModelListPage
-FunctionModelCanvasPage
+#### New Implementation (Partially Implemented)
+```
+FunctionModelListPage → FunctionModelList → FunctionModelTableRow → Base Components
+FunctionModelCanvasPage → FunctionProcessDashboardEnhanced → useFunctionModelNodes → Node Repositories
 ```
 
 ### 2. **Component Responsibilities**
 
 #### Single Responsibility Principle
+- **`FunctionModel`**: Only responsible for legacy function model data structure
 - **`BaseNode`**: Only responsible for defining the unified node interface
 - **`FunctionModelNode`**: Only responsible for function model specific node properties
-- **`NodeBehavior`**: Only responsible for node behavior abstraction and execution
-- **`FunctionModelNodeMigration`**: Only responsible for data migration between architectures
-- **`useFunctionModelNodes`**: Only responsible for function model node state management
+- **`useFunctionModelPersistence`**: Only responsible for legacy model persistence
+- **`useFunctionModelNodes`**: Only responsible for new node-based state management
 
 #### Encapsulation
 - Components expose only necessary interfaces via props
 - Internal state and logic are hidden from parent components
-- Data transformations happen at the appropriate layer (Domain entities, Application hooks)
+- Data transformations happen at the appropriate layer
 - Migration layer provides clean separation between old and new architectures
 
 #### Reusability
-- Base components (`BaseNode`, `NodeBehavior`) are reused across features
+- Base components are reused across features
 - Composite components can be extended for other similar features
 - Hooks provide reusable business logic
 - Migration layer can be reused for other feature migrations
 
 ### 3. **Data Flow Compliance**
 
-#### Top-Down Data Flow
+#### Legacy Data Flow
 ```typescript
 // Page Component → Feature Component → Composite Component → Base Component
 FunctionModelCanvasPage
-  ↓ (props: functionModel, migrationState)
+  ↓ (props: functionModel)
 FunctionProcessDashboard
-  ↓ (props: nodes, links, actions)
-useFunctionModelNodes
-  ↓ (props: nodeType, behavior)
-NodeBehavior
+  ↓ (props: nodes, edges)
+ReactFlow
+  ↓ (props: nodeType, data)
+FlowNodes
 ```
 
-#### Event Bubbling
+#### New Data Flow (Partially Implemented)
 ```typescript
-// Base Component → Composite Component → Feature Component → Page Component
-NodeBehavior (onExecute)
-  ↓
-useFunctionModelNodes (onNodeBehaviorComplete)
-  ↓
-FunctionProcessDashboard (onNodeUpdate)
-  ↓
-FunctionModelCanvasPage (onModelUpdate)
+// Page Component → Feature Component → Application Hook → Repository
+FunctionModelCanvasPage
+  ↓ (props: functionModel)
+FunctionProcessDashboardEnhanced
+  ↓ (props: modelId)
+useFunctionModelNodes
+  ↓ (props: nodeType, behavior)
+Node Repositories
 ```
 
 ### 4. **Clean Architecture Integration**
@@ -939,7 +939,7 @@ Application Layer (Hooks)
   ↓ depends on
 Domain Layer (Entities)
   ↑ depends on
-Infrastructure Layer (Repositories + Migration)
+Infrastructure Layer (Repositories)
 ```
 
 #### Layer Responsibilities
@@ -994,4 +994,28 @@ Infrastructure Layer (Repositories + Migration)
 - Adaptable to changing requirements
 - Migration layer enables gradual adoption
 
-This architecture compliance documentation demonstrates how the enhanced Function Model feature successfully implements both Clean Architecture principles and the established component architecture, providing a solid foundation for future development and maintenance while preserving all existing functionality through the migration layer. 
+## Current Implementation Status
+
+### ✅ **Fully Implemented**
+- Legacy React Flow canvas with drag-and-drop functionality
+- Basic node types (Stage, Action, IO, Container)
+- Node creation, editing, and deletion
+- Cross-feature linking modal system
+- Version control and model persistence
+- Basic node metadata system
+
+### 🔄 **Partially Implemented**
+- **Node-Based Architecture**: Core types and hooks exist, but not fully integrated
+- **Enhanced Node Management**: `useFunctionModelNodes` hook implemented but not used in main canvas
+- **Migration Layer**: Types and interfaces exist, but migration logic not fully implemented
+- **Cross-Feature Linking**: Basic linking exists, but advanced features not implemented
+- **Node Behavior System**: Framework exists, but execution not fully implemented
+
+### ❌ **Not Implemented**
+- **Workflow Execution**: No execution engine
+- **AI Integration**: No AI agent implementation
+- **Advanced Analytics**: No performance monitoring
+- **Real-time Collaboration**: No collaborative editing
+- **Advanced Export/Import**: Limited to JSON format
+
+This architecture compliance documentation demonstrates how the Function Model feature successfully implements both Clean Architecture principles and the established component architecture, providing a solid foundation for future development and maintenance while preserving all existing functionality through the migration layer. 

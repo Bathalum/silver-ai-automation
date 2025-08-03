@@ -25,23 +25,25 @@ export function LoadModelDialog({
   modelId, 
   onLoad 
 }: LoadModelDialogProps) {
-  const {
-    versions: versionHistory,
-    loading,
-    error,
-    loadVersions: loadVersionHistory,
-    getVersion
-  } = useFunctionModelVersionControl(modelId)
-
   const [selectedVersion, setSelectedVersion] = useState<string>('')
-  const [selectedVersionData, setSelectedVersionData] = useState<VersionEntry | null>(null)
+  const [selectedVersionData, setSelectedVersionData] = useState<any>(null)
   const [loadingVersion, setLoadingVersion] = useState(false)
+
+  console.log('LoadModelDialog props:', { open, modelId })
+
+  const { 
+    versions: versionHistory, 
+    loading, 
+    error, 
+    loadVersions: loadVersions, 
+    getVersion 
+  } = useFunctionModelVersionControl(modelId)
 
   useEffect(() => {
     if (open && modelId) {
-      loadVersionHistory()
+      loadVersions()
     }
-  }, [open, modelId, loadVersionHistory])
+  }, [open, modelId, loadVersions])
 
   const handleVersionSelect = async (version: string) => {
     setSelectedVersion(version)
@@ -176,7 +178,7 @@ export function LoadModelDialog({
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm">Changes in this version:</h4>
                     <div className="space-y-1">
-                      {selectedVersionData.changes.map((change, index) => (
+                      {selectedVersionData.changes.map((change: any, index: number) => (
                         <div key={index} className="flex items-center gap-2 text-sm">
                           <Badge variant="outline" className="text-xs">
                             {getChangeTypeDescription(change.changeType)}
@@ -211,31 +213,31 @@ export function LoadModelDialog({
               <h4 className="font-medium text-sm">Recent Versions</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {versionHistory.slice(0, 5).map((version) => (
-                  <Card 
-                    key={version.version} 
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleVersionSelect(version.version)}
-                  >
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">v{version.version}</span>
-                          {version.isPublished && (
-                            <Badge variant="default" className="text-xs">Published</Badge>
-                          )}
+                    <Card 
+                      key={version.version} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleVersionSelect(version.version)}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">v{version.version}</span>
+                            {version.isPublished && (
+                              <Badge variant="default" className="text-xs">Published</Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatDate(version.timestamp)}
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDate(version.timestamp)}
-                        </div>
-                      </div>
-                      {version.changes.length > 0 && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          {version.changes[0]?.description}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                        {version.changes.length > 0 && (
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            {version.changes[0]?.description}
+                          </div>
+                        )}
+                                             </CardContent>
+                     </Card>
+                   ))}
               </div>
             </div>
           )}

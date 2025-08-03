@@ -641,7 +641,7 @@ export class FunctionModelNodeMigration {
    */
   private static convertLinkToRelationship(link: NodeLinkRecord): NodeRelationship {
     const context = link.linkContext as any
-    
+
     return {
       id: link.linkId,
       sourceNodeId: link.sourceNodeId || '',

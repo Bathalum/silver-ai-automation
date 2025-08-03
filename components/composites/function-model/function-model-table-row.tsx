@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Settings, Activity, Copy, Trash2, ChevronRight, Dot } from 'lucide-react'
 import { NodeTypeIndicator } from './node-type-indicator'
 import { StatusIndicator } from './status-indicator'
-import { generatePerformanceData, formatLastModified, getModelCategory } from '@/lib/utils/performance-data'
+import { generatePerformanceData, formatLastModified, getModelCategory, analyzeConnections } from '@/lib/utils/performance-data'
 import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
 
 interface FunctionModelTableRowProps {
@@ -30,6 +30,10 @@ export function FunctionModelTableRow({
   const { nodeTypes, performance, stats } = generatePerformanceData(model)
   const category = getModelCategory(model)
   const lastModified = formatLastModified(model.lastSavedAt)
+  
+  // NEW: Analyze actual connections
+  const connectionAnalysis = analyzeConnections(model.edgesData)
+  const actualConnections = model.edgesData?.length || 0
 
   return (
     <div
@@ -76,7 +80,16 @@ export function FunctionModelTableRow({
             )}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            {model.nodesData?.length || 0} nodes • {performance.connections} connections
+            {model.nodesData?.length || 0} nodes • {actualConnections} connections
+            {connectionAnalysis.complexity !== 'low' && (
+              <span className={`ml-1 px-1 py-0.5 rounded text-xs ${
+                connectionAnalysis.complexity === 'high' 
+                  ? 'bg-red-100 text-red-700' 
+                  : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                {connectionAnalysis.complexity}
+              </span>
+            )}
           </div>
         </div>
 
