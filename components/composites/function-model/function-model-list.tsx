@@ -9,18 +9,18 @@ import { AlertCircle, Search, Filter, Plus } from 'lucide-react'
 import { FunctionModelTableRow } from './function-model-table-row'
 import { FunctionModelFilters } from './function-model-filters'
 import { NodeTypeIndicator } from './node-type-indicator'
-import type { FunctionModel, FunctionModelFilters as Filters } from '@/lib/domain/entities/function-model-types'
+import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 
 interface FunctionModelListProps {
-  models: FunctionModel[]
+  models: FunctionModelNode[]
   loading: boolean
   error: string | null
   onModelSelect: (modelId: string) => void
   onModelDelete: (modelId: string) => void
   onModelDuplicate: (modelId: string) => void
-  onFiltersChange?: (filters: Filters) => void
+  onFiltersChange?: (filters: any) => void
   onSearchChange?: (query: string) => void
-  filters?: Filters
+  filters?: any
   searchQuery?: string
 }
 

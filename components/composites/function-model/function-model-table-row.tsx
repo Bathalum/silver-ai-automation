@@ -7,10 +7,10 @@ import { MoreHorizontal, Settings, Activity, Copy, Trash2, ChevronRight, Dot } f
 import { NodeTypeIndicator } from './node-type-indicator'
 import { StatusIndicator } from './status-indicator'
 import { generatePerformanceData, formatLastModified, getModelCategory, analyzeConnections } from '@/lib/utils/performance-data'
-import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
+import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 
 interface FunctionModelTableRowProps {
-  model: FunctionModel
+  model: FunctionModelNode
   onEdit: (modelId: string) => void
   onDelete: (modelId: string) => void
   onDuplicate: (modelId: string) => void
@@ -32,8 +32,8 @@ export function FunctionModelTableRow({
   const lastModified = formatLastModified(model.lastSavedAt)
   
   // NEW: Analyze actual connections
-  const connectionAnalysis = analyzeConnections(model.edgesData)
-  const actualConnections = model.edgesData?.length || 0
+  const connectionAnalysis = analyzeConnections(model.relationships || [])
+  const actualConnections = model.relationships?.length || 0
 
   return (
     <div
@@ -42,7 +42,7 @@ export function FunctionModelTableRow({
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={() => onEdit(model.modelId)}
+      onClick={() => onEdit(model.nodeId)}
     >
       <div className="grid grid-cols-12 gap-4 items-center">
         {/* Model Info */}
@@ -52,7 +52,7 @@ export function FunctionModelTableRow({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h3 className="font-medium text-sm truncate">{model.name}</h3>
-                <span className="text-xs text-muted-foreground">#{model.modelId.slice(0, 8)}</span>
+                <span className="text-xs text-muted-foreground">#{model.nodeId.slice(0, 8)}</span>
               </div>
               <p className="text-xs text-muted-foreground truncate mt-0.5">{model.description}</p>
               <div className="flex items-center gap-2 mt-1">
@@ -80,7 +80,7 @@ export function FunctionModelTableRow({
             )}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            {model.nodesData?.length || 0} nodes • {actualConnections} connections
+            {model.relationships?.length || 0} nodes • {actualConnections} connections
             {connectionAnalysis.complexity !== 'low' && (
               <span className={`ml-1 px-1 py-0.5 rounded text-xs ${
                 connectionAnalysis.complexity === 'high' 

@@ -10,13 +10,13 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { X, Plus } from 'lucide-react'
-import { type FunctionModel, type SaveOptions } from '@/lib/domain/entities/function-model-types'
+import { type FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 
 interface SaveModelDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (options: SaveOptions) => Promise<void>
-  model?: FunctionModel
+  onSave: (options: any) => Promise<void>
+  model?: FunctionModelNode
   loading?: boolean
 }
 
@@ -38,7 +38,7 @@ export function SaveModelDialog({
   const handleSave = async () => {
     if (!model) return
 
-    const options: SaveOptions = {
+    const options: any = {
       changeSummary: changeSummary || 'Manual save',
       autoVersion,
       isMajorVersion,

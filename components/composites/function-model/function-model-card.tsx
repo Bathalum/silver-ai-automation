@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { MoreHorizontal, Edit, Trash2, Copy, ExternalLink, Calendar, Layers } from 'lucide-react'
-import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
+import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 
 interface FunctionModelCardProps {
-  model: FunctionModel
+  model: FunctionModelNode
   onEdit: (modelId: string) => void
   onDelete: (modelId: string) => void
   onDuplicate: (modelId: string) => void
@@ -58,7 +58,7 @@ export function FunctionModelCard({
   }
   
   const getNodeCount = () => {
-    return model.nodesData?.length || 0
+    return model.relationships?.length || 0
   }
   
   return (
@@ -68,7 +68,7 @@ export function FunctionModelCard({
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={() => onEdit(model.modelId)}
+      onClick={() => onEdit(model.nodeId)}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -94,21 +94,21 @@ export function FunctionModelCard({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={(e) => {
                 e.stopPropagation()
-                onEdit(model.modelId)
+                onEdit(model.nodeId)
               }}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={(e) => {
                 e.stopPropagation()
-                onDuplicate(model.modelId)
+                onDuplicate(model.nodeId)
               }}>
                 <Copy className="h-4 w-4 mr-2" />
                 Duplicate
               </DropdownMenuItem>
               <DropdownMenuItem onClick={(e) => {
                 e.stopPropagation()
-                window.open(`/function-model/${model.modelId}`, '_blank')
+                window.open(`/function-model/${model.nodeId}`, '_blank')
               }}>
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open in New Tab
@@ -116,7 +116,7 @@ export function FunctionModelCard({
               <DropdownMenuItem 
                 onClick={(e) => {
                   e.stopPropagation()
-                  onDelete(model.modelId)
+                  onDelete(model.nodeId)
                 }}
                 className="text-destructive"
               >

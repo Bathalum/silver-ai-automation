@@ -9,15 +9,16 @@ import { StageNodeModal } from "@/components/composites/stage-node-modal"
 import { ActionModal } from "@/components/composites/action-modal"
 import { FunctionModelModal } from "@/components/composites/function-model-modal"
 import { StageNode, IONode, ActionTableNode, FunctionModelContainerNode } from "./flow-nodes"
-import { SaveLoadPanel } from "@/components/composites/function-model/save-load-panel"
+// SaveLoadPanel removed - using node-based persistence instead
 import { CrossFeatureLinkingModal } from "@/components/composites/cross-feature-linking-modal"
-import type { FunctionModel, Stage, ActionItem, DataPort, NodeData } from "@/lib/domain/entities/function-model-types"
+import { NodeBehaviorPanel } from "@/components/composites/function-model/node-behavior-panel"
+import { UnifiedOperationsPanel } from "@/components/composites/function-model/unified-operations-panel"
+import type { FunctionModelNode, FunctionModelNodeRelationship, Stage, ActionItem, DataPort } from "@/lib/domain/entities/function-model-node-types"
 import type { BackgroundVariant } from "reactflow"
 import { addEdge, type Connection, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, type Node } from "reactflow"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
-import type { NodeRelationship } from "@/lib/domain/entities/function-model-types"
-import { IONodeModal } from "@/components/composites/io-node-modal";
+import { IONodeModal } from "@/components/composites/io-node-modal"
 
 interface Flow {
   name: string
@@ -36,274 +37,205 @@ const generateUUID = (): string => {
 };
 
 // Helper functions to convert between data formats
-const convertToReactFlowNode = (nodeData: any): Node => {
+const convertToReactFlowNode = (nodeData: FunctionModelNode): Node => {
   return {
-    id: nodeData.id,
-    type: nodeData.type,
+    id: nodeData.nodeId,
+    type: nodeData.nodeType,
     position: nodeData.position,
-    data: nodeData.data,
-    ...(nodeData.parentNode && { parentNode: nodeData.parentNode }),
-    ...(nodeData.extent && { extent: nodeData.extent }),
-    ...(nodeData.draggable !== undefined && { draggable: nodeData.draggable }),
-    ...(nodeData.selectable !== undefined && { selectable: nodeData.selectable }),
-    ...(nodeData.deletable !== undefined && { deletable: nodeData.deletable }),
-    ...(nodeData.width && { width: nodeData.width }),
-    ...(nodeData.height && { height: nodeData.height })
+    data: {
+      label: nodeData.name,
+      type: nodeData.nodeType,
+      description: nodeData.description,
+      stageData: nodeData.functionModelData.stage,
+      actionData: nodeData.functionModelData.action,
+      portData: nodeData.functionModelData.io,
+      containerData: nodeData.functionModelData.container
+    },
+    ...(nodeData.reactFlowData.draggable !== undefined && { draggable: nodeData.reactFlowData.draggable }),
+    ...(nodeData.reactFlowData.selectable !== undefined && { selectable: nodeData.reactFlowData.selectable }),
+    ...(nodeData.reactFlowData.deletable !== undefined && { deletable: nodeData.reactFlowData.deletable })
   };
 };
 
-const convertToReactFlowEdge = (edgeData: any): Edge => {
+const convertToReactFlowEdge = (edgeData: FunctionModelNodeRelationship): Edge => {
   return {
     id: edgeData.id,
-    source: edgeData.source,
-    target: edgeData.target,
+    source: edgeData.sourceNodeId,
+    target: edgeData.targetNodeId,
     ...(edgeData.sourceHandle && { sourceHandle: edgeData.sourceHandle }),
     ...(edgeData.targetHandle && { targetHandle: edgeData.targetHandle }),
-    ...(edgeData.type && { type: edgeData.type }),
-    ...(edgeData.animated !== undefined && { animated: edgeData.animated }),
-    ...(edgeData.style && { style: edgeData.style })
+    ...(edgeData.type && { type: edgeData.type })
   };
 };
 
-// Sample data for initial state
-const sampleFunctionModel: FunctionModel = {
-  modelId: 'sample-model-id', // Use a consistent ID for sample model
-  name: "Function / Process Name",
-  description: "1 paragraph per goal that you want to achieve by the end of the process",
-  version: "1.0.0",
-  status: "draft",
-  nodesData: [
-    {
-      id: 'stage-1',
-      type: 'stageNode',
-      position: { x: 100, y: 100 },
-      data: {
-        label: 'Sample Stage',
-        type: 'stage',
+// Sample data for initial state using node-based architecture
+const sampleFunctionModelNodes: FunctionModelNode[] = [
+  {
+    nodeId: 'stage-1',
+    modelId: 'sample-model-id',
+    type: 'function-model',
+    nodeType: 'stageNode',
+    name: 'Sample Stage',
+    description: 'This is a sample stage',
+    position: { x: 100, y: 100 },
+    metadata: {
+      feature: 'function-model',
+      version: '1.0',
+      tags: ['stage', 'function-model'],
+      aiAgent: undefined,
+      vectorEmbedding: undefined
+    },
+    functionModelData: {
+      stage: {
+        id: 'stage-1',
+        name: 'Sample Stage',
         description: 'This is a sample stage',
-        stageData: {
-          id: 'stage-1',
-          name: 'Sample Stage',
-          description: 'This is a sample stage',
-          position: { x: 100, y: 100 },
-          actions: [],
-          dataChange: [],
-          boundaryCriteria: [],
-          raci: {
-            inform: [],
-            consult: [],
-            accountable: [],
-            responsible: []
-          }
+        position: { x: 100, y: 100 },
+        actions: [],
+        dataChange: [],
+        boundaryCriteria: [],
+        raci: {
+          inform: [],
+          consult: [],
+          accountable: [],
+          responsible: []
         }
-      }
+      },
+      action: undefined,
+      io: undefined,
+      container: undefined
     },
-    {
-      id: 'action-1',
-      type: 'actionTableNode',
-      position: { x: 300, y: 100 },
-      data: {
-        label: 'Sample Actions',
-        type: 'action',
-        description: 'This is a sample action table',
-        actionData: {
-          id: 'action-1',
-          name: 'Sample Action',
-          description: 'This is a sample action',
-          type: 'action'
-        }
-      }
-    }
-  ],
-  edgesData: [],
-  viewportData: { x: 0, y: 0, zoom: 1 },
-  tags: [],
-  metadata: {
-    category: "",
-    dependencies: [],
-    references: [],
-    exportSettings: {
-      includeMetadata: true,
-      includeRelationships: true,
-      format: "json",
-      resolution: "medium"
+    businessLogic: {
+      complexity: 'simple',
+      estimatedDuration: 0,
+      sla: undefined,
+      kpis: []
     },
-    collaboration: {
-      allowComments: true,
-      allowSuggestions: true,
-      requireApproval: false,
-      autoSave: true,
-      saveInterval: 30
-    }
-  },
-  permissions: {
-    canView: true,
-    canEdit: true,
-    canDelete: true,
-    canShare: true,
-    canExport: true,
-    canVersion: true,
-    canCollaborate: true
-  },
-  relationships: [],
-  versionHistory: [],
-  currentVersion: "1.0.0",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  lastSavedAt: new Date()
-}
+    processBehavior: {
+      executionType: 'sequential',
+      dependencies: [],
+      triggers: []
+    },
+    reactFlowData: {
+      draggable: true,
+      selectable: true,
+      deletable: true
+    },
+    relationships: [],
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+];
 
 interface FunctionProcessDashboardProps {
-  functionModel?: FunctionModel
+  modelId?: string
+  functionModelNodes?: FunctionModelNode[]
 }
 
 export function FunctionProcessDashboard({
-  functionModel: initialModel = sampleFunctionModel,
+  modelId,
+  functionModelNodes: initialNodes = sampleFunctionModelNodes,
 }: FunctionProcessDashboardProps) {
   const router = useRouter()
-  const [functionModel, setFunctionModel] = useState<FunctionModel>(initialModel)
+  const [functionModelNodes, setFunctionModelNodes] = useState<FunctionModelNode[]>(initialNodes)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-
-  // Modal state management for nested modals
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isEditingDescription, setIsEditingDescription] = useState(false)
+  const [activePersistenceTab, setActivePersistenceTab] = useState<'save' | 'load' | 'links' | 'behavior' | 'operations'>('save')
+  const [persistenceSidebarOpen, setPersistenceSidebarOpen] = useState(false)
+  const [crossFeatureModalOpen, setCrossFeatureModalOpen] = useState(false)
+  const [selectedStage, setSelectedStage] = useState<Stage | null>(null)
+  const [stageModalOpen, setStageModalOpen] = useState(false)
+  const [selectedIONode, setSelectedIONode] = useState<any>(null)
+  const [ioNodeModalOpen, setIONodeModalOpen] = useState(false)
+  const [functionModelModalOpen, setFunctionModelModalOpen] = useState(false)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [modalStack, setModalStack] = useState<Array<{
     type: "function" | "stage" | "action" | "input" | "output"
-    data: FunctionModel | Stage | ActionItem | DataPort
+    data: FunctionModelNode | Stage | ActionItem | DataPort
     context?: { previousModal?: string; stageId?: string }
   }>>([])
 
-  // State for StageNodeModal
-  const [stageModalOpen, setStageModalOpen] = useState(false)
-  const [selectedStage, setSelectedStage] = useState<Stage | null>(null)
-
-  // Add state for IONode modal
-  const [ioNodeModalOpen, setIONodeModalOpen] = useState(false);
-  const [selectedIONode, setSelectedIONode] = useState<any>(null);
-
-  // Add state for Function Model modal
-  const [functionModelModalOpen, setFunctionModelModalOpen] = useState(false);
-
-  // Add state for persistence sidebar
-  const [persistenceSidebarOpen, setPersistenceSidebarOpen] = useState(false);
-  const [activePersistenceTab, setActivePersistenceTab] = useState<'save' | 'links'>('save');
-
-  // Add state for cross-feature linking modal
-  const [crossFeatureModalOpen, setCrossFeatureModalOpen] = useState(false);
-
-  // Load function model on mount
+  // Load saved model on mount
   useEffect(() => {
     const loadSavedModel = async () => {
       // Only try to load if we have a valid modelId (not the sample one)
-      if (functionModel.modelId && functionModel.modelId !== 'sample-model-id') {
+      if (modelId && modelId !== 'sample-model-id') {
         setIsLoading(true)
         setLoadError(null)
         
         try {
-          console.log('Loading saved model:', functionModel.modelId)
-          const { loadFunctionModel } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
-          const loadedModel = await loadFunctionModel(functionModel.modelId, { includeMetadata: true })
-          console.log('Model loaded successfully:', loadedModel)
-          console.log('Loaded model nodesData type:', typeof loadedModel.nodesData)
-          console.log('Loaded model nodesData length:', loadedModel.nodesData?.length)
-          console.log('Loaded model nodesData content:', JSON.stringify(loadedModel.nodesData, null, 2))
-          setFunctionModel(loadedModel)
+          console.log('Loading saved model:', modelId)
+          // Use the node-based use cases instead of legacy persistence
+          const { getFunctionModelNodes } = await import('@/lib/application/use-cases/function-model-use-cases')
+          const loadedNodes = await getFunctionModelNodes(modelId)
+          console.log('Model loaded successfully:', loadedNodes)
+          setFunctionModelNodes(loadedNodes)
           
           // Update flow data with loaded model
-          console.log('Setting flow data with nodes:', loadedModel.nodesData)
-          console.log('Setting flow data with edges:', loadedModel.edgesData)
+          const reactFlowNodes = loadedNodes.map(convertToReactFlowNode)
           setFlow(prev => ({
             ...prev,
-            name: loadedModel.name,
-            nodes: loadedModel.nodesData || [],
-            edges: loadedModel.edgesData || [],
-            viewport: loadedModel.viewportData || { x: 0, y: 0, zoom: 1 }
+            name: loadedNodes[0]?.name || 'Untitled Flow',
+            nodes: reactFlowNodes,
+            edges: [], // Convert relationships to edges if needed
+            viewport: { x: 0, y: 0, zoom: 1 }
           }))
-        } catch (err) {
-          console.error('Failed to load model:', err)
-          setLoadError(err instanceof Error ? err.message : 'Failed to load model')
+        } catch (error) {
+          console.error('Failed to load model:', error)
+          setLoadError(error instanceof Error ? error.message : 'Failed to load model')
         } finally {
           setIsLoading(false)
         }
       } else {
-        // If we have the sample model, try to load the most recent saved model
-        setIsLoading(true)
-        setLoadError(null)
-        
-        try {
-          console.log('Loading most recent saved model...')
-          const { getAllFunctionModels } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
-          const allModels = await getAllFunctionModels()
-          
-          if (allModels.length > 0) {
-            const mostRecentModel = allModels[0] // Already ordered by created_at desc
-            console.log('Loading most recent model:', mostRecentModel.modelId)
-            const { loadFunctionModel } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
-            const loadedModel = await loadFunctionModel(mostRecentModel.modelId, { includeMetadata: true })
-            console.log('Most recent model loaded successfully:', loadedModel)
-            setFunctionModel(loadedModel)
-            
-            // Update flow data with loaded model
-            setFlow(prev => ({
-              ...prev,
-              name: loadedModel.name,
-              nodes: loadedModel.nodesData || [],
-              edges: loadedModel.edgesData || [],
-              viewport: loadedModel.viewportData || { x: 0, y: 0, zoom: 1 }
-            }))
-          } else {
-            console.log('No saved models found, using sample model')
-            // Ensure the flow state is properly set with sample model data
-            console.log('Setting flow with sample model data:', functionModel.nodesData)
-            setFlow(prev => ({
-              ...prev,
-              name: functionModel.name,
-              nodes: functionModel.nodesData || [],
-              edges: functionModel.edgesData || [],
-              viewport: functionModel.viewportData || { x: 0, y: 0, zoom: 1 }
-            }))
-          }
-        } catch (err) {
-          console.error('Failed to load most recent model:', err)
-          setLoadError(err instanceof Error ? err.message : 'Failed to load most recent model')
-        } finally {
-          setIsLoading(false)
-        }
+        console.log('No saved models found, using sample model')
+        // Ensure the flow state is properly set with sample model data
+        console.log('Setting flow with sample model data:', initialNodes)
+        const reactFlowNodes = initialNodes.map(convertToReactFlowNode)
+        setFlow(prev => ({
+          ...prev,
+          name: initialNodes[0]?.name || 'Untitled Flow',
+          nodes: reactFlowNodes,
+          edges: [], // No edges for sample model
+          viewport: { x: 0, y: 0, zoom: 1 }
+        }))
       }
     }
 
     loadSavedModel()
-  }, [functionModel.modelId])
+  }, [modelId, initialNodes])
 
   // Get connected actions for a stage using NodeRelationships
   const getConnectedActions = useCallback((stageId: string): ActionItem[] => {
-    if (!functionModel.relationships) {
+    if (!functionModelNodes) {
       return []
     }
     
     // Find all parent-child relationships where stage is the parent OR target
-    const stageRelationships = functionModel.relationships.filter(
-      rel => rel.type === 'parent-child' && 
-            ((rel.sourceNodeId === stageId && rel.targetNodeType === 'actionTableNode') ||
-             (rel.targetNodeId === stageId && rel.sourceNodeType === 'actionTableNode'))
+    const stageRelationships = functionModelNodes.flatMap(node => 
+      node.relationships.filter(
+        rel => rel.relationshipType === 'parent-child' && 
+              ((rel.sourceNodeId === stageId) ||
+               (rel.targetNodeId === stageId))
+      )
     )
     
-    // Deduplicate by action node ID
-    const actionNodeIds = Array.from(new Set(
-      stageRelationships.map(rel =>
-        rel.sourceNodeId === stageId ? rel.targetNodeId : rel.sourceNodeId
-      )
-    ));
+    // Get action IDs from relationships
+    const actionIds = stageRelationships.map(rel => 
+      rel.sourceNodeId === stageId ? rel.targetNodeId : rel.sourceNodeId
+    )
     
-    // Map to ActionItem objects
-    const actions = actionNodeIds.map(actionNodeId => ({
-      id: actionNodeId,
-      name: `Action ${actionNodeId}`,
-      description: `Action connected to stage ${stageId}`,
-      type: 'action' as const
-    }));
+    // Find action nodes
+    const actions: ActionItem[] = []
+    functionModelNodes.forEach(node => {
+      if (actionIds.includes(node.nodeId) && node.functionModelData.action) {
+        actions.push(node.functionModelData.action)
+      }
+    })
     
     return actions;
-  }, [functionModel.relationships])
+  }, [functionModelNodes])
 
   // Open action modal from stage modal
   const openActionModal = useCallback((action: ActionItem, stageId: string) => {
@@ -330,27 +262,34 @@ export function FunctionProcessDashboard({
     setStageModalOpen(true)
   }, [])
 
-
-
   const [flow, setFlow] = useState<Flow>({
-    name: functionModel.name,
-    nodes: functionModel.nodesData || [],
-    edges: functionModel.edgesData || [],
-    viewport: functionModel.viewportData || { x: 0, y: 0, zoom: 1 },
+    name: functionModelNodes[0]?.name || 'Untitled Flow',
+    nodes: functionModelNodes.map(convertToReactFlowNode),
+    edges: [],
+    viewport: { x: 0, y: 0, zoom: 1 },
   })
-
-
 
   // Sync flow state with functionModel
   useEffect(() => {
-    setFunctionModel(prev => ({
-      ...prev,
-      nodesData: flow.nodes,
-      edgesData: flow.edges,
-      viewportData: flow.viewport,
-      name: flow.name
-    }))
-  }, [flow.nodes, flow.edges, flow.viewport, flow.name])
+    setFunctionModelNodes(prev => prev.map(node => ({
+      ...node,
+      position: node.position, // Keep position from node
+      data: {
+        label: node.name,
+        type: node.nodeType,
+        description: node.description,
+        stageData: node.functionModelData.stage,
+        actionData: node.functionModelData.action,
+        portData: node.functionModelData.io,
+        containerData: node.functionModelData.container
+      },
+      reactFlowData: {
+        draggable: node.reactFlowData.draggable,
+        selectable: node.reactFlowData.selectable,
+        deletable: node.reactFlowData.deletable
+      }
+    })))
+  }, [functionModelNodes])
 
   // Navigate back to stage modal from action modal
   const navigateBackToStage = useCallback((stageId: string) => {
@@ -385,16 +324,18 @@ export function FunctionProcessDashboard({
     const sourceHandle = params.sourceHandle;
     const targetHandle = params.targetHandle;
     
-    // Create relationship record
-    const relationship: NodeRelationship = {
-      id: `${params.source}-${params.target}-${Date.now()}`,
+    // Create relationship record using unified structure
+    const relationship = {
+      relationshipId: `${params.source}-${params.target}-${Date.now()}`,
       sourceNodeId: params.source!,
       targetNodeId: params.target!,
-      sourceHandle: sourceHandle || '',
-      targetHandle: targetHandle || '',
-      type: 'sibling', // default to sibling
-      sourceNodeType: sourceNode.type as any,
-      targetNodeType: targetNode.type as any,
+      relationshipType: 'sibling' as const, // default to sibling
+      metadata: {
+        sourceHandle: sourceHandle || '',
+        targetHandle: targetHandle || '',
+        strength: 1.0,
+        bidirectional: false
+      },
       createdAt: new Date()
     };
     
@@ -402,7 +343,10 @@ export function FunctionProcessDashboard({
     if ((sourceHandle === 'header-source' && targetHandle === 'bottom-target') ||
         (sourceHandle === 'bottom-target' && targetHandle === 'header-source')) {
       
-      relationship.type = 'parent-child';
+      const parentChildRelationship = {
+        ...relationship,
+        relationshipType: 'parent-child' as const,
+      };
       
       let parentNode: Node | undefined, actionNode: Node | undefined
       // Support both StageNode and IONode as parent
@@ -416,30 +360,32 @@ export function FunctionProcessDashboard({
       
       if (parentNode && actionNode) {
         // Create TWO relationships: one in each direction for easier querying
-        const parentToActionRelationship: NodeRelationship = {
-          ...relationship,
-          id: `${parentNode.id}-${actionNode.id}-${Date.now()}`,
+        const parentToActionRelationship = {
+          ...parentChildRelationship,
+          relationshipId: `${parentNode.id}-${actionNode.id}-${Date.now()}`,
           sourceNodeId: parentNode.id,
           targetNodeId: actionNode.id,
-          sourceNodeType: parentNode.type as any,
-          targetNodeType: actionNode.type as any,
         }
         
-        const actionToParentRelationship: NodeRelationship = {
-          ...relationship,
-          id: `${actionNode.id}-${parentNode.id}-${Date.now()}`,
+        const actionToParentRelationship = {
+          ...parentChildRelationship,
+          relationshipId: `${actionNode.id}-${parentNode.id}-${Date.now()}`,
           sourceNodeId: actionNode.id,
           targetNodeId: parentNode.id,
-          sourceNodeType: actionNode.type as any,
-          targetNodeType: parentNode.type as any,
         }
         
         // Add both relationships to function model
-        setFunctionModel((fm) => {
-          const relationships = fm.relationships || [];
-          const updatedRelationships = [...relationships, parentToActionRelationship, actionToParentRelationship];
-          
-          return { ...fm, relationships: updatedRelationships }
+        setFunctionModelNodes((fm) => {
+          const updatedNodes = fm.map(node => {
+            if (node.nodeId === parentNode!.id) {
+              return {
+                ...node,
+                relationships: [...node.relationships, parentToActionRelationship, actionToParentRelationship]
+              };
+            }
+            return node;
+          });
+          return updatedNodes;
         })
         
         // Update parent node data in flow.nodes if it's a dynamically created stage or io node
@@ -489,14 +435,18 @@ export function FunctionProcessDashboard({
     if ((sourceHandle === 'right-source' && targetHandle === 'left-target') ||
         (sourceHandle === 'left-target' && targetHandle === 'right-source')) {
       
-      relationship.type = 'sibling';
-      
       // Add relationship to function model
-      setFunctionModel((fm) => {
-        const relationships = fm.relationships || [];
-        const updatedRelationships = [...relationships, relationship];
-        
-        return { ...fm, relationships: updatedRelationships }
+      setFunctionModelNodes((fm) => {
+        const updatedNodes = fm.map(node => {
+          if (node.nodeId === relationship.sourceNodeId) {
+            return {
+              ...node,
+              relationships: [...node.relationships, relationship]
+            };
+          }
+          return node;
+        });
+        return updatedNodes;
       })
       
 
@@ -522,55 +472,24 @@ export function FunctionProcessDashboard({
         if (!sourceNode || !targetNode) return
         
         // Remove relationship from function model
-        setFunctionModel((fm) => {
-          const relationships = fm.relationships || [];
-          
-          const updatedRelationships = relationships.filter(rel => 
-            !(rel.sourceNodeId === edge.source && rel.targetNodeId === edge.target) &&
-            !(rel.sourceNodeId === edge.target && rel.targetNodeId === edge.source)
-          )
-          
-          // Handle Parent-Child relationship removal (StageNode ↔ ActionTableNode)
-          let stageNode: Node | undefined, actionNode: Node | undefined
-          if (sourceNode.type === "stageNode" && targetNode.type === "actionTableNode") {
-            stageNode = sourceNode
-            actionNode = targetNode
-          } else if (sourceNode.type === "actionTableNode" && targetNode.type === "stageNode") {
-            stageNode = targetNode
-            actionNode = sourceNode
-          }
-          
-          if (stageNode && actionNode) {
-            // Remove action id from stage's actions array (for dynamically created stages)
-            setFlow((f) => {
-              const updatedNodes = f.nodes.map((node) => {
-                if (node.id === stageNode!.id && node.type === 'stageNode' && node.data.stage) {
-                  const actions = (node.data.stage.actions || []).filter((id: string) => id !== actionNode!.id)
-                  return {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      stage: {
-                        ...node.data.stage,
-                        actions
-                      }
-                    }
-                  }
-                }
-                return node
-              })
-              
-              return { ...f, nodes: updatedNodes }
-            })
-          }
-          
-          return { ...fm, relationships: updatedRelationships }
+        setFunctionModelNodes((fm) => {
+          const updatedNodes = fm.map(node => {
+            if (node.nodeId === sourceNode.id) {
+              return {
+                ...node,
+                relationships: node.relationships.filter(rel => 
+                  !(rel.sourceNodeId === edge.source && rel.targetNodeId === edge.target) &&
+                  !(rel.sourceNodeId === edge.target && rel.targetNodeId === edge.source)
+                )
+              };
+            }
+            return node;
+          });
+          return updatedNodes;
         })
       }
     })
   }, [flow.edges, flow.nodes])
-
-
 
   // Add Stage Node handler
   const handleAddStageNode = useCallback(() => {
@@ -776,8 +695,6 @@ export function FunctionProcessDashboard({
     });
   }, [setFlow]);
 
-  const [isEditingName, setIsEditingName] = useState(false)
-  const [isEditingDescription, setIsEditingDescription] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
@@ -802,14 +719,20 @@ export function FunctionProcessDashboard({
     const newName = e.target.value
     setFlow((f) => ({ ...f, name: newName }))
     // Also update the function model name
-    setFunctionModel(prev => prev ? { ...prev, name: newName } : prev)
+    setFunctionModelNodes(prev => prev.map(node => ({
+      ...node,
+      name: newName
+    })))
   }
 
   // Handle description change
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newDescription = e.target.value
     // Also update the function model description
-    setFunctionModel(prev => prev ? { ...prev, description: newDescription } : prev)
+    setFunctionModelNodes(prev => prev.map(node => ({
+      ...node,
+      description: newDescription
+    })))
   }
 
   // Handle blur or Enter to finish editing
@@ -894,6 +817,9 @@ export function FunctionProcessDashboard({
   // Add a central onNodeClick handler
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     console.log('Node clicked:', node);
+    // Set selected node for behavior panel
+    setSelectedNodeId(node.id);
+    
     if (node.type === 'stageNode') {
       // Open the stage modal with the correct stage data
       const stageData = node.data.stage;
@@ -912,17 +838,25 @@ export function FunctionProcessDashboard({
     }
   }, []);
 
+  // Handle node selection for behavior panel
+  const handleNodeSelect = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId)
+    setActivePersistenceTab('behavior')
+  }, []);
+
   // Utility: Get all ActionTableNodes connected to a given IONode (similar to getConnectedActions for StageNode)
   const getConnectedActionsForIONode = useCallback((ioNodeId: string): ActionItem[] => {
-    if (!functionModel.relationships) {
+    if (!functionModelNodes) {
       return []
     }
     
     // Find all parent-child relationships where IONode is the parent OR target
-    const ioRelationships = functionModel.relationships.filter(
-      rel => rel.type === 'parent-child' && 
-            ((rel.sourceNodeId === ioNodeId && rel.targetNodeType === 'actionTableNode') ||
-             (rel.targetNodeId === ioNodeId && rel.sourceNodeType === 'actionTableNode'))
+    const ioRelationships = functionModelNodes.flatMap(node => 
+      node.relationships.filter(
+        rel => rel.relationshipType === 'parent-child' && 
+              ((rel.sourceNodeId === ioNodeId) ||
+               (rel.targetNodeId === ioNodeId))
+      )
     )
     
     // Deduplicate by action node ID
@@ -941,7 +875,7 @@ export function FunctionProcessDashboard({
     }));
     
     return actions;
-  }, [functionModel.relationships])
+  }, [functionModelNodes])
 
   return (
     <div className="w-full h-full relative">
@@ -1010,7 +944,7 @@ export function FunctionProcessDashboard({
         {isEditingDescription ? (
           <textarea
             ref={descriptionRef}
-            value={functionModel.description}
+            value={functionModelNodes[0]?.description || ''}
             onChange={handleDescriptionChange}
             onBlur={finishDescriptionEditing}
             onKeyDown={handleDescriptionKeyDown}
@@ -1025,7 +959,7 @@ export function FunctionProcessDashboard({
             title="Click to edit description"
             onClick={() => setIsEditingDescription(true)}
           >
-            {functionModel.description || 'Click to add description...'}
+            {functionModelNodes[0]?.description || 'Click to add description...'}
           </p>
         )}
         {/* Floating horizontal icon bar for node types */}
@@ -1171,58 +1105,39 @@ export function FunctionProcessDashboard({
               <Link className="h-4 w-4 inline mr-2" />
               Cross-Links
             </button>
+            <button
+              onClick={() => setActivePersistenceTab('behavior')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activePersistenceTab === 'behavior'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Zap className="h-4 w-4 inline mr-2" />
+              Behavior
+            </button>
+            <button
+              onClick={() => setActivePersistenceTab('operations')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activePersistenceTab === 'operations'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Settings className="h-4 w-4 inline mr-2" />
+              Operations
+            </button>
           </div>
 
           {/* Sidebar Content */}
           <div className="flex-1 overflow-y-auto p-4">
             {activePersistenceTab === 'save' && (
-              <SaveLoadPanel
-                modelId={functionModel.modelId}
-                model={{
-                  ...functionModel,
-                  nodesData: flow.nodes,
-                  edgesData: flow.edges,
-                  viewportData: flow.viewport
-                }}
-                onModelUpdate={(updatedModel) => {
-                  console.log('Dashboard received updated model:', updatedModel);
-                  console.log('Updated model nodesData:', updatedModel.nodesData);
-                  console.log('Updated model edgesData:', updatedModel.edgesData);
-                  console.log('Updated model viewportData:', updatedModel.viewportData);
-                  
-                  setFunctionModel(updatedModel);
-                  // Update flow data with loaded model
-                  const newFlow: Flow = {
-                    name: updatedModel.name,
-                    nodes: (updatedModel.nodesData || []).map((nodeData: any) => ({
-                      id: nodeData.id,
-                      type: nodeData.type,
-                      position: nodeData.position,
-                      data: nodeData.data,
-                      ...(nodeData.parentNode && { parentNode: nodeData.parentNode }),
-                      ...(nodeData.extent && { extent: nodeData.extent }),
-                      ...(nodeData.draggable !== undefined && { draggable: nodeData.draggable }),
-                      ...(nodeData.selectable !== undefined && { selectable: nodeData.selectable }),
-                      ...(nodeData.deletable !== undefined && { deletable: nodeData.deletable }),
-                      ...(nodeData.width && { width: nodeData.width }),
-                      ...(nodeData.height && { height: nodeData.height })
-                    })),
-                    edges: (updatedModel.edgesData || []).map((edgeData: any) => ({
-                      id: edgeData.id,
-                      source: edgeData.source,
-                      target: edgeData.target,
-                      ...(edgeData.sourceHandle && { sourceHandle: edgeData.sourceHandle }),
-                      ...(edgeData.targetHandle && { targetHandle: edgeData.targetHandle }),
-                      ...(edgeData.type && { type: edgeData.type }),
-                      ...(edgeData.animated !== undefined && { animated: edgeData.animated }),
-                      ...(edgeData.style && { style: edgeData.style })
-                    })),
-                    viewport: updatedModel.viewportData || { x: 0, y: 0, zoom: 1 }
-                  };
-                  console.log('Setting new flow:', newFlow);
-                  setFlow(newFlow);
-                }}
-              />
+              <div className="p-4">
+                <p className="text-sm text-muted-foreground">
+                  Save/Load functionality has been migrated to node-based architecture.
+                  Use the node operations panel for persistence.
+                </p>
+              </div>
             )}
             {activePersistenceTab === 'links' && (
               <div className="p-4">
@@ -1235,6 +1150,43 @@ export function FunctionProcessDashboard({
                   Manage Cross-Feature Links
                 </Button>
               </div>
+            )}
+            {activePersistenceTab === 'behavior' && selectedNodeId && (
+              <NodeBehaviorPanel
+                featureType="function-model"
+                entityId={modelId || 'default-model-id'}
+                nodeId={selectedNodeId}
+                onExecutionComplete={(result) => {
+                  console.log('Node execution completed:', result)
+                  // Handle execution result
+                }}
+                onValidationComplete={(result) => {
+                  console.log('Node validation completed:', result)
+                  // Handle validation result
+                }}
+              />
+            )}
+            {activePersistenceTab === 'operations' && (
+              <UnifiedOperationsPanel
+                featureType="function-model"
+                entityId={modelId || 'default-model-id'}
+                onNodeCreated={(node) => {
+                  console.log('Node created:', node)
+                  // Handle node creation
+                }}
+                onNodeUpdated={(node) => {
+                  console.log('Node updated:', node)
+                  // Handle node update
+                }}
+                onNodeDeleted={(nodeId) => {
+                  console.log('Node deleted:', nodeId)
+                  // Handle node deletion
+                }}
+                onLinkCreated={(link) => {
+                  console.log('Link created:', link)
+                  // Handle link creation
+                }}
+              />
             )}
           </div>
         </div>
@@ -1271,8 +1223,8 @@ export function FunctionProcessDashboard({
               },
             }))}
           allActionNodes={flow.nodes.filter((n) => n.type === 'actionTableNode')}
-          connectedActions={getConnectedActions(selectedStage.id)}
-          onActionClick={(action) => openActionModal(action, selectedStage.id)}
+          connectedActions={getConnectedActions(selectedStage.id) as any}
+          onActionClick={(action) => openActionModal(action as any, selectedStage.id)}
           showBackButton={false}
           onUpdateStage={(updatedStage) => {
             setFlow((prevFlow) => {
@@ -1302,7 +1254,7 @@ export function FunctionProcessDashboard({
               return { ...prevFlow, nodes: updatedNodes };
             });
           }}
-          modelId={functionModel.modelId}
+          modelId={modelId || 'default-model-id'}
         />
       )}
       
@@ -1318,7 +1270,7 @@ export function FunctionProcessDashboard({
               setModalStack(prev => prev.filter((_, i) => i !== index))
             }
           }}
-          action={modal.data as ActionItem}
+          action={modal.data as any}
           showBackButton={modal.context?.previousModal === 'stage'}
           onBackClick={() => {
             if (modal.context?.stageId) {
@@ -1346,7 +1298,7 @@ export function FunctionProcessDashboard({
             }))}
           allActionNodes={flow.nodes.filter((n) => n.type === 'actionTableNode')}
           connectedActions={getConnectedActionsForIONode(selectedIONode.id)}
-          onActionClick={(action) => openActionModal(action, selectedIONode.id)}
+          onActionClick={(action) => openActionModal(action as any, selectedIONode.id)}
           showBackButton={false}
           onUpdatePort={(updatedPort) => {
             setFlow((prevFlow) => {
@@ -1388,9 +1340,18 @@ export function FunctionProcessDashboard({
       <FunctionModelModal
         isOpen={functionModelModalOpen}
         onClose={() => setFunctionModelModalOpen(false)}
-        functionModel={functionModel}
+        functionModel={functionModelNodes[0]} // Assuming the first node is the model
         onUpdateFunctionModel={(updatedModel) => {
-          setFunctionModel(updatedModel);
+          setFunctionModelNodes(prev => prev.map(node => ({
+            ...node,
+            name: updatedModel.name,
+            description: updatedModel.description,
+            functionModelData: updatedModel.functionModelData,
+            metadata: updatedModel.metadata,
+            businessLogic: updatedModel.businessLogic,
+            processBehavior: updatedModel.processBehavior,
+            updatedAt: new Date()
+          })));
         }}
         onNavigateToEventStorm={() => {
           // TODO: Navigate to Event Storm page
@@ -1411,7 +1372,7 @@ export function FunctionProcessDashboard({
         open={crossFeatureModalOpen}
         onOpenChange={setCrossFeatureModalOpen}
         sourceFeature="function-model"
-        sourceId={functionModel.modelId}
+        sourceId={modelId || 'default-model-id'}
         onLinkCreated={(link) => {
           console.log('Cross-feature link created:', link)
         }}

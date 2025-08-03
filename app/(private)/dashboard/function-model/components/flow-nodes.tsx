@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileText, Brain, GitBranch, Settings, Layers, Info, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { type NodeData } from "@/lib/domain/entities/function-model-types"
-import { useNodeLinking } from "@/lib/application/hooks/use-function-model-persistence"
+import { type FunctionModelNode } from "@/lib/domain/entities/function-model-node-types"
+import { useCrossFeatureLinking } from "@/lib/application/hooks/use-cross-feature-linking"
 
 // 1:1 copy of StageNode, but for IONode
 export function IONode(props: NodeProps) {
@@ -87,7 +87,11 @@ export function StageNode(props: NodeProps) {
   console.log('StageNode rendered:', { id: props.id, data, stage })
   
   // NEW: Load node links for visualization
-  const { links } = useNodeLinking(data.modelId || 'sample-model-id', props.id)
+  const { links } = useCrossFeatureLinking({
+    sourceFeature: 'function-model',
+    sourceEntityId: data.modelId || 'sample-model-id',
+    sourceNodeId: props.id
+  })
   
   return (
     <div className="w-[340px] cursor-pointer relative">
@@ -124,7 +128,7 @@ export function StageNode(props: NodeProps) {
       {/* Link indicators */}
       {links.length > 0 && (
         <div className="absolute -top-2 -right-2 flex gap-1">
-          {links.map(link => (
+          {links.map((link: any) => (
             <div
               key={link.linkId}
               className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center"
@@ -792,10 +796,10 @@ export function ActionTableNode(props: NodeProps) {
 } 
 
 // New: Function Model Container Node
-export function FunctionModelContainerNode({ data, selected }: NodeProps<NodeData>) {
-  const containerData = data.containerData
+export function FunctionModelContainerNode({ data, selected }: NodeProps<FunctionModelNode>) {
+  const containerData = data.functionModelData.container
   const [isEditing, setIsEditing] = useState(false)
-  const [name, setName] = useState(containerData?.name || data.label)
+  const [name, setName] = useState(containerData?.name || data.name)
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value)
@@ -807,7 +811,7 @@ export function FunctionModelContainerNode({ data, selected }: NodeProps<NodeDat
       // TODO: Update container data
     } else if (e.key === 'Escape') {
       setIsEditing(false)
-      setName(containerData?.name || data.label)
+      setName(containerData?.name || data.name)
     }
   }
 
@@ -844,7 +848,7 @@ export function FunctionModelContainerNode({ data, selected }: NodeProps<NodeDat
         </div>
         <div className="flex items-center gap-1">
           <Badge variant="secondary" className="text-xs">
-            {containerData?.type || 'container'}
+            {containerData?.containerType || 'container'}
           </Badge>
         </div>
       </div>
@@ -869,7 +873,7 @@ export function FunctionModelContainerNode({ data, selected }: NodeProps<NodeDat
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-blue-100">
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <Info className="h-3 w-3" />
-          <span>Container for {containerData?.childFunctionModelIds?.length || 0} items</span>
+          <span>Container for {containerData?.childNodes?.length || 0} items</span>
         </div>
         <div className="flex items-center gap-1">
           <Button

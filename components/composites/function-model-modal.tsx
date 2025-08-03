@@ -5,15 +5,16 @@ import { EntityFormFields } from "./feature-form-fields"
 import { FlowStatistics } from "../ui/flow-statistics"
 import { Layers, Settings, Database } from "lucide-react"
 import type { Node, Edge } from "reactflow"
-import type { FunctionModel, Stage, DataPort } from "@/lib/domain/entities/function-model-types"
+import type { FunctionModelNode, Stage, DataPort } from "@/lib/domain/entities/function-model-node-types"
+import { Badge } from "@/components/ui/badge"
 
 interface FunctionModelModalProps {
   isOpen: boolean
   onClose: () => void
-  functionModel: FunctionModel
+  functionModel: FunctionModelNode
   flowNodes?: Node[]
   flowEdges?: Edge[]
-  onUpdateFunctionModel?: (updatedModel: FunctionModel) => void
+  onUpdateFunctionModel?: (updatedModel: FunctionModelNode) => void
   onNavigateToEventStorm?: () => void
   onNavigateToSpindle?: () => void
   onNavigateToKnowledgeBase?: () => void
@@ -36,7 +37,7 @@ export function FunctionModelModal({
     <div className="space-y-6">
       {/* Basic Entity Fields */}
       <EntityFormFields
-        id={functionModel.id}
+        id={functionModel.nodeId}
         name={functionModel.name}
         description={functionModel.description}
         onUpdateName={(name) => onUpdateFunctionModel?.({ ...functionModel, name })}
@@ -60,11 +61,11 @@ export function FunctionModelModal({
               name="Input Port"
               description="Data input for the function model"
               onUpdateName={(name) => {
-                // TODO: Update input port name in nodesData
+                // TODO: Update input port name in functionModelData
                 console.log('Update input port name:', name)
               }}
               onUpdateDescription={(description) => {
-                // TODO: Update input port description in nodesData
+                // TODO: Update input port description in functionModelData
                 console.log('Update input port description:', description)
               }}
               entityType="Input"
@@ -84,11 +85,11 @@ export function FunctionModelModal({
               name="Output Port"
               description="Data output from the function model"
               onUpdateName={(name) => {
-                // TODO: Update output port name in nodesData
+                // TODO: Update output port name in functionModelData
                 console.log('Update output port name:', name)
               }}
               onUpdateDescription={(description) => {
-                // TODO: Update output port description in nodesData
+                // TODO: Update output port description in functionModelData
                 console.log('Update output port description:', description)
               }}
               entityType="Output"
@@ -97,25 +98,23 @@ export function FunctionModelModal({
         </div>
       </div>
 
-      {/* Nodes Summary */}
+      {/* Node Information */}
       <div className="space-y-4">
         <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <Layers className="w-4 h-4" />
-          Nodes ({functionModel.nodesData?.length || 0})
+          Node Information
         </h4>
-        <div className="bg-gray-50 rounded-lg p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {functionModel.nodesData?.map((node) => (
-              <div key={node.id} className="bg-white rounded border p-3">
-                <h5 className="font-medium text-sm">{node.data.label}</h5>
-                <p className="text-xs text-gray-600 mt-1">{node.data.description}</p>
-                <div className="text-xs text-gray-500 mt-2">
-                  Type: {node.type}
-                </div>
-              </div>
-            )) || (
-              <div className="text-sm text-gray-500">No nodes found</div>
-            )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-3 border rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{functionModel.name}</span>
+              <Badge variant="outline">{functionModel.nodeType}</Badge>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{functionModel.description}</p>
+            <div className="mt-2 text-xs text-gray-400">
+              <div>Type: {functionModel.type}</div>
+              <div>Position: ({functionModel.position.x}, {functionModel.position.y})</div>
+            </div>
           </div>
         </div>
       </div>
@@ -133,8 +132,8 @@ export function FunctionModelModal({
               <span className="font-mono">{functionModel.metadata.version}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span>Category:</span>
-              <span>{functionModel.metadata.category || 'Not set'}</span>
+              <span>Feature:</span>
+              <span>{functionModel.metadata.feature || 'Not set'}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span>Tags:</span>
@@ -162,16 +161,16 @@ export function FunctionModelModal({
       {/* Function Model Specific Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
         <div className="bg-blue-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-blue-700">Nodes</h4>
-          <p className="text-2xl font-bold text-blue-900">{functionModel.nodesData?.length || 0}</p>
+          <h4 className="text-sm font-medium text-blue-700">Node Type</h4>
+          <p className="text-2xl font-bold text-blue-900">{functionModel.nodeType}</p>
         </div>
         <div className="bg-green-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-green-700">Connections</h4>
-          <p className="text-2xl font-bold text-green-900">{functionModel.edgesData?.length || 0}</p>
+          <h4 className="text-sm font-medium text-green-700">Execution Type</h4>
+          <p className="text-2xl font-bold text-green-900">{functionModel.processBehavior?.executionType || 'sequential'}</p>
         </div>
         <div className="bg-purple-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-purple-700">Status</h4>
-          <p className="text-2xl font-bold text-purple-900 capitalize">{functionModel.status}</p>
+          <h4 className="text-sm font-medium text-purple-700">Complexity</h4>
+          <p className="text-2xl font-bold text-purple-900 capitalize">{functionModel.businessLogic?.complexity || 'simple'}</p>
         </div>
       </div>
     </div>

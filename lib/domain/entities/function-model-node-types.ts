@@ -1,14 +1,14 @@
 // Function Model Node Types
 // This file defines the FunctionModelNode interface that extends BaseNode with function model specific properties
 
-import type { BaseNode, FeatureType } from './base-node-types'
-import type { Stage, ActionItem, DataPort, FunctionModelContainer, RACIMatrix } from './function-model-types'
+import { BaseNode, NodeMetadata, NodeRelationship } from './unified-node-types'
 
 export interface FunctionModelNode extends BaseNode {
-  featureType: 'function-model'
-  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainer'
+  type: 'function-model'
+  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainerNode'
+  modelId: string
   
-  // Function Model specific properties
+  // Preserve ALL existing data structures
   functionModelData: {
     stage?: Stage
     action?: ActionItem
@@ -16,198 +16,121 @@ export interface FunctionModelNode extends BaseNode {
     container?: FunctionModelContainer
   }
   
-  // Process-specific behavior
-  processBehavior: {
-    executionType: 'sequential' | 'parallel' | 'conditional'
-    dependencies: string[]
-    timeout?: number
-    retryPolicy?: RetryPolicy
+  // Preserve complex business logic
+  businessLogic: {
+    sla?: number
+    kpis?: string[]
+    complexity?: 'simple' | 'moderate' | 'complex'
+    estimatedDuration?: number
   }
   
-  // Business logic properties
-  businessLogic: {
-    raciMatrix?: RACIMatrix
-    sla?: ServiceLevelAgreement
-    kpis?: KeyPerformanceIndicator[]
+  // Preserve process behavior
+  processBehavior: {
+    executionType: 'sequential' | 'parallel' | 'conditional'
+    dependencies?: string[]
+    triggers?: string[]
   }
-}
-
-export interface RetryPolicy {
-  maxRetries: number
-  retryDelay: number // in milliseconds
-  backoffMultiplier: number
-  maxDelay: number // in milliseconds
-}
-
-export interface ServiceLevelAgreement {
-  responseTime: number // in milliseconds
-  availability: number // percentage (0-100)
-  uptime: number // percentage (0-100)
-  supportHours: {
-    start: string // HH:MM format
-    end: string // HH:MM format
-    timezone: string
+  
+  // Preserve React Flow specific data
+  reactFlowData: {
+    parentNode?: string
+    extent?: 'parent' | [number, number, number, number]
+    draggable?: boolean
+    selectable?: boolean
+    deletable?: boolean
+    width?: number
+    height?: number
   }
+  
+  // Preserve complex relationships
+  relationships: NodeRelationship[]
 }
 
-export interface KeyPerformanceIndicator {
+// Preserve ALL existing complex types
+export interface Stage {
   id: string
   name: string
   description: string
-  metric: string
-  target: number
-  current: number
-  unit: string
-  trend: 'improving' | 'stable' | 'declining'
+  position: { x: number; y: number }
+  actions: string[]
+  dataChange: string[]
+  boundaryCriteria: string[]
+  raci: RACIMatrix
 }
 
-// Factory function for creating function model nodes
-export function createFunctionModelNode(
-  nodeType: FunctionModelNode['nodeType'],
-  name: string,
-  position: { x: number; y: number },
-  options: Partial<FunctionModelNode> = {}
-): Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'> {
-  const baseNode = {
-    featureType: 'function-model' as const,
-    nodeType,
-    name,
-    description: options.description || '',
-    position,
-    visualProperties: {
-      color: options.visualProperties?.color || getDefaultColor(nodeType),
-      icon: options.visualProperties?.icon || getDefaultIcon(nodeType),
-      size: options.visualProperties?.size || 'medium',
-      style: options.visualProperties?.style || {},
-      featureSpecific: options.visualProperties?.featureSpecific || {}
-    },
-    metadata: {
-      tags: options.metadata?.tags || [nodeType, 'function-model'],
-      searchKeywords: options.metadata?.searchKeywords || [name, nodeType],
-      crossFeatureLinks: options.metadata?.crossFeatureLinks || [],
-      aiAgent: options.metadata?.aiAgent,
-      vectorEmbedding: options.metadata?.vectorEmbedding
-    },
-    status: options.status || 'active'
-  }
-
-  return {
-    ...baseNode,
-    functionModelData: {
-      stage: options.functionModelData?.stage,
-      action: options.functionModelData?.action,
-      io: options.functionModelData?.io,
-      container: options.functionModelData?.container
-    },
-    processBehavior: {
-      executionType: options.processBehavior?.executionType || 'sequential',
-      dependencies: options.processBehavior?.dependencies || [],
-      timeout: options.processBehavior?.timeout,
-      retryPolicy: options.processBehavior?.retryPolicy || {
-        maxRetries: 3,
-        retryDelay: 1000,
-        backoffMultiplier: 2,
-        maxDelay: 10000
-      }
-    },
-    businessLogic: {
-      raciMatrix: options.businessLogic?.raciMatrix,
-      sla: options.businessLogic?.sla,
-      kpis: options.businessLogic?.kpis || []
-    }
+export interface ActionItem {
+  id: string
+  name: string
+  description: string
+  type: 'action' | 'action-group'
+  linkedEntities?: NodeLinkedEntity[]
+  modes?: {
+    actions: { rows: any[] }
+    dataChanges: { rows: any[] }
+    boundaryCriteria: { rows: any[] }
   }
 }
 
-// Helper functions for default values
-function getDefaultColor(nodeType: FunctionModelNode['nodeType']): string {
-  switch (nodeType) {
-    case 'stageNode':
-      return '#3b82f6' // blue
-    case 'actionTableNode':
-      return '#10b981' // green
-    case 'ioNode':
-      return '#f59e0b' // amber
-    case 'functionModelContainer':
-      return '#8b5cf6' // purple
-    default:
-      return '#6b7280' // gray
-  }
+export interface DataPort {
+  id: string
+  name: string
+  description: string
+  mode: 'input' | 'output'
+  masterData: string[]
+  referenceData: string[]
+  transactionData: string[]
 }
 
-function getDefaultIcon(nodeType: FunctionModelNode['nodeType']): string {
-  switch (nodeType) {
-    case 'stageNode':
-      return '📋'
-    case 'actionTableNode':
-      return '⚡'
-    case 'ioNode':
-      return '🔌'
-    case 'functionModelContainer':
-      return '📦'
-    default:
-      return '📊'
-  }
+export interface FunctionModelContainer {
+  id: string
+  name: string
+  description: string
+  childNodes: string[]
+  containerType: 'process' | 'subprocess' | 'decision'
 }
 
-// Type guard for FunctionModelNode validation
-export function isValidFunctionModelNode(node: any): node is FunctionModelNode {
-  if (!isValidBaseNode(node)) {
-    return false
-  }
-  
-  return (
-    node.featureType === 'function-model' &&
-    ['stageNode', 'actionTableNode', 'ioNode', 'functionModelContainer'].includes(node.nodeType) &&
-    typeof node.functionModelData === 'object' &&
-    typeof node.processBehavior === 'object' &&
-    typeof node.businessLogic === 'object'
-  )
+export interface RACIMatrix {
+  inform: string[]
+  consult: string[]
+  accountable: string[]
+  responsible: string[]
 }
 
-// Utility functions for function model nodes
-export function getNodeExecutionType(node: FunctionModelNode): string {
-  return node.processBehavior.executionType
+// Preserve complex relationship system
+export interface NodeLinkedEntity {
+  id: string
+  type: 'knowledge-base' | 'event-storm' | 'spindle' | 'function-model'
+  name: string
+  description: string
+  linkType: 'input' | 'output' | 'reference' | 'dependency'
+  context?: Record<string, any>
 }
 
-export function getNodeDependencies(node: FunctionModelNode): string[] {
-  return node.processBehavior.dependencies
+// Preserve complex relationship system
+export interface FunctionModelNodeRelationship extends NodeRelationship {
+  id: string
+  sourceNodeId: string
+  targetNodeId: string
+  sourceHandle: string
+  targetHandle: string
+  type: 'parent-child' | 'sibling'
+  sourceNodeType: 'stageNode' | 'actionTableNode' | 'ioNode'
+  targetNodeType: 'stageNode' | 'actionTableNode' | 'ioNode'
+  createdAt: Date
 }
 
-export function hasNodeTimeout(node: FunctionModelNode): boolean {
-  return node.processBehavior.timeout !== undefined
+// Validation types for node updates
+export interface NodeUpdateValidation {
+  isValid: boolean
+  errors: string[]
+  warnings: string[]
 }
 
-export function getNodeTimeout(node: FunctionModelNode): number | undefined {
-  return node.processBehavior.timeout
-}
-
-export function hasRetryPolicy(node: FunctionModelNode): boolean {
-  return node.processBehavior.retryPolicy !== undefined
-}
-
-export function getRetryPolicy(node: FunctionModelNode): RetryPolicy | undefined {
-  return node.processBehavior.retryPolicy
-}
-
-export function hasRACIMatrix(node: FunctionModelNode): boolean {
-  return node.businessLogic.raciMatrix !== undefined
-}
-
-export function getRACIMatrix(node: FunctionModelNode): RACIMatrix | undefined {
-  return node.businessLogic.raciMatrix
-}
-
-export function hasSLA(node: FunctionModelNode): boolean {
-  return node.businessLogic.sla !== undefined
-}
-
-export function getSLA(node: FunctionModelNode): ServiceLevelAgreement | undefined {
-  return node.businessLogic.sla
-}
-
-export function getKPIs(node: FunctionModelNode): KeyPerformanceIndicator[] {
-  return node.businessLogic.kpis || []
-}
-
-// Import the base node validation function
-import { isValidBaseNode } from './base-node-types' 
+// Node creation options
+export interface FunctionModelNodeOptions {
+  description?: string
+  businessLogic?: Partial<FunctionModelNode['businessLogic']>
+  processBehavior?: Partial<FunctionModelNode['processBehavior']>
+  reactFlowData?: Partial<FunctionModelNode['reactFlowData']>
+  metadata?: Partial<NodeMetadata>
+} 

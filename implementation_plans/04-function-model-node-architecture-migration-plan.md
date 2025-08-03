@@ -7,7 +7,7 @@ This plan outlines the migration of the Function Model feature from the current 
 ## Current State Analysis
 
 ### ✅ **Existing Strengths**
-- **React Flow Compatible**: The `FunctionModelNode` in `function-model-types.ts` is already compatible with React Flow
+- **React Flow Compatible**: The `FunctionModelNode` in `function-model-node-types.ts` is already compatible with React Flow
 - **Clean Architecture**: Perfect implementation of Clean Architecture principles
 - **Dedicated Table**: Already using separate `function_models` table (not unified nodes)
 - **Rich Metadata**: Comprehensive function model specific fields and metadata
@@ -17,8 +17,8 @@ This plan outlines the migration of the Function Model feature from the current 
 
 ### 🔄 **Current Issues Identified**
 - **Type Conflicts**: Two different `FunctionModelNode` types causing confusion
-  - `function-model-types.ts`: React Flow compatible (what we should use)
-  - `function-model-node-types.ts`: New architecture type (causing conflicts)
+  - `function-model-node-types.ts`: React Flow compatible (what we should use)
+  - Legacy types: Removed to eliminate conflicts
 - **Unnecessary Conversions**: Trying to convert between incompatible types
 - **Database Schema**: New tables created but not aligned with existing structure
 
@@ -33,11 +33,11 @@ This plan outlines the migration of the Function Model feature from the current 
 ### Phase 1: Type System Simplification (Week 1)
 
 #### 1.1 Eliminate Type Conflicts
-**Objective**: Remove the conflicting `FunctionModelNode` type and use React Flow compatible types
+**Objective**: Remove the conflicting types and use React Flow compatible types
 
 **Current Problem**:
 ```typescript
-// function-model-types.ts - React Flow compatible (GOOD)
+// function-model-node-types.ts - React Flow compatible (GOOD)
 export interface FunctionModelNode {
   id: string
   type: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainer'
@@ -46,22 +46,14 @@ export interface FunctionModelNode {
   // ... React Flow compatible properties
 }
 
-// function-model-node-types.ts - New architecture (CONFLICTING)
-export interface FunctionModelNode {
-  nodeId: string
-  modelId: string
-  featureType: 'function-model'
-  positionX: number
-  positionY: number
-  // ... Different structure
-}
+// Legacy types - Removed to eliminate conflicts
 ```
 
 **Solution**:
-1. **Remove** `function-model-node-types.ts` entirely
-2. **Use** `FunctionModelNode` from `function-model-types.ts` consistently
-3. **Update** all imports to use the React Flow compatible type
-4. **Remove** all conversion functions
+1. **Use** `FunctionModelNode` from `function-model-node-types.ts` consistently
+2. **Update** all imports to use the React Flow compatible type
+3. **Remove** all conversion functions
+4. **Ensure** all components use the unified type
 
 #### 1.2 Update Database Schema Alignment
 **Objective**: Ensure database schema matches React Flow structure
@@ -99,273 +91,259 @@ CREATE TABLE function_model_nodes (
 
 **Current Repository Issues**:
 ```typescript
-// function-model-repository.ts - MIXED APPROACH
-export class FunctionModelRepository {
-  // Uses both old and new types
-  async createFunctionModelNode(nodeData: Omit<FunctionModelNode, 'nodeId'>): Promise<FunctionModelNode>
-  async getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]>
+// OLD: Complex conversion between types
+async createFunctionModelNode(node: FunctionModelNode): Promise<FunctionModelNode> {
+  // Complex conversion logic
+  const dbNode = convertToDbFormat(node)
+  const savedNode = await this.supabase.insert(dbNode)
+  return convertFromDbFormat(savedNode)
 }
-```
 
-**Simplified Approach**:
-```typescript
-// function-model-repository.ts - SIMPLIFIED
-export class FunctionModelRepository {
-  // Use React Flow compatible types only
-  async getById(modelId: string): Promise<FunctionModel | null>
-  async update(modelId: string, updates: Partial<FunctionModel>): Promise<FunctionModel>
-  // No separate node operations needed - nodes are part of the model
+// NEW: Direct React Flow compatible operations
+async updateModelNodes(modelId: string, nodes: Node[]): Promise<void> {
+  await this.supabase
+    .from('function_models')
+    .update({ nodes_data: nodes })
+    .eq('model_id', modelId)
 }
-```
-
-### Phase 2: UI Component Simplification (Week 2)
-
-#### 2.1 Remove Conversion Functions
-**Objective**: Eliminate all type conversion functions
-
-**Current Problem**:
-```typescript
-// function-process-dashboard.tsx - UNNECESSARY CONVERSIONS
-const convertToReactFlowNode = (functionModelNode: FunctionModelNode): Node => { ... }
-const convertToReactFlowEdge = (functionModelEdge: FunctionModelEdge): Edge => { ... }
 ```
 
 **Solution**:
-```typescript
-// function-process-dashboard.tsx - DIRECT USAGE
-const [flow, setFlow] = useState<Flow>({
-  name: functionModel.name,
-  nodes: functionModel.nodesData || [], // Direct usage
-  edges: functionModel.edgesData || [], // Direct usage
-  viewport: functionModel.viewportData || { x: 0, y: 0, zoom: 1 }
-})
-```
+1. **Simplify** repository methods to work directly with React Flow types
+2. **Remove** complex conversion functions
+3. **Use** JSONB storage for nodes/edges
+4. **Leverage** existing React Flow compatibility
 
-#### 2.2 Update Flow Interface
-**Objective**: Use React Flow compatible types directly
+### Phase 2: Component Integration (Week 2)
 
+#### 2.1 Update Canvas Components
+**Objective**: Ensure all canvas components use the unified type system
+
+**Current Issues**:
 ```typescript
-// BEFORE - Mixed types
-interface Flow {
-  name: string
-  nodes: FunctionModelNode[] // Conflicting type
-  edges: FunctionModelEdge[] // Conflicting type
-  viewport: { x: number; y: number; zoom: number }
+// OLD: Mixed type usage
+function FunctionProcessDashboard({ functionModel }: { functionModel: FunctionModel }) {
+  const nodes = functionModel.nodesData // React Flow compatible
+  const edges = functionModel.edgesData // React Flow compatible
+  // ... but some components expect different types
 }
 
-// AFTER - React Flow compatible
-interface Flow {
-  name: string
-  nodes: Node[] // React Flow Node type
-  edges: Edge[] // React Flow Edge type
-  viewport: { x: number; y: number; zoom: number }
+// NEW: Consistent type usage
+function FunctionProcessDashboard({ functionModel }: { functionModel: FunctionModelNode }) {
+  const nodes = functionModel.nodes // React Flow compatible
+  const edges = functionModel.edges // React Flow compatible
+  // ... all components use same types
 }
 ```
 
-### Phase 3: Database Schema Cleanup (Week 3)
+**Solution**:
+1. **Update** all canvas components to use `FunctionModelNode`
+2. **Ensure** consistent type usage across all components
+3. **Remove** any remaining type conversion logic
+4. **Test** all node operations work correctly
+
+#### 2.2 Update Hook Integration
+**Objective**: Simplify hook usage with unified types
+
+**Current Issues**:
+```typescript
+// OLD: Complex hook with type conversions
+const [nodes, setNodes] = useFunctionModelNodes(modelId)
+// ... complex conversion logic
+
+// NEW: Simple hook with React Flow types
+const { nodes, edges, updateNodes, updateEdges } = useFunctionModelNodes(modelId)
+// ... direct React Flow operations
+```
+
+**Solution**:
+1. **Simplify** `useFunctionModelNodes` to work with React Flow types
+2. **Remove** complex state management
+3. **Use** direct React Flow operations
+4. **Ensure** auto-save works with simplified structure
+
+### Phase 3: Database Cleanup (Week 3)
 
 #### 3.1 Remove Unnecessary Tables
-**Objective**: Remove tables that don't align with React Flow structure
+**Objective**: Clean up database schema to match simplified architecture
 
 **Tables to Remove**:
-- `function_model_nodes` (not needed - nodes stored in JSONB)
-- `node_metadata` (not needed - metadata stored in node data)
-- `node_links` (not needed - links stored in edges)
+- `function_model_nodes` (not needed - use JSONB in function_models)
+- `node_metadata` (not needed - metadata in JSONB)
+- `node_links` (not needed - use cross_feature_links)
 
 **Tables to Keep**:
 - `function_models` (existing - works perfectly)
-- `cross_feature_links` (existing - for cross-feature linking)
-- `ai_agents` (existing - for AI integration)
+- `function_model_versions` (existing - version control)
+- `cross_feature_links` (existing - cross-feature relationships)
 
 #### 3.2 Update Migration Scripts
-**Objective**: Remove unnecessary migration scripts
+**Objective**: Ensure migration scripts work with simplified structure
 
-**Current Migration Scripts**:
-```sql
--- REMOVE - Not needed
-CREATE TABLE function_model_nodes (...)
-CREATE TABLE node_metadata (...)
-CREATE TABLE node_links (...)
-```
-
-**Simplified Approach**:
-- **No new tables needed**
-- **Use existing JSONB structure**
-- **Leverage existing cross-feature linking**
-
-### Phase 4: Cross-Feature Linking Enhancement (Week 4)
-
-#### 4.1 Leverage Existing Cross-Feature Links
-**Objective**: Use the existing `cross_feature_links` table for node-level linking
-
-**Current Structure** (already working):
-```sql
-CREATE TABLE cross_feature_links (
-  link_id UUID PRIMARY KEY,
-  source_feature VARCHAR(50),
-  source_entity_id UUID,
-  source_node_id VARCHAR(255), -- Already supports node-level linking
-  target_feature VARCHAR(50),
-  target_entity_id UUID,
-  target_node_id VARCHAR(255), -- Already supports node-level linking
-  link_type VARCHAR(50),
-  link_context JSONB
-);
-```
-
-**Enhancement**:
-- **No schema changes needed**
-- **Add node-level linking UI**
-- **Leverage existing structure**
-
-#### 4.2 Update Cross-Feature Linking UI
-**Objective**: Add node-level linking to existing cross-feature linking modal
-
+**Current Migration Issues**:
 ```typescript
-// Enhanced cross-feature linking
-interface CrossFeatureLink {
-  linkId: string
-  sourceFeature: 'function-model' | 'knowledge-base' | 'spindle'
-  sourceEntityId: string
-  sourceNodeId?: string // Node-level linking
-  targetFeature: 'function-model' | 'knowledge-base' | 'spindle'
-  targetEntityId: string
-  targetNodeId?: string // Node-level linking
-  linkType: 'documents' | 'implements' | 'references' | 'supports'
-  linkContext: Record<string, any>
+// OLD: Complex migration between different types
+export function migrateFunctionModelToNodes(model: FunctionModel): FunctionModelNode[] {
+  // Complex conversion logic
+  return model.nodesData.map(node => convertToNewType(node))
+}
+
+// NEW: Simple migration (if needed)
+export function migrateFunctionModel(model: FunctionModel): FunctionModelNode {
+  // Direct mapping - same structure
+  return {
+    ...model,
+    nodes: model.nodesData,
+    edges: model.edgesData
+  }
 }
 ```
 
-### Phase 5: AI Integration Enhancement (Week 5)
+**Solution**:
+1. **Simplify** migration scripts to work with React Flow types
+2. **Remove** complex conversion logic
+3. **Use** direct mapping where possible
+4. **Test** migration works correctly
 
-#### 5.1 Leverage Existing AI Agents Table
-**Objective**: Use the existing `ai_agents` table for node-level AI
+### Phase 4: Testing and Validation (Week 4)
 
-**Current Structure** (already working):
-```sql
-CREATE TABLE ai_agents (
-  agent_id UUID PRIMARY KEY,
-  feature_type VARCHAR(50),
-  entity_id UUID,
-  node_id VARCHAR(255), -- Already supports node-level AI
-  name VARCHAR(255),
-  instructions TEXT,
-  tools JSONB,
-  capabilities JSONB
-);
-```
+#### 4.1 Unit Testing
+**Objective**: Ensure all components work with unified types
 
-**Enhancement**:
-- **No schema changes needed**
-- **Add node-level AI configuration UI**
-- **Leverage existing structure**
+**Test Cases**:
+- ✅ Node creation with React Flow types
+- ✅ Node editing with React Flow types
+- ✅ Node deletion with React Flow types
+- ✅ Edge creation with React Flow types
+- ✅ Auto-save functionality
+- ✅ Version control integration
 
-### Phase 6: Testing and Validation (Week 6)
-
-#### 6.1 Comprehensive Testing
-**Objective**: Ensure all functionality works with simplified architecture
+#### 4.2 Integration Testing
+**Objective**: Test complete workflows with unified types
 
 **Test Scenarios**:
-1. **Node Loading**: Verify nodes load correctly from JSONB
-2. **Node Creation**: Verify new nodes are saved to JSONB
-3. **Cross-Feature Linking**: Verify node-level linking works
-4. **AI Integration**: Verify node-level AI configuration works
-5. **Performance**: Verify no performance degradation
+- ✅ Create new function model
+- ✅ Add nodes and edges
+- ✅ Save and load model
+- ✅ Version control operations
+- ✅ Cross-feature linking
+- ✅ Export/import functionality
 
-## Success Metrics
+#### 4.3 Performance Testing
+**Objective**: Ensure performance with simplified architecture
 
-### Functional Metrics
-- **Node Loading**: 100% successful loading from existing data
-- **Performance**: <500ms response time for node operations
-- **Cross-Feature Linking**: Support for 1000+ cross-feature relationships
-- **AI Integration**: Ready for node-level AI agents
-- **Scalability**: Support for 10,000+ nodes per function model
+**Performance Metrics**:
+- ✅ Load time for large models (1000+ nodes)
+- ✅ Save time for large models
+- ✅ Memory usage during editing
+- ✅ Network requests optimization
 
-### Technical Metrics
-- **Type Safety**: 100% type consistency (no more conflicts)
-- **Code Reduction**: 50% reduction in conversion code
-- **Maintainability**: Simplified architecture with fewer moving parts
-- **Migration Success**: 100% successful data preservation
-- **Backward Compatibility**: Maintain all existing functionality
+## Implementation Benefits
+
+### 1. **Simplified Architecture**
+- **Single Type System**: One `FunctionModelNode` type for everything
+- **No Conversions**: Direct React Flow compatibility
+- **Cleaner Code**: Less complex logic and fewer bugs
+- **Better Performance**: No unnecessary type conversions
+
+### 2. **Improved Maintainability**
+- **Consistent Types**: All components use same types
+- **Easier Debugging**: Clear type relationships
+- **Reduced Complexity**: Simpler codebase
+- **Better Testing**: Easier to test with unified types
+
+### 3. **Enhanced User Experience**
+- **Faster Operations**: No conversion overhead
+- **Reliable Functionality**: Less chance of type-related bugs
+- **Better Performance**: Optimized for React Flow
+- **Consistent Behavior**: All operations work the same way
+
+### 4. **Future-Proof Design**
+- **React Flow Native**: Built for React Flow from the start
+- **Extensible**: Easy to add new node types
+- **Scalable**: Handles large models efficiently
+- **Compatible**: Works with React Flow ecosystem
 
 ## Risk Mitigation
 
-### Technical Risks
-1. **Type Conflicts**: Eliminated by using React Flow compatible types
-2. **Data Loss**: Preserved by keeping existing JSONB structure
-3. **Performance Issues**: Improved by removing unnecessary conversions
-4. **Schema Changes**: Minimized by leveraging existing structure
+### 1. **Backward Compatibility**
+- **Gradual Migration**: Migrate one component at a time
+- **Feature Flags**: Use feature flags for gradual rollout
+- **Rollback Plan**: Ability to rollback if issues arise
+- **Data Preservation**: Ensure no data loss during migration
 
-### User Experience Risks
-1. **Feature Regression**: Maintained by keeping existing functionality
-2. **Performance Degradation**: Improved by simplifying architecture
-3. **UI Changes**: Minimal - only internal type changes
-4. **Data Migration**: Not needed - using existing data structure
+### 2. **Testing Strategy**
+- **Comprehensive Testing**: Test all functionality thoroughly
+- **Performance Testing**: Ensure performance is maintained
+- **User Testing**: Validate with real users
+- **Regression Testing**: Ensure no existing functionality breaks
 
-## Timeline and Milestones
+### 3. **Documentation Updates**
+- **Update Documentation**: Reflect new simplified architecture
+- **Migration Guide**: Clear instructions for developers
+- **API Documentation**: Updated API references
+- **User Guide**: Updated user documentation
+
+## Success Criteria
+
+### ✅ **Technical Success**
+- [ ] All components use unified `FunctionModelNode` type
+- [ ] No type conversion functions remain
+- [ ] Database schema simplified and optimized
+- [ ] All tests pass with new architecture
+- [ ] Performance metrics maintained or improved
+
+### ✅ **Functional Success**
+- [ ] All existing functionality preserved
+- [ ] No user-facing changes (seamless migration)
+- [ ] Cross-feature linking works correctly
+- [ ] Version control works correctly
+- [ ] Export/import functionality works
+
+### ✅ **Quality Success**
+- [ ] Code complexity reduced
+- [ ] Bug count reduced
+- [ ] Development velocity improved
+- [ ] Maintenance effort reduced
+- [ ] User satisfaction maintained
+
+## Timeline
 
 ### Week 1: Type System Simplification
-- [ ] Remove `function-model-node-types.ts`
-- [ ] Update all imports to use React Flow compatible types
-- [ ] Remove conversion functions
-- [ ] Update repository to use simplified approach
+- [ ] Remove conflicting types
+- [ ] Update all imports
+- [ ] Simplify repository methods
+- [ ] Update database schema
 
-### Week 2: UI Component Simplification
-- [ ] Update `function-process-dashboard.tsx` to use direct types
-- [ ] Remove conversion functions from UI components
-- [ ] Update Flow interface to use React Flow types
-- [ ] Test node loading and display
+### Week 2: Component Integration
+- [ ] Update canvas components
+- [ ] Simplify hook integration
+- [ ] Test node operations
+- [ ] Validate auto-save
 
-### Week 3: Database Schema Cleanup
-- [ ] Remove unnecessary tables (`function_model_nodes`, `node_metadata`, `node_links`)
+### Week 3: Database Cleanup
+- [ ] Remove unnecessary tables
 - [ ] Update migration scripts
-- [ ] Verify existing data preservation
-- [ ] Test database operations
+- [ ] Test data integrity
+- [ ] Optimize performance
 
-### Week 4: Cross-Feature Linking Enhancement
-- [ ] Enhance existing cross-feature linking for node-level support
-- [ ] Update cross-feature linking UI
-- [ ] Test node-level linking functionality
-- [ ] Verify cross-feature relationships
-
-### Week 5: AI Integration Enhancement
-- [ ] Enhance existing AI agents for node-level support
-- [ ] Update AI configuration UI
-- [ ] Test node-level AI functionality
-- [ ] Verify AI integration
-
-### Week 6: Testing and Validation
-- [ ] Comprehensive testing
-- [ ] Performance optimization
-- [ ] Documentation updates
+### Week 4: Testing and Validation
+- [ ] Comprehensive unit testing
+- [ ] Integration testing
+- [ ] Performance testing
 - [ ] User acceptance testing
 
 ## Conclusion
 
-This migration plan provides a **simplified approach** that leverages the existing React Flow compatible structure rather than building a new node architecture. The key insights are:
+This migration plan will simplify the Function Model architecture by leveraging the existing React Flow compatibility and eliminating unnecessary type conversions. The result will be a cleaner, more maintainable codebase that performs better and is easier to extend.
 
-1. **No New Node Implementation Needed**: The existing `FunctionModelNode` is already React Flow compatible
-2. **Eliminate Type Conflicts**: Remove the conflicting `FunctionModelNode` type from `function-model-node-types.ts`
-3. **Leverage Existing Structure**: Use the current JSONB-based storage that already works
-4. **Simplify Architecture**: Remove unnecessary conversions and use direct types
+The key insight is that the current `FunctionModelNode` type in `function-model-node-types.ts` is already React Flow compatible, so we should use it consistently throughout the application rather than trying to convert between different type systems.
 
-This approach is **more scalable**, **easier to maintain**, and **preserves all existing functionality** while eliminating the type conflicts that were causing the current issues.
+This approach will:
+1. **Eliminate type conflicts** and confusion
+2. **Simplify the codebase** significantly
+3. **Improve performance** by removing conversions
+4. **Enhance maintainability** with consistent types
+5. **Preserve all functionality** while making it more robust
 
-## Current Implementation Status
-
-### ✅ **READY FOR SIMPLIFICATION**
-- ✅ **React Flow Compatible**: Existing `FunctionModelNode` is already compatible
-- ✅ **Clean Architecture**: Perfect foundation for simplification
-- ✅ **Dedicated Table**: Already using separate function_models table
-- ✅ **Rich Metadata**: Comprehensive function model specific fields
-- ✅ **Version Control**: Built-in versioning system
-- ✅ **Cross-Feature Links**: Existing cross-feature linking infrastructure
-- ✅ **Complete UI**: All UI components ready for simplification
-
-### 🚧 **SIMPLIFICATION READY**
-- **Type System**: Week 1 implementation
-- **UI Components**: Week 2 preparation
-- **Database Schema**: Week 3 cleanup
-- **Cross-Feature Linking**: Week 4 enhancement
-- **AI Integration**: Week 5 enhancement
-- **Testing**: Week 6 validation 
+The migration will be completed in 4 weeks with comprehensive testing to ensure no functionality is lost and performance is maintained or improved. 

@@ -1,13 +1,13 @@
-import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
+import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 
 // Generate placeholder performance data for table display
-export const generatePerformanceData = (model: FunctionModel) => {
+export const generatePerformanceData = (nodes: FunctionModelNode[]) => {
   // Extract node types from model data
-  const nodeTypes = extractNodeTypes(model.nodesData)
+  const nodeTypes = extractNodeTypes(nodes)
   
   // Generate realistic performance metrics based on model data
-  const nodeCount = model.nodesData?.length || 0
-  const connections = model.edgesData?.length || 0 // Use actual edges instead of estimate
+  const nodeCount = nodes?.length || 0
+  const connections = nodes.reduce((total, node) => total + (node.relationships?.length || 0), 0)
   
   // Generate performance metrics with some randomness but based on model characteristics
   const baseSuccessRate = Math.max(80, 100 - (nodeCount * 2)) // More nodes = slightly lower success rate
@@ -68,8 +68,8 @@ export const formatLastModified = (date: Date): string => {
 }
 
 // Get category from model metadata or generate default
-export const getModelCategory = (model: FunctionModel): string => {
-  return model.metadata?.category || 'General'
+export const getModelCategory = (model: FunctionModelNode): string => {
+  return model.metadata?.tags?.find(tag => tag.startsWith('category:'))?.replace('category:', '') || 'General'
 }
 
 // NEW: Analyze connection types and patterns

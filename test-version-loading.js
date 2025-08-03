@@ -62,8 +62,8 @@ async function testVersionLoading() {
     
     const snapshot = version.version_data
     console.log('Snapshot keys:', Object.keys(snapshot))
-    console.log('Has nodesData:', !!snapshot.nodesData)
-    console.log('Has edgesData:', !!snapshot.edgesData)
+    console.log('Has nodes:', !!snapshot.nodes)
+    console.log('Has edges:', !!snapshot.edges)
     console.log('Has viewportData:', !!snapshot.viewportData)
     console.log('Has name:', !!snapshot.name)
     console.log('Has description:', !!snapshot.description)
@@ -75,8 +75,8 @@ async function testVersionLoading() {
       description: snapshot.description || models[0].description || '',
       version: snapshot.version,
       status: snapshot.status || models[0].status || 'draft',
-      nodesData: snapshot.nodesData || [],
-      edgesData: snapshot.edgesData || [],
+      nodes: snapshot.nodes || [],
+      edges: snapshot.edges || [],
       viewportData: snapshot.viewportData || { x: 0, y: 0, zoom: 1 },
       processType: snapshot.processType || models[0].process_type,
       complexityLevel: snapshot.complexityLevel || models[0].complexity_level,
@@ -95,8 +95,8 @@ async function testVersionLoading() {
     console.log('Reconstructed model:')
     console.log('- Name:', reconstructedModel.name)
     console.log('- Version:', reconstructedModel.version)
-    console.log('- Nodes count:', reconstructedModel.nodesData.length)
-    console.log('- Edges count:', reconstructedModel.edgesData.length)
+    console.log('- Nodes count:', reconstructedModel.nodes.length)
+    console.log('- Edges count:', reconstructedModel.edges.length)
     console.log('- Viewport:', reconstructedModel.viewportData)
     
     console.log('Version loading test completed successfully!')

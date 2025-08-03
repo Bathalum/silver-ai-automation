@@ -35,7 +35,7 @@ The Function Model feature is the core workflow design engine of the Silver AI A
 ```
 Legacy React Flow Implementation (Active)
 ├── FunctionProcessDashboard (Canvas)
-├── useFunctionModelPersistence (State Management)
+├── useFunctionModelVersionControl (State Management)
 ├── FunctionModelRepository (Data Access)
 └── React Flow Nodes (UI Components)
 
@@ -56,7 +56,7 @@ New Node-Based Architecture (Partially Implemented)
 
 ### Currently Active Components
 - `FunctionProcessDashboard`: Main canvas component
-- `useFunctionModelPersistence`: Legacy state management
+- `useFunctionModelVersionControl`: Version control state management
 - `FunctionModelRepository`: Hybrid repository
 - `FlowNodes`: React Flow node definitions
 - `CrossFeatureLinkingModal`: Cross-feature integration
@@ -74,7 +74,7 @@ New Node-Based Architecture (Partially Implemented)
 ```
 User Interaction → Canvas Component → Application Hook → Repository → Database
      ↓              ↓                ↓              ↓           ↓
-Node Edit → FunctionProcessDashboard → useFunctionModelPersistence → FunctionModelRepository → Supabase
+Node Edit → FunctionProcessDashboard → useFunctionModelVersionControl → FunctionModelRepository → Supabase
      ↓              ↓                ↓              ↓           ↓
 UI Update ← Component State ← Hook State ← Repository Response ← Save/Load Operations
 ```
@@ -222,7 +222,7 @@ UI Update ← Component State ← Hook State ← Repository Response ← Save/Lo
 
 ### Code Structure
 - **Active Components**: `app/(private)/dashboard/function-model/`
-- **Legacy Hooks**: `lib/application/hooks/use-function-model-persistence.ts`
+- **Version Control Hooks**: `lib/application/hooks/use-function-model-version-control.ts`
 - **New Hooks**: `lib/application/hooks/use-function-model-nodes.ts`
 - **Repositories**: `lib/infrastructure/repositories/`
 

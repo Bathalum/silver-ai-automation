@@ -1,8 +1,7 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
-import { FunctionModelNode, NodeLink } from '@/lib/domain/entities/function-model-node-types'
-import { useCrossFeatureLinking } from '@/lib/application/hooks/use-cross-feature-linking'
+import React, { useState, useCallback } from 'react'
+import { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,494 +11,419 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { 
+  Settings, 
+  Trash2, 
+  Play, 
   Edit3, 
   Save, 
-  X, 
-  Play, 
-  Clock, 
-  AlertTriangle, 
-  CheckCircle, 
-  Link, 
-  ExternalLink,
-  Settings,
-  BarChart3,
-  Code,
-  FileText,
-  Zap
+  X,
+  Layers,
+  Zap,
+  Hammer,
+  ArrowLeftRight,
+  Package
 } from 'lucide-react'
 
 interface NodeDetailsPanelProps {
-  node: FunctionModelNode | null
-  onUpdate?: (nodeId: string, updates: Partial<FunctionModelNode>) => void
-  onExecute?: (nodeId: string) => void
-  onClose?: () => void
+  node: FunctionModelNode
+  onUpdate: (nodeId: string, updates: Partial<FunctionModelNode>) => void
+  onDelete: (nodeId: string) => void
   readOnly?: boolean
 }
 
-export function NodeDetailsPanel({ 
-  node, 
-  onUpdate, 
-  onExecute, 
-  onClose, 
-  readOnly = false 
+export function NodeDetailsPanel({
+  node,
+  onUpdate,
+  onDelete,
+  readOnly = false
 }: NodeDetailsPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState<Partial<FunctionModelNode>>({})
-  const [executionStatus, setExecutionStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle')
-  const [executionResult, setExecutionResult] = useState<any>(null)
-
-  // Cross-feature linking hook
-  const {
-    links,
-    loading: linksLoading,
-    createCrossFeatureLink,
-    deleteLink,
-    getConnectedEntities,
-    getLinkStatistics
-  } = useCrossFeatureLinking({
-    sourceFeature: 'function-model',
-    sourceEntityId: node?.modelId || '',
-    sourceNodeId: node?.nodeId
+  const [editData, setEditData] = useState({
+    name: node.name,
+    description: node.description,
+    nodeType: node.nodeType,
+    executionType: node.processBehavior.executionType,
+    complexity: node.businessLogic.complexity || 'simple',
+    sla: node.businessLogic.sla || 0,
+    kpis: node.businessLogic.kpis || []
   })
 
-  // Initialize edit data when node changes
-  useEffect(() => {
-    if (node) {
-      setEditData({
-        name: node.name,
-        description: node.description,
-        positionX: node.positionX,
-        positionY: node.positionY,
-        processBehavior: node.processBehavior,
-        businessLogic: node.businessLogic
-      })
-    }
-  }, [node])
-
-  // Handle save changes
+  // Handle save
   const handleSave = useCallback(async () => {
-    if (!node || !onUpdate) return
-
     try {
-      await onUpdate(node.nodeId, editData)
+      await onUpdate(node.nodeId, {
+        name: editData.name,
+        description: editData.description,
+        nodeType: editData.nodeType,
+        processBehavior: {
+          ...node.processBehavior,
+          executionType: editData.executionType
+        },
+        businessLogic: {
+          ...node.businessLogic,
+          complexity: editData.complexity,
+          sla: editData.sla,
+          kpis: editData.kpis
+        }
+      })
       setIsEditing(false)
     } catch (error) {
       console.error('Failed to update node:', error)
     }
-  }, [node, editData, onUpdate])
+  }, [node.nodeId, editData, onUpdate])
 
-  // Handle cancel edit
-  const handleCancel = useCallback(() => {
-    setIsEditing(false)
-    if (node) {
-      setEditData({
-        name: node.name,
-        description: node.description,
-        positionX: node.positionX,
-        positionY: node.positionY,
-        processBehavior: node.processBehavior,
-        businessLogic: node.businessLogic
-      })
-    }
-  }, [node])
-
-  // Handle node execution
-  const handleExecute = useCallback(async () => {
-    if (!node || !onExecute) return
-
-    setExecutionStatus('running')
+  // Handle delete
+  const handleDelete = useCallback(async () => {
+    if (!confirm('Are you sure you want to delete this node?')) return
+    
     try {
-      await onExecute(node.nodeId)
-      setExecutionStatus('success')
-      setTimeout(() => setExecutionStatus('idle'), 3000)
+      await onDelete(node.nodeId)
     } catch (error) {
-      setExecutionStatus('error')
-      setTimeout(() => setExecutionStatus('idle'), 5000)
+      console.error('Failed to delete node:', error)
     }
-  }, [node, onExecute])
+  }, [node.nodeId, onDelete])
 
-  // Get execution status icon
-  const getExecutionStatusIcon = useCallback(() => {
-    switch (executionStatus) {
-      case 'running':
-        return <Clock className="h-4 w-4 animate-spin text-blue-500" />
-      case 'success':
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case 'error':
-        return <AlertTriangle className="h-4 w-4 text-red-500" />
+  // Get node icon
+  const getNodeIcon = useCallback((nodeType: string) => {
+    switch (nodeType) {
+      case 'stageNode':
+        return <Layers className="w-5 h-5" />
+      case 'actionTableNode':
+        return <Hammer className="w-5 h-5" />
+      case 'ioNode':
+        return <ArrowLeftRight className="w-5 h-5" />
+      case 'functionModelContainerNode':
+        return <Package className="w-5 h-5" />
       default:
-        return <Play className="h-4 w-4 text-gray-500" />
+        return <Settings className="w-5 h-5" />
     }
-  }, [executionStatus])
-
-  // Get node type color
-  const getNodeTypeColor = useCallback((nodeType: string) => {
-    const colors = {
-      stageNode: 'bg-green-100 text-green-800',
-      actionTableNode: 'bg-blue-100 text-blue-800',
-      ioNode: 'bg-yellow-100 text-yellow-800',
-      functionModelContainer: 'bg-purple-100 text-purple-800'
-    }
-    return colors[nodeType] || 'bg-gray-100 text-gray-800'
   }, [])
 
-  if (!node) {
-    return (
-      <Card className="w-80 h-full">
-        <CardHeader>
-          <CardTitle className="text-lg">Node Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-gray-500 py-8">
-            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Select a node to view details</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  // Get node color
+  const getNodeColor = useCallback((nodeType: string) => {
+    switch (nodeType) {
+      case 'stageNode':
+        return 'bg-blue-500'
+      case 'actionTableNode':
+        return 'bg-green-500'
+      case 'ioNode':
+        return 'bg-purple-500'
+      case 'functionModelContainerNode':
+        return 'bg-orange-500'
+      default:
+        return 'bg-gray-500'
+    }
+  }, [])
 
   return (
-    <Card className="w-80 h-full overflow-y-auto">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Node Details</CardTitle>
+    <div className="w-80 border-l bg-white overflow-y-auto">
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            {!readOnly && (
-              <>
-                {isEditing ? (
-                  <>
-                    <Button size="sm" onClick={handleSave}>
-                      <Save className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCancel}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
-                    <Edit3 className="h-4 w-4" />
-                  </Button>
-                )}
-              </>
-            )}
-            <Button size="sm" variant="outline" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
-        {/* Basic Information */}
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700">Name</label>
-            {isEditing ? (
-              <Input
-                value={editData.name || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
-                className="mt-1"
-              />
-            ) : (
-              <p className="text-sm text-gray-900 mt-1">{node.name}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Description</label>
-            {isEditing ? (
-              <Textarea
-                value={editData.description || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
-                className="mt-1"
-                rows={3}
-              />
-            ) : (
-              <p className="text-sm text-gray-600 mt-1">{node.description || 'No description'}</p>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <Badge className={getNodeTypeColor(node.nodeType)}>
-              {node.nodeType}
-            </Badge>
-            {node.processBehavior?.executionType && (
-              <Badge variant="outline">
-                {node.processBehavior.executionType}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Execution Controls */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Execution</h3>
-            {getExecutionStatusIcon()}
+            <div className={`p-2 rounded-md ${getNodeColor(node.nodeType)} text-white`}>
+              {getNodeIcon(node.nodeType)}
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Node Details</h2>
+              <p className="text-sm text-gray-600">{node.nodeType}</p>
+            </div>
           </div>
           
-          <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              onClick={handleExecute}
-              disabled={executionStatus === 'running'}
-              className="flex-1"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Execute
-            </Button>
-            <Button size="sm" variant="outline">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {executionStatus === 'success' && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-sm text-green-800">Execution completed successfully</p>
-            </div>
-          )}
-
-          {executionStatus === 'error' && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-800">Execution failed</p>
-            </div>
-          )}
-        </div>
-
-        <Separator />
-
-        {/* Detailed Information Tabs */}
-        <Tabs defaultValue="properties" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="properties">Properties</TabsTrigger>
-            <TabsTrigger value="links">Links</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="properties" className="space-y-4 mt-4">
-            {/* Position */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Position X</label>
-                {isEditing ? (
-                  <Input
-                    type="number"
-                    value={editData.positionX || 0}
-                    onChange={(e) => setEditData(prev => ({ ...prev, positionX: parseInt(e.target.value) || 0 }))}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-sm text-gray-900 mt-1">{node.positionX}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Position Y</label>
-                {isEditing ? (
-                  <Input
-                    type="number"
-                    value={editData.positionY || 0}
-                    onChange={(e) => setEditData(prev => ({ ...prev, positionY: parseInt(e.target.value) || 0 }))}
-                    className="mt-1"
-                  />
-                ) : (
-                  <p className="text-sm text-gray-900 mt-1">{node.positionY}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Process Behavior */}
-            <div>
-              <label className="text-sm font-medium text-gray-700">Execution Type</label>
-              {isEditing ? (
-                <Select
-                  value={editData.processBehavior?.executionType || 'sequential'}
-                  onValueChange={(value) => setEditData(prev => ({
-                    ...prev,
-                    processBehavior: { ...prev.processBehavior, executionType: value }
-                  }))}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sequential">Sequential</SelectItem>
-                    <SelectItem value="parallel">Parallel</SelectItem>
-                    <SelectItem value="conditional">Conditional</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-sm text-gray-900 mt-1">{node.processBehavior?.executionType || 'sequential'}</p>
-              )}
-            </div>
-
-            {/* Timeout */}
-            <div>
-              <label className="text-sm font-medium text-gray-700">Timeout (seconds)</label>
-              {isEditing ? (
-                <Input
-                  type="number"
-                  value={editData.processBehavior?.timeout || 30}
-                  onChange={(e) => setEditData(prev => ({
-                    ...prev,
-                    processBehavior: { ...prev.processBehavior, timeout: parseInt(e.target.value) || 30 }
-                  }))}
-                  className="mt-1"
-                />
-              ) : (
-                <p className="text-sm text-gray-900 mt-1">{node.processBehavior?.timeout || 30}s</p>
-              )}
-            </div>
-
-            {/* Dependencies */}
-            <div>
-              <label className="text-sm font-medium text-gray-700">Dependencies</label>
-              <p className="text-sm text-gray-600 mt-1">
-                {node.processBehavior?.dependencies?.length || 0} dependencies
-              </p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="links" className="space-y-4 mt-4">
-            {linksLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
-                <p className="text-sm text-gray-500 mt-2">Loading links...</p>
-              </div>
-            ) : (
+          <div className="flex items-center gap-1">
+            {!readOnly && (
               <>
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium">Cross-Feature Links</h4>
-                  <Badge variant="secondary">{links.length}</Badge>
-                </div>
-
-                {links.length === 0 ? (
-                  <div className="text-center py-4">
-                    <Link className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm text-gray-500">No cross-feature links</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {links.map((link) => (
-                      <div key={link.linkId} className="p-3 border rounded-md">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">
-                              {link.targetFeature} → {link.targetEntityId}
-                            </p>
-                            <p className="text-xs text-gray-500">{link.linkType}</p>
-                          </div>
-                          <Button size="sm" variant="ghost">
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <Separator />
-
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Link Statistics</h4>
-                  {(() => {
-                    const stats = getLinkStatistics()
-                    return (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Total Links:</span>
-                          <span className="font-medium">{stats.total}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Cross-Feature:</span>
-                          <span className="font-medium">{stats.byFeature['knowledge-base'] || 0}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Strong Links:</span>
-                          <span className="font-medium">{stats.byStrength.strong}</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditing(!isEditing)}
+                >
+                  {isEditing ? <X className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </>
             )}
+          </div>
+        </div>
+
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="behavior">Behavior</TabsTrigger>
+            <TabsTrigger value="data">Data</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="space-y-4">
+            {/* Basic Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Basic Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Name</label>
+                  {isEditing ? (
+                    <Input
+                      value={editData.name}
+                      onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-sm mt-1">{node.name}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Description</label>
+                  {isEditing ? (
+                    <Textarea
+                      value={editData.description}
+                      onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
+                      className="mt-1"
+                      rows={3}
+                    />
+                  ) : (
+                    <p className="text-sm mt-1">{node.description || 'No description'}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Node Type</label>
+                  {isEditing ? (
+                    <Select
+                      value={editData.nodeType}
+                      onValueChange={(value) => setEditData(prev => ({ ...prev, nodeType: value as FunctionModelNode['nodeType'] }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stageNode">Stage Node</SelectItem>
+                        <SelectItem value="actionTableNode">Action Table Node</SelectItem>
+                        <SelectItem value="ioNode">I/O Node</SelectItem>
+                        <SelectItem value="functionModelContainerNode">Container Node</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="outline" className="mt-1">{node.nodeType}</Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Position Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Position</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs font-medium text-gray-600">X</label>
+                    <p className="text-sm">{node.position.x}</p>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs font-medium text-gray-600">Y</label>
+                    <p className="text-sm">{node.position.y}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Metadata */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Metadata</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">Feature</span>
+                  <Badge variant="secondary" className="text-xs">{node.metadata.feature}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">Version</span>
+                  <Badge variant="secondary" className="text-xs">{node.metadata.version}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">Tags</span>
+                  <div className="flex gap-1">
+                    {node.metadata.tags.slice(0, 2).map((tag, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">{tag}</Badge>
+                    ))}
+                    {node.metadata.tags.length > 2 && (
+                      <Badge variant="outline" className="text-xs">+{node.metadata.tags.length - 2}</Badge>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-4 mt-4">
-            <div className="space-y-4">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-blue-600" />
-                  <h4 className="text-sm font-medium text-blue-900">Execution Analytics</h4>
+          <TabsContent value="behavior" className="space-y-4">
+            {/* Process Behavior */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Process Behavior</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Execution Type</label>
+                  {isEditing ? (
+                    <Select
+                      value={editData.executionType}
+                      onValueChange={(value) => setEditData(prev => ({ ...prev, executionType: value as any }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sequential">Sequential</SelectItem>
+                        <SelectItem value="parallel">Parallel</SelectItem>
+                        <SelectItem value="conditional">Conditional</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="outline" className="mt-1">{node.processBehavior.executionType}</Badge>
+                  )}
                 </div>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Total Executions:</span>
-                    <span className="font-medium">0</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Success Rate:</span>
-                    <span className="font-medium">0%</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Avg Duration:</span>
-                    <span className="font-medium">0s</span>
-                  </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Dependencies</label>
+                  <p className="text-sm mt-1">
+                    {node.processBehavior.dependencies?.length || 0} dependencies
+                  </p>
                 </div>
-              </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Triggers</label>
+                  <p className="text-sm mt-1">
+                    {node.processBehavior.triggers?.length || 0} triggers
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-green-600" />
-                  <h4 className="text-sm font-medium text-green-900">Performance</h4>
+            {/* Business Logic */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Business Logic</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Complexity</label>
+                  {isEditing ? (
+                    <Select
+                      value={editData.complexity}
+                      onValueChange={(value) => setEditData(prev => ({ ...prev, complexity: value as any }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="simple">Simple</SelectItem>
+                        <SelectItem value="moderate">Moderate</SelectItem>
+                        <SelectItem value="complex">Complex</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="outline" className="mt-1">{node.businessLogic.complexity}</Badge>
+                  )}
                 </div>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>CPU Usage:</span>
-                    <span className="font-medium">Low</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Memory Usage:</span>
-                    <span className="font-medium">Low</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Network Calls:</span>
-                    <span className="font-medium">0</span>
-                  </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">SLA (seconds)</label>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      value={editData.sla}
+                      onChange={(e) => setEditData(prev => ({ ...prev, sla: parseInt(e.target.value) || 0 }))}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-sm mt-1">{node.businessLogic.sla || 'Not set'}</p>
+                  )}
                 </div>
-              </div>
-            </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">KPIs</label>
+                  <p className="text-sm mt-1">
+                    {node.businessLogic.kpis?.length || 0} KPIs defined
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="data" className="space-y-4">
+            {/* Function Model Data */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Function Model Data</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Stage Data</label>
+                  <p className="text-sm mt-1">
+                    {node.functionModelData.stage ? 'Present' : 'Not set'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Action Data</label>
+                  <p className="text-sm mt-1">
+                    {node.functionModelData.action ? 'Present' : 'Not set'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">I/O Data</label>
+                  <p className="text-sm mt-1">
+                    {node.functionModelData.io ? 'Present' : 'Not set'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Container Data</label>
+                  <p className="text-sm mt-1">
+                    {node.functionModelData.container ? 'Present' : 'Not set'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Relationships */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Relationships</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">
+                  {node.relationships?.length || 0} relationships
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
-        <Separator />
-
-        {/* Metadata */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium">Metadata</h4>
-          <div className="space-y-1 text-xs text-gray-500">
-            <div className="flex justify-between">
-              <span>Created:</span>
-              <span>{new Date(node.createdAt).toLocaleDateString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Updated:</span>
-              <span>{new Date(node.updatedAt).toLocaleDateString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Version:</span>
-              <span>{node.metadata?.version || '1.0.0'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Created By:</span>
-              <span>{node.metadata?.createdBy || 'System'}</span>
-            </div>
+        {/* Save Button */}
+        {isEditing && !readOnly && (
+          <div className="mt-4 flex gap-2">
+            <Button onClick={handleSave} className="flex-1">
+              <Save className="w-4 h-4 mr-2" />
+              Save Changes
+            </Button>
+            <Button variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+    </div>
   )
 } 

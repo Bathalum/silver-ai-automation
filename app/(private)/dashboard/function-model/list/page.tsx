@@ -1,42 +1,73 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { FunctionModelList } from '@/components/composites/function-model/function-model-list'
-import { useFunctionModelList } from '@/lib/application/hooks/use-function-model-persistence'
-import { createNewFunctionModel } from '@/lib/application/use-cases/function-model-persistence-use-cases'
 
 export default function FunctionModelListPage() {
   const router = useRouter()
-  const {
-    models,
-    loading,
-    error,
-    filters,
-    searchQuery,
-    loadModels,
-    duplicateModel,
-    deleteModel,
-    updateFilters,
-    updateSearchQuery
-  } = useFunctionModelList()
-  
+  const [models, setModels] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState({})
+  const [searchQuery, setSearchQuery] = useState('')
+
   useEffect(() => {
+    // Load models using node-based approach
+    const loadModels = async () => {
+      try {
+        setLoading(true)
+        // TODO: Implement model loading using node-based use cases
+        setModels([])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load models')
+      } finally {
+        setLoading(false)
+      }
+    }
+
     loadModels()
-  }, [loadModels])
-  
+  }, [])
+
+  const updateFilters = (newFilters: any) => {
+    setFilters(newFilters)
+  }
+
+  const updateSearchQuery = (query: string) => {
+    setSearchQuery(query)
+  }
+
   const handleCreateNew = async () => {
     try {
-      // Create a new model with a default name
-      const newModel = await createNewFunctionModel(
-        'Untitled Function Model',
-        'New function model - click to edit description'
+      // Use node-based use cases instead of legacy persistence
+      const { createFunctionModelNode } = await import('@/lib/application/use-cases/function-model-use-cases')
+      
+      // Create a new model using node-based approach
+      const newModelNode = await createFunctionModelNode(
+        'functionModelContainerNode',
+        'New Function Model',
+        { x: 0, y: 0 },
+        'new-model-id',
+        {
+          description: 'A new function model',
+          businessLogic: {
+            complexity: 'simple',
+            estimatedDuration: 0,
+            sla: undefined,
+            kpis: []
+          },
+          processBehavior: {
+            executionType: 'sequential',
+            dependencies: [],
+            triggers: []
+          }
+        }
       )
       
-      // Navigate directly to the canvas
-      router.push(`/dashboard/function-model/${newModel.modelId}`)
+      // Navigate to the new model
+      router.push(`/dashboard/function-model/${newModelNode.modelId}`)
     } catch (err) {
       console.error('Failed to create new model:', err)
       // You might want to show a toast notification here
@@ -49,7 +80,8 @@ export default function FunctionModelListPage() {
   
   const handleModelDelete = async (modelId: string) => {
     try {
-      await deleteModel(modelId)
+      // TODO: Implement model deletion using node-based use cases
+      console.log('Delete model:', modelId)
     } catch (err) {
       console.error('Failed to delete model:', err)
       // You might want to show a toast notification here
@@ -58,9 +90,8 @@ export default function FunctionModelListPage() {
   
   const handleModelDuplicate = async (modelId: string) => {
     try {
-      const duplicatedModel = await duplicateModel(modelId)
-      // Optionally navigate to the duplicated model
-      router.push(`/dashboard/function-model/${duplicatedModel.modelId}`)
+      // TODO: Implement model duplication using node-based use cases
+      console.log('Duplicate model:', modelId)
     } catch (err) {
       console.error('Failed to duplicate model:', err)
       // You might want to show a toast notification here

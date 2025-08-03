@@ -1,6 +1,8 @@
 // Version Control Domain Entities
 // This file defines the core types for Function Model version control
 
+import { type FunctionModelNode } from './function-model-node-types'
+
 export interface VersionEntry {
   version: string
   timestamp: Date
@@ -32,8 +34,8 @@ export type ChangeType =
 export interface FunctionModelSnapshot {
   modelId: string
   version: string
-  nodesData: any[]
-  edgesData: any[]
+  nodes: FunctionModelNode[]
+  edges: any[]
   viewportData: any
   metadata: any
   // Additional fields for complete model reconstruction
@@ -136,8 +138,8 @@ export function createChangeDescription(
 export function createFunctionModelSnapshot(
   modelId: string,
   version: string,
-  nodesData: any[],
-  edgesData: any[],
+  nodes: FunctionModelNode[],
+  edges: any[],
   viewportData: any,
   metadata: any,
   // Add additional model fields for complete reconstruction
@@ -157,8 +159,8 @@ export function createFunctionModelSnapshot(
   return {
     modelId,
     version,
-    nodesData,
-    edgesData,
+    nodes,
+    edges,
     viewportData,
     metadata,
     // Include additional fields for complete model reconstruction

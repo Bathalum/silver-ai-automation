@@ -12,7 +12,7 @@ import { cn } from "../../lib/utils"
 import { SIDEBAR_ITEMS } from "./shared/constants"
 import { ModeSelector, ModeType } from "./shared/mode-selector"
 import { NavigationTabContent } from "./shared/navigation-tab-content"
-import type { ActionItem, TabType } from "../../lib/domain/entities/function-model-types"
+import type { ActionItem, TabType } from "../../lib/domain/entities/unified-node-types"
 
 interface ActionModalProps {
   isOpen: boolean

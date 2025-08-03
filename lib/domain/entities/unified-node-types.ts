@@ -92,9 +92,63 @@ export interface KnowledgeBaseData {
 }
 
 // Import existing types for compatibility
-import type { Stage, ActionItem, DataPort, FunctionModelContainer } from './function-model-types'
 import type { Domain, Event } from './event-storm'
 import type { SOP } from './knowledge-base-types'
+
+// Define the types that were previously imported from function-model-types
+export interface Stage {
+  id: string
+  name: string
+  description: string
+  position: { x: number; y: number }
+  actions: string[]
+  dataChange: string[]
+  boundaryCriteria: string[]
+  raci: RACIMatrix
+}
+
+export interface ActionItem {
+  id: string
+  name: string
+  description: string
+  type: "action" | "action-group"
+  linkedEntities?: NodeLinkedEntity[]
+}
+
+export interface DataPort {
+  id: string
+  name: string
+  description: string
+  mode?: "input" | "output"
+  masterData: string[]
+  referenceData: string[]
+  transactionData: string[]
+}
+
+export interface FunctionModelContainer {
+  id: string
+  name: string
+  description: string
+  type: 'sub-process' | 'module' | 'component'
+  parentFunctionModelId?: string
+  childFunctionModelIds?: string[]
+  metadata?: Record<string, any>
+}
+
+export interface NodeLinkedEntity {
+  entityId: string
+  entityType: 'function-model' | 'knowledge-base' | 'spindle'
+  linkType: 'documents' | 'implements' | 'references' | 'supports' | 'nested'
+  linkContext: Record<string, any>
+  linkId: string
+}
+
+export interface RACIMatrix {
+  inform: string[]
+  consult: string[]
+  accountable: string[]
+  responsible: string[]
+}
 
 // Node type constants for validation
 export const NODE_TYPES = {

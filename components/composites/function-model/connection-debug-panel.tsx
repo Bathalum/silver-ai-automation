@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react'
 import { analyzeConnections, validateConnections, getConnectionStats } from '@/lib/utils/performance-data'
-import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
+import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 
 interface ConnectionDebugPanelProps {
-  model: FunctionModel
+  model: FunctionModelNode
   isOpen: boolean
   onClose: () => void
 }
@@ -20,9 +20,13 @@ export function ConnectionDebugPanel({ model, isOpen, onClose }: ConnectionDebug
   
   if (!isOpen) return null
   
-  const connectionAnalysis = analyzeConnections(model.edgesData)
-  const validation = validateConnections(model.edgesData, model.nodesData)
-  const stats = getConnectionStats(model.edgesData)
+  // Extract edges and nodes from the model structure
+  const edgesData = model.edges || []
+  const nodesData = model.nodes || []
+  
+  const connectionAnalysis = analyzeConnections(edgesData)
+  const validation = validateConnections(edgesData, nodesData)
+  const stats = getConnectionStats(edgesData)
   
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -168,7 +172,7 @@ export function ConnectionDebugPanel({ model, isOpen, onClose }: ConnectionDebug
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span>Total Nodes:</span>
-                      <Badge variant="outline">{model.nodesData?.length || 0}</Badge>
+                      <Badge variant="outline">{nodesData?.length || 0}</Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Connected Nodes:</span>

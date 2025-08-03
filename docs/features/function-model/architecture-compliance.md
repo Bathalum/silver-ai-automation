@@ -11,39 +11,7 @@ The Domain Layer contains the core business entities and rules, with both legacy
 
 #### Core Entities (Current Implementation)
 ```typescript
-// lib/domain/entities/function-model-types.ts (LEGACY)
-export interface FunctionModel {
-  modelId: string
-  name: string
-  description: string
-  version: string
-  status: 'draft' | 'published' | 'archived'
-  
-  // Visual representation (React Flow data)
-  nodesData: Node[]
-  edgesData: Edge[]
-  viewportData: Viewport
-  
-  // Function Model specific metadata
-  processType?: string
-  complexityLevel?: 'simple' | 'moderate' | 'complex'
-  estimatedDuration?: number
-  tags: string[]
-  
-  // Relationships between nodes
-  relationships: NodeRelationship[]
-  
-  // Persistence metadata
-  metadata: FunctionModelMetadata
-  permissions: FunctionModelPermissions
-  versionHistory: VersionEntry[]
-  currentVersion: string
-  createdAt: Date
-  updatedAt: Date
-  lastSavedAt: Date
-}
-
-// lib/domain/entities/unified-node-types.ts (NEW)
+// lib/domain/entities/unified-node-types.ts (ACTIVE)
 export interface BaseNode {
   nodeId: string
   type: 'function-model' | 'event-storm' | 'spindle' | 'knowledge-base'
@@ -56,135 +24,130 @@ export interface BaseNode {
   updatedAt: Date
 }
 
-// lib/domain/entities/function-model-node-types.ts (NEW - Partially Implemented)
+// lib/domain/entities/function-model-node-types.ts (ACTIVE)
 export interface FunctionModelNode extends BaseNode {
-  featureType: 'function-model'
-  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainer'
+  type: 'function-model'
+  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainerNode'
+  modelId: string
+  
+  // Preserve ALL existing data structures
   functionModelData: {
     stage?: Stage
     action?: ActionItem
     io?: DataPort
     container?: FunctionModelContainer
   }
+  
+  // Preserve complex business logic
+  businessLogic: {
+    sla?: number
+    kpis?: string[]
+    complexity?: 'simple' | 'moderate' | 'complex'
+    estimatedDuration?: number
+  }
+  
+  // Preserve process behavior
   processBehavior: {
     executionType: 'sequential' | 'parallel' | 'conditional'
-    dependencies: string[]
-    timeout?: number
-    retryPolicy?: RetryPolicy
+    dependencies?: string[]
+    triggers?: string[]
   }
-  businessLogic: {
-    raciMatrix?: RACIMatrix
-    sla?: ServiceLevelAgreement
-    kpis?: KeyPerformanceIndicator[]
+  
+  // Preserve React Flow specific data
+  reactFlowData: {
+    parentNode?: string
+    extent?: 'parent' | [number, number, number, number]
+    draggable?: boolean
+    selectable?: boolean
+    deletable?: boolean
+    width?: number
+    height?: number
   }
+  
+  // Preserve complex relationships
+  relationships: NodeRelationship[]
 }
 ```
 
 #### Business Rules (Current Implementation)
 ```typescript
-// lib/domain/entities/function-model-types.ts
-export function createFunctionModel(
-  name: string,
-  description: string,
-  options: Partial<FunctionModel> = {}
-): Omit<FunctionModel, 'modelId' | 'createdAt' | 'updatedAt' | 'lastSavedAt'> {
-  return {
-    name,
-    description,
-    version: '1.0.0',
-    status: 'draft',
-    nodesData: [],
-    edgesData: [],
-    viewportData: { x: 0, y: 0, zoom: 1 },
-    tags: [],
-    relationships: [],
-    metadata: {
-      category: '',
-      dependencies: [],
-      references: [],
-      exportSettings: {
-        includeMetadata: true,
-        includeRelationships: true,
-        format: 'json',
-        resolution: 'medium'
-      },
-      collaboration: {
-        allowComments: true,
-        allowSuggestions: true,
-        requireApproval: false,
-        autoSave: true,
-        saveInterval: 30
-      }
-    },
-    permissions: {
-      canView: true,
-      canEdit: true,
-      canDelete: true,
-      canShare: true,
-      canExport: true,
-      canVersion: true,
-      canCollaborate: true
-    },
-    versionHistory: [],
-    currentVersion: '1.0.0'
-  }
+// lib/domain/entities/function-model-connection-rules.ts (ACTIVE)
+export interface ConnectionRule {
+  sourceHandle: string
+  targetHandle: string
+  sourceNodeTypes: string[]
+  targetNodeTypes: string[]
+  relationshipType: 'parent-child' | 'sibling'
+  validation?: (sourceNode: FunctionModelNode, targetNode: FunctionModelNode) => boolean
 }
 
-// lib/domain/entities/function-model-node-types.ts (NEW - Partially Implemented)
-export function createFunctionModelNode(
-  nodeType: FunctionModelNode['nodeType'],
-  name: string,
-  position: { x: number; y: number },
-  options: Partial<FunctionModelNode> = {}
-): Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'> {
-  const baseNode = {
-    featureType: 'function-model' as const,
-    nodeType,
-    name,
-    description: options.description || '',
-    position,
-    visualProperties: {
-      color: options.visualProperties?.color || getDefaultColor(nodeType),
-      icon: options.visualProperties?.icon || getDefaultIcon(nodeType),
-      size: options.visualProperties?.size || 'medium',
-      style: options.visualProperties?.style || {},
-      featureSpecific: options.visualProperties?.featureSpecific || {}
-    },
-    metadata: {
-      tags: options.metadata?.tags || [nodeType, 'function-model'],
-      searchKeywords: options.metadata?.searchKeywords || [name, nodeType],
-      crossFeatureLinks: options.metadata?.crossFeatureLinks || [],
-      aiAgent: options.metadata?.aiAgent,
-      vectorEmbedding: options.metadata?.vectorEmbedding
-    },
-    status: options.status || 'active'
+export const FUNCTION_MODEL_CONNECTION_RULES: ConnectionRule[] = [
+  // ActionTableNode to StageNode/IONode (parent-child)
+  {
+    sourceHandle: 'header-source',
+    targetHandle: 'bottom-target',
+    sourceNodeTypes: ['actionTableNode'],
+    targetNodeTypes: ['stageNode', 'ioNode'],
+    relationshipType: 'parent-child'
+  },
+  
+  // StageNode/IONode to StageNode/IONode (siblings)
+  {
+    sourceHandle: 'right-source',
+    targetHandle: 'left-target',
+    sourceNodeTypes: ['stageNode', 'ioNode'],
+    targetNodeTypes: ['stageNode', 'ioNode'],
+    relationshipType: 'sibling'
   }
+]
 
-  return {
-    ...baseNode,
-    functionModelData: {
-      stage: options.functionModelData?.stage,
-      action: options.functionModelData?.action,
-      io: options.functionModelData?.io,
-      container: options.functionModelData?.container
-    },
-    processBehavior: {
-      executionType: options.processBehavior?.executionType || 'sequential',
-      dependencies: options.processBehavior?.dependencies || [],
-      timeout: options.processBehavior?.timeout,
-      retryPolicy: options.processBehavior?.retryPolicy || {
-        maxRetries: 3,
-        retryDelay: 1000,
-        backoffMultiplier: 2,
-        maxDelay: 10000
-      }
-    },
-    businessLogic: {
-      raciMatrix: options.businessLogic?.raciMatrix,
-      sla: options.businessLogic?.sla,
-      kpis: options.businessLogic?.kpis || []
-    }
+export function validateConnection(
+  sourceNode: FunctionModelNode,
+  targetNode: FunctionModelNode,
+  sourceHandle: string,
+  targetHandle: string
+): boolean {
+  const rule = FUNCTION_MODEL_CONNECTION_RULES.find(r => 
+    r.sourceHandle === sourceHandle && 
+    r.targetHandle === targetHandle
+  )
+  
+  if (!rule) return false
+  
+  const sourceTypeValid = rule.sourceNodeTypes.includes(sourceNode.nodeType)
+  const targetTypeValid = rule.targetNodeTypes.includes(targetNode.nodeType)
+  
+  if (!sourceTypeValid || !targetTypeValid) return false
+  
+  // Prevent ActionTableNodes from connecting as siblings
+  if (rule.relationshipType === 'sibling' && 
+      (sourceNode.nodeType === 'actionTableNode' || targetNode.nodeType === 'actionTableNode')) {
+    return false
   }
+  
+  // Prevent self-connections
+  if (sourceNode.nodeId === targetNode.nodeId) {
+    return false
+  }
+  
+  // Prevent duplicate connections
+  const existingConnection = sourceNode.relationships.find(rel => 
+    rel.sourceNodeId === sourceNode.nodeId &&
+    rel.targetNodeId === targetNode.nodeId &&
+    rel.sourceHandle === sourceHandle &&
+    rel.targetHandle === targetHandle
+  )
+  
+  if (existingConnection) {
+    return false
+  }
+  
+  // Run custom validation if provided
+  if (rule.validation) {
+    return rule.validation(sourceNode, targetNode)
+  }
+  
+  return true
 }
 ```
 
@@ -195,180 +158,173 @@ The Application Layer orchestrates use cases and coordinates data flow between D
 
 #### Use Cases (Current Implementation)
 ```typescript
-// lib/application/hooks/use-function-model-persistence.ts (LEGACY)
-export function useFunctionModelPersistence(modelId: string) {
-  const [model, setModel] = useState<FunctionModel | null>(null)
+// lib/application/hooks/use-function-model-nodes.ts (ACTIVE)
+export function useFunctionModelNodes(modelId: string) {
+  const [nodes, setNodes] = useState<FunctionModelNode[]>([])
+  const [edges, setEdges] = useState<Edge[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [autoSave, setAutoSave] = useState(true)
-  const [saveInterval, setSaveInterval] = useState(30)
-
-  const loadModel = useCallback(async (options: LoadOptions = {}) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const loadedModel = await loadFunctionModel(modelId, options)
-      setModel(loadedModel)
-      return loadedModel
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load model'
-      setError(errorMessage)
-      throw new Error(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }, [modelId])
-
-  const saveModel = useCallback(async (options: SaveOptions = {}) => {
-    if (!model) {
-      throw new Error('No model to save')
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      const savedModel = await saveFunctionModel(model, options)
-      setModel(savedModel)
-      return savedModel
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save model'
-      setError(errorMessage)
-      throw new Error(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }, [model])
-
-  return {
-    model,
-    loading,
-    error,
-    loadModel,
-    saveModel,
-    updateModel,
-    clearError,
-    autoSave,
-    setAutoSave,
-    saveInterval,
-    setSaveInterval
-  }
-}
-
-// lib/application/hooks/use-function-model-nodes.ts (NEW - Partially Implemented)
-export function useFunctionModelNodes(options: UseFunctionModelNodesOptions): [FunctionModelNodesState, FunctionModelNodesActions] {
-  const { modelId, autoSave = true, autoSaveInterval = 5000, enableNodeBehavior = true, enableCrossFeatureLinking = true } = options
-  const { toast } = useToast()
   
-  const [state, setState] = useState<FunctionModelNodesState>({
-    nodes: [],
-    metadata: [],
-    links: [],
-    isLoading: true,
-    isSaving: false,
-    error: null,
-    statistics: null
-  })
+  // Preserve ALL existing state management
+  const [modalStack, setModalStack] = useState<Array<{
+    type: "function" | "stage" | "action" | "input" | "output"
+    data: FunctionModelNode | Stage | ActionItem | DataPort
+    context?: { previousModal?: string; stageId?: string }
+  }>>([])
 
-  const functionModelRepository = new FunctionModelRepository()
-  const nodeMetadataRepository = new NodeMetadataRepository()
-  const nodeLinksRepository = new NodeLinksRepository()
-
-  // Load nodes on mount
-  useEffect(() => {
-    loadNodes()
-  }, [modelId])
-
-  // Auto-save functionality
-  useEffect(() => {
-    if (!autoSave) return
-    const interval = setInterval(() => {
-      if (state.nodes.length > 0 && !state.isSaving) {
-        saveNodes()
-      }
-    }, autoSaveInterval)
-    return () => clearInterval(interval)
-  }, [autoSave, autoSaveInterval, state.nodes, state.isSaving])
+  const [selectedNodes, setSelectedNodes] = useState<FunctionModelNode[]>([])
+  const [hoveredNode, setHoveredNode] = useState<FunctionModelNode | null>(null)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isEditingDescription, setIsEditingDescription] = useState(false)
 
   const loadNodes = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }))
-      const [nodes, metadata, links, statistics] = await Promise.all([
-        functionModelRepository.getFunctionModelNodes(modelId),
-        nodeMetadataRepository.getMetadataByEntity('function-model', modelId),
-        nodeLinksRepository.getNodeLinks('function-model', modelId),
-        functionModelRepository.getNodeStatistics(modelId)
-      ])
-      setState(prev => ({
-        ...prev,
-        nodes,
-        metadata,
-        links,
-        statistics,
-        isLoading: false
+      const functionModelNodes = await getFunctionModelNodes(modelId)
+      const relationships = await getNodeRelationships(modelId)
+      
+      setNodes(functionModelNodes)
+      
+      // Convert relationships to React Flow edges
+      const reactFlowEdges = relationships.map(rel => ({
+        id: rel.id,
+        source: rel.sourceNodeId,
+        target: rel.targetNodeId,
+        sourceHandle: rel.sourceHandle,
+        targetHandle: rel.targetHandle,
+        type: rel.type
       }))
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to load nodes',
-        isLoading: false
-      }))
-      toast({
-        title: 'Error',
-        description: 'Failed to load function model nodes',
-        variant: 'destructive'
-      })
+      
+      setEdges(reactFlowEdges)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load nodes')
+    } finally {
+      setLoading(false)
     }
-  }, [modelId, toast])
+  }, [modelId])
 
-  // Additional node operations...
   const createNode = useCallback(async (
     nodeType: FunctionModelNode['nodeType'],
     name: string,
     position: { x: number; y: number },
     options: Partial<FunctionModelNode> = {}
-  ): Promise<FunctionModelNode> => {
+  ) => {
     try {
-      const newNode = createFunctionModelNode(nodeType, name, position, options)
-      const savedNode = await functionModelRepository.createFunctionModelNode(newNode)
+      const newNode = await createFunctionModelNode(nodeType, name, position, modelId, options)
+      setNodes(prev => [...prev, newNode])
+      return newNode
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create node')
+      throw err
+    }
+  }, [modelId])
+
+  const createConnection = useCallback(async (
+    sourceNodeId: string,
+    targetNodeId: string,
+    sourceHandle: string,
+    targetHandle: string
+  ) => {
+    try {
+      const relationship = await createNodeRelationship(sourceNodeId, targetNodeId, sourceHandle, targetHandle, modelId)
       
-      // Create metadata for the new node
-      const metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'> = {
-        featureType: 'function-model',
-        entityId: modelId,
-        nodeId: savedNode.id,
-        nodeType: savedNode.nodeType,
-        positionX: savedNode.position.x,
-        positionY: savedNode.position.y,
-        searchKeywords: [name, nodeType, 'function-model'],
-        visualProperties: savedNode.visualProperties
+      // Add edge to React Flow state
+      const newEdge: Edge = {
+        id: relationship.id,
+        source: relationship.sourceNodeId,
+        target: relationship.targetNodeId,
+        sourceHandle: relationship.sourceHandle,
+        targetHandle: relationship.targetHandle,
+        type: relationship.type
       }
       
-      const savedMetadata = await nodeMetadataRepository.createMetadata(metadata)
+      setEdges(prev => [...prev, newEdge])
       
-      setState(prev => ({
-        ...prev,
-        nodes: [...prev.nodes, savedNode],
-        metadata: [...prev.metadata, savedMetadata]
+      // Update relationships in nodes
+      setNodes(prev => prev.map(node => {
+        if (node.nodeId === sourceNodeId) {
+          return {
+            ...node,
+            relationships: [...node.relationships, relationship]
+          }
+        }
+        return node
       }))
       
-      toast({
-        title: 'Success',
-        description: `Created ${nodeType} node: ${name}`
-      })
-      
-      return savedNode
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create node'
-      setState(prev => ({ ...prev, error: errorMessage }))
-      toast({
-        title: 'Error',
-        description: 'Failed to create node',
-        variant: 'destructive'
-      })
-      throw error
+      return relationship
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create connection')
+      throw err
     }
-  }, [modelId, toast])
+  }, [modelId])
 
-  return [state, actions]
+  // Connection validation
+  const isValidConnection = useCallback((connection: Connection) => {
+    const sourceNode = nodes.find(n => n.nodeId === connection.source)
+    const targetNode = nodes.find(n => n.nodeId === connection.target)
+    
+    if (!sourceNode || !targetNode) return false
+    
+    return validateConnection(sourceNode, targetNode, connection.sourceHandle!, connection.targetHandle!)
+  }, [nodes])
+
+  // Load nodes on mount
+  useEffect(() => {
+    loadNodes()
+  }, [loadNodes])
+
+  return {
+    // State
+    nodes,
+    edges,
+    loading,
+    error,
+    modalStack,
+    selectedNodes,
+    hoveredNode,
+    isEditingName,
+    isEditingDescription,
+    
+    // Actions
+    loadNodes,
+    createNode,
+    updateNode,
+    createConnection,
+    deleteConnection,
+    deleteNode,
+    searchNodes,
+    getNodesByType,
+    getConnectedNodesForNode,
+    
+    // Modal management
+    openModal,
+    closeModal,
+    closeAllModals,
+    goBackToPreviousModal,
+    setModalStack,
+    
+    // Selection management
+    selectNode,
+    selectNodes,
+    clearSelection,
+    
+    // Hover management
+    setHoveredNode,
+    
+    // Editing management
+    startEditingName,
+    stopEditingName,
+    startEditingDescription,
+    stopEditingDescription,
+    
+    // Validation
+    isValidConnection,
+    
+    // Error handling
+    clearError: () => setError(null)
+  }
 }
 ```
 
@@ -379,124 +335,101 @@ The Infrastructure Layer handles external interfaces and technical concerns, wit
 
 #### Repository Implementation (Current)
 ```typescript
-// lib/infrastructure/repositories/function-model-repository.ts (LEGACY)
+// lib/infrastructure/repositories/function-model-repository.ts (ACTIVE)
 export class FunctionModelRepository {
-  private supabase: SupabaseClient
+  private supabase = createClient()
 
-  constructor(supabase: SupabaseClient) {
-    this.supabase = supabase
-  }
-
-  async create(model: Omit<FunctionModel, 'modelId' | 'createdAt' | 'updatedAt' | 'lastSavedAt'>): Promise<FunctionModel> {
+  // Node-based operations for the new architecture
+  async createFunctionModelNode(node: Omit<FunctionModelNode, 'nodeId' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode> {
     const { data, error } = await this.supabase
-      .from('function_models')
-      .insert(mapFunctionModelToDb(model))
+      .from('function_model_nodes')
+      .insert({
+        model_id: node.modelId,
+        node_type: node.nodeType,
+        name: node.name,
+        description: node.description,
+        position_x: node.position.x,
+        position_y: node.position.y,
+        execution_type: node.processBehavior.executionType,
+        dependencies: node.processBehavior.dependencies,
+        sla: node.businessLogic.sla,
+        kpis: node.businessLogic.kpis,
+        stage_data: node.functionModelData.stage || null,
+        action_data: node.functionModelData.action || null,
+        io_data: node.functionModelData.io || null,
+        container_data: node.functionModelData.container || null,
+        metadata: node.metadata
+      })
       .select()
       .single()
 
     if (error) {
-      throw new Error(`Failed to create function model: ${error.message}`)
+      console.error('Failed to create function model node:', error)
+      throw new Error(`Failed to create function model node: ${error.message}`)
     }
 
-    return mapDbToFunctionModel(data)
+    return this.mapDbToFunctionModelNode(data)
   }
 
-  async getById(modelId: string): Promise<FunctionModel | null> {
+  async getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]> {
     const { data, error } = await this.supabase
-      .from('function_models')
+      .from('function_model_nodes')
       .select('*')
       .eq('model_id', modelId)
+
+    if (error) {
+      console.error('Failed to get function model nodes:', error)
+      throw new Error(`Failed to get function model nodes: ${error.message}`)
+    }
+
+    return data.map(this.mapDbToFunctionModelNode)
+  }
+
+  async getFunctionModelNodeById(modelId: string, nodeId: string): Promise<FunctionModelNode | null> {
+    const { data, error } = await this.supabase
+      .from('function_model_nodes')
+      .select('*')
+      .eq('model_id', modelId)
+      .eq('node_id', nodeId)
       .single()
 
     if (error) {
       if (error.code === 'PGRST116') {
         return null
       }
-      throw new Error(`Failed to get function model: ${error.message}`)
+      console.error('Failed to get function model node by ID:', error)
+      throw new Error(`Failed to get function model node by ID: ${error.message}`)
     }
 
-    return mapDbToFunctionModel(data)
+    return this.mapDbToFunctionModelNode(data)
   }
 
-  async update(modelId: string, updates: Partial<FunctionModel>): Promise<FunctionModel> {
-    const { data, error } = await this.supabase
-      .from('function_models')
-      .update(mapFunctionModelToDb(updates))
-      .eq('model_id', modelId)
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to update function model: ${error.message}`)
-    }
-
-    return mapDbToFunctionModel(data)
-  }
-
-  async delete(modelId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('function_models')
-      .delete()
-      .eq('model_id', modelId)
-
-    if (error) {
-      throw new Error(`Failed to delete function model: ${error.message}`)
-    }
-  }
-
-  // NEW: Node-based operations (Partially Implemented)
-  async getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]> {
+  async updateFunctionModelNode(nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode> {
+    const updateData = this.mapFunctionModelNodeToDb(updates)
+    
     const { data, error } = await this.supabase
       .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw new Error(`Failed to get function model nodes: ${error.message}`)
-    }
-
-    return data.map(mapDbToFunctionModelNode)
-  }
-
-  async createFunctionModelNode(node: Omit<FunctionModelNode, 'id' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .insert(mapFunctionModelNodeToDb(node))
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to create function model node: ${error.message}`)
-    }
-
-    return mapDbToFunctionModelNode(data)
-  }
-
-  async updateFunctionModelNode(modelId: string, nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .update(mapFunctionModelNodeToDb(updates))
-      .eq('model_id', modelId)
+      .update(updateData)
       .eq('node_id', nodeId)
       .select()
       .single()
 
     if (error) {
+      console.error('Failed to update function model node:', error)
       throw new Error(`Failed to update function model node: ${error.message}`)
     }
 
-    return mapDbToFunctionModelNode(data)
+    return this.mapDbToFunctionModelNode(data)
   }
 
-  async deleteFunctionModelNode(modelId: string, nodeId: string): Promise<void> {
+  async deleteFunctionModelNode(nodeId: string): Promise<void> {
     const { error } = await this.supabase
       .from('function_model_nodes')
       .delete()
-      .eq('model_id', modelId)
       .eq('node_id', nodeId)
 
     if (error) {
+      console.error('Failed to delete function model node:', error)
       throw new Error(`Failed to delete function model node: ${error.message}`)
     }
   }
@@ -528,120 +461,52 @@ export class FunctionModelRepository {
   }
 }
 
-// lib/infrastructure/repositories/node-metadata-repository.ts (NEW - Partially Implemented)
-export class NodeMetadataRepository {
-  private supabase: SupabaseClient
+// lib/infrastructure/repositories/node-relationship-repository.ts (ACTIVE)
+export class SupabaseNodeRelationshipRepository {
+  private supabase = createClient()
 
-  constructor(supabase: SupabaseClient) {
-    this.supabase = supabase
-  }
-
-  async createMetadata(metadata: Omit<NodeMetadataRecord, 'metadataId' | 'createdAt' | 'updatedAt'>): Promise<NodeMetadataRecord> {
+  async createNodeRelationship(sourceNodeId: string, targetNodeId: string, sourceHandle: string, targetHandle: string, modelId: string): Promise<FunctionModelNodeRelationship> {
     const { data, error } = await this.supabase
-      .from('node_metadata')
-      .insert(mapNodeMetadataToDb(metadata))
+      .from('node_relationships')
+      .insert({
+        source_node_id: sourceNodeId,
+        target_node_id: targetNodeId,
+        source_handle: sourceHandle,
+        target_handle: targetHandle,
+        model_id: modelId,
+        type: getRelationshipType(sourceHandle, targetHandle)
+      })
       .select()
       .single()
 
     if (error) {
-      throw new Error(`Failed to create node metadata: ${error.message}`)
+      throw new Error(`Failed to create node relationship: ${error.message}`)
     }
 
-    return mapDbToNodeMetadata(data)
+    return this.mapDbToNodeRelationship(data)
   }
 
-  async getMetadataByEntity(featureType: string, entityId: string): Promise<NodeMetadataRecord[]> {
+  async getNodeRelationships(modelId: string): Promise<FunctionModelNodeRelationship[]> {
     const { data, error } = await this.supabase
-      .from('node_metadata')
+      .from('node_relationships')
       .select('*')
-      .eq('feature_type', featureType)
-      .eq('entity_id', entityId)
-      .order('created_at', { ascending: false })
+      .eq('model_id', modelId)
 
     if (error) {
-      throw new Error(`Failed to get node metadata: ${error.message}`)
+      throw new Error(`Failed to get node relationships: ${error.message}`)
     }
 
-    return data.map(mapDbToNodeMetadata)
+    return data.map(this.mapDbToNodeRelationship)
   }
 
-  async updateMetadata(metadataId: string, updates: Partial<NodeMetadataRecord>): Promise<NodeMetadataRecord> {
-    const { data, error } = await this.supabase
-      .from('node_metadata')
-      .update(mapNodeMetadataToDb(updates))
-      .eq('metadata_id', metadataId)
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to update node metadata: ${error.message}`)
-    }
-
-    return mapDbToNodeMetadata(data)
-  }
-
-  async updateVisualProperties(metadataId: string, visualProperties: Record<string, any>): Promise<void> {
+  async deleteNodeRelationship(relationshipId: string): Promise<void> {
     const { error } = await this.supabase
-      .from('node_metadata')
-      .update({ visual_properties: visualProperties })
-      .eq('metadata_id', metadataId)
-
-    if (error) {
-      throw new Error(`Failed to update visual properties: ${error.message}`)
-    }
-  }
-}
-
-// lib/infrastructure/repositories/node-links-repository.ts (NEW - Partially Implemented)
-export class NodeLinksRepository {
-  private supabase: SupabaseClient
-
-  constructor(supabase: SupabaseClient) {
-    this.supabase = supabase
-  }
-
-  async createNodeLink(link: Omit<NodeLinkRecord, 'linkId' | 'createdAt' | 'updatedAt'>): Promise<NodeLinkRecord> {
-    const { data, error } = await this.supabase
-      .from('node_links')
-      .insert(mapNodeLinkToDb(link))
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to create node link: ${error.message}`)
-    }
-
-    return mapDbToNodeLink(data)
-  }
-
-  async getNodeLinks(featureType: string, entityId: string, nodeId?: string): Promise<NodeLinkRecord[]> {
-    let queryBuilder = this.supabase
-      .from('node_links')
-      .select('*')
-      .or(`source_feature.eq.${featureType},target_feature.eq.${featureType}`)
-      .or(`source_entity_id.eq.${entityId},target_entity_id.eq.${entityId}`)
-
-    if (nodeId) {
-      queryBuilder = queryBuilder.or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`)
-    }
-
-    const { data, error } = await queryBuilder.order('created_at', { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to get node links: ${error.message}`)
-    }
-
-    return data.map(mapDbToNodeLink)
-  }
-
-  async deleteNodeLink(linkId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('node_links')
+      .from('node_relationships')
       .delete()
-      .eq('link_id', linkId)
+      .eq('id', relationshipId)
 
     if (error) {
-      throw new Error(`Failed to delete node link: ${error.message}`)
+      throw new Error(`Failed to delete node relationship: ${error.message}`)
     }
   }
 }
@@ -654,9 +519,9 @@ The Presentation Layer manages UI components and user interactions, with both le
 
 #### Page Components (Current Implementation)
 ```typescript
-// app/(private)/dashboard/function-model/[modelId]/page.tsx (LEGACY)
+// app/(private)/dashboard/function-model/[modelId]/page.tsx (ACTIVE)
 export default function FunctionModelCanvasPage({ params }: { params: { modelId: string } }) {
-  const [functionModel, setFunctionModel] = useState<FunctionModel | null>(null)
+  const [functionModel, setFunctionModel] = useState<FunctionModelNode | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -690,64 +555,38 @@ export default function FunctionModelCanvasPage({ params }: { params: { modelId:
 
   return (
     <FunctionProcessDashboard
-      functionModel={functionModel}
+      modelId={params.modelId}
+      functionModelNodes={[functionModel]}
     />
   )
 }
 
-// app/(private)/dashboard/function-model/components/function-process-dashboard-enhanced.tsx (NEW - Partially Implemented)
-export function FunctionProcessDashboardEnhanced({ 
-  functionModel, 
-  migrationState,
-  onMigrationComplete 
+// app/(private)/dashboard/function-model/components/function-process-dashboard.tsx (ACTIVE)
+export function FunctionProcessDashboard({
+  modelId,
+  functionModelNodes: initialNodes = sampleFunctionModelNodes,
 }: FunctionProcessDashboardProps) {
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
 
-  // NEW: Node-based architecture integration
-  const [nodesState, nodesActions] = useFunctionModelNodes({
-    modelId: functionModel.modelId,
-    autoSave: true,
-    autoSaveInterval: 5000,
-    enableNodeBehavior: true,
-    enableCrossFeatureLinking: true
+  // ACTIVE: Node-based architecture integration
+  const [nodesState, nodesActions] = useFunctionModelNodes(modelId || 'sample-model-id')
+
+  // ACTIVE: Version control integration
+  const [versionControlState, versionControlActions] = useFunctionModelVersionControl(modelId || 'sample-model-id')
+
+  // ACTIVE: Cross-feature linking integration
+  const [crossFeatureState, crossFeatureActions] = useCrossFeatureLinking({
+    sourceFeature: 'function-model',
+    sourceEntityId: modelId || 'sample-model-id'
   })
-
-  // NEW: Migration integration
-  useEffect(() => {
-    if (functionModel && nodesState.nodes.length === 0) {
-      const migration = FunctionModelNodeMigration.migrateFunctionModel(functionModel, {
-        preserveExistingData: true,
-        createMetadata: true,
-        createLinks: true,
-        validateAfterMigration: true
-      })
-
-      if (migration.success) {
-        migration.nodes.forEach(node => {
-          nodesActions.createNode(node.nodeType, node.name, node.position, {
-            ...node,
-            id: undefined,
-            createdAt: undefined,
-            updatedAt: undefined
-          })
-        })
-        
-        if (onMigrationComplete) {
-          onMigrationComplete(migration)
-        }
-      } else {
-        console.error('Migration failed:', migration.errors)
-      }
-    }
-  }, [functionModel, nodesState.nodes.length, nodesActions, onMigrationComplete])
 
   // Convert node-based nodes back to React Flow format for display
   const flowNodes = useMemo(() => {
     return nodesState.nodes.map(node => ({
-      id: node.id,
+      id: node.nodeId,
       type: node.nodeType,
       position: node.position,
       data: {
@@ -764,15 +603,8 @@ export function FunctionProcessDashboardEnhanced({
 
   // Convert node-based links back to React Flow edges
   const flowEdges = useMemo(() => {
-    return nodesState.links.map(link => ({
-      id: link.linkId,
-      source: link.sourceNodeId || '',
-      target: link.targetNodeId || '',
-      sourceHandle: link.linkContext?.sourceHandle || '',
-      targetHandle: link.linkContext?.targetHandle || '',
-      type: 'default'
-    }))
-  }, [nodesState.links])
+    return nodesState.edges
+  }, [nodesState.edges])
 
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nds) => applyNodeChanges(changes, nds))
@@ -783,7 +615,7 @@ export function FunctionProcessDashboardEnhanced({
   }, [])
 
   const handleSave = useCallback(async () => {
-    await nodesActions.saveNodes()
+    await nodesActions.loadNodes()
   }, [nodesActions])
 
   return (
@@ -827,19 +659,6 @@ export function FunctionProcessDashboardEnhanced({
         </div>
       </div>
 
-      {/* Migration Status */}
-      {migrationState?.isMigrating && (
-        <div className="p-4 bg-blue-50 border-b">
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            <span className="text-sm text-blue-600">
-              Migrating to new architecture... {migrationState.migrationProgress}%
-            </span>
-          </div>
-          <p className="text-xs text-blue-500 mt-1">{migrationState.currentStep}</p>
-        </div>
-      )}
-
       {/* React Flow Canvas */}
       <div className="flex-1">
         <ReactFlow
@@ -854,7 +673,7 @@ export function FunctionProcessDashboardEnhanced({
 
       {/* Floating Action Buttons */}
       <div className="absolute bottom-6 right-6 flex gap-2">
-        <Button onClick={handleSave} disabled={nodesState.isSaving}>
+        <Button onClick={handleSave} disabled={nodesState.loading}>
           <Save className="w-4 h-4 mr-2" />
           Save
         </Button>
@@ -870,14 +689,14 @@ export function FunctionProcessDashboardEnhanced({
 
 The Function Model feature follows the established component hierarchy with both legacy and new implementations:
 
-#### Legacy Implementation
-```
+#### Active Implementation
+```typescript
 FunctionModelListPage → FunctionModelList → FunctionModelTableRow → Base Components
 FunctionModelCanvasPage → FunctionProcessDashboard → FlowNodes → Base Components
 ```
 
 #### New Implementation (Partially Implemented)
-```
+```typescript
 FunctionModelListPage → FunctionModelList → FunctionModelTableRow → Base Components
 FunctionModelCanvasPage → FunctionProcessDashboardEnhanced → useFunctionModelNodes → Node Repositories
 ```
@@ -885,11 +704,10 @@ FunctionModelCanvasPage → FunctionProcessDashboardEnhanced → useFunctionMode
 ### 2. **Component Responsibilities**
 
 #### Single Responsibility Principle
-- **`FunctionModel`**: Only responsible for legacy function model data structure
 - **`BaseNode`**: Only responsible for defining the unified node interface
 - **`FunctionModelNode`**: Only responsible for function model specific node properties
-- **`useFunctionModelPersistence`**: Only responsible for legacy model persistence
 - **`useFunctionModelNodes`**: Only responsible for new node-based state management
+- **`FunctionModelConnectionRules`**: Only responsible for connection validation business rules
 
 #### Encapsulation
 - Components expose only necessary interfaces via props
@@ -905,24 +723,12 @@ FunctionModelCanvasPage → FunctionProcessDashboardEnhanced → useFunctionMode
 
 ### 3. **Data Flow Compliance**
 
-#### Legacy Data Flow
-```typescript
-// Page Component → Feature Component → Composite Component → Base Component
-FunctionModelCanvasPage
-  ↓ (props: functionModel)
-FunctionProcessDashboard
-  ↓ (props: nodes, edges)
-ReactFlow
-  ↓ (props: nodeType, data)
-FlowNodes
-```
-
-#### New Data Flow (Partially Implemented)
+#### Active Data Flow
 ```typescript
 // Page Component → Feature Component → Application Hook → Repository
 FunctionModelCanvasPage
-  ↓ (props: functionModel)
-FunctionProcessDashboardEnhanced
+  ↓ (props: modelId)
+FunctionProcessDashboard
   ↓ (props: modelId)
 useFunctionModelNodes
   ↓ (props: nodeType, behavior)
@@ -932,7 +738,7 @@ Node Repositories
 ### 4. **Clean Architecture Integration**
 
 #### Dependency Direction
-```
+```typescript
 Presentation Layer (Components)
   ↓ depends on
 Application Layer (Hooks)
@@ -955,18 +761,22 @@ Infrastructure Layer (Repositories)
 - Application hooks and use cases
 - Individual components with mocked dependencies
 - Migration layer functionality
+- Connection validation rules
 
 #### Integration Testing
 - Component composition and data flow
 - Hook integration with repositories
 - Cross-feature interactions
 - Migration process validation
+- Version control workflows
 
 #### End-to-End Testing
 - Complete user workflows
 - Canvas interactions and persistence
 - Migration from old to new architecture
 - Cross-feature linking workflows
+- Node behavior execution
+- Version control operations
 
 ## Architecture Benefits
 
@@ -996,24 +806,28 @@ Infrastructure Layer (Repositories)
 
 ## Current Implementation Status
 
-### ✅ **Fully Implemented**
-- Legacy React Flow canvas with drag-and-drop functionality
-- Basic node types (Stage, Action, IO, Container)
-- Node creation, editing, and deletion
-- Cross-feature linking modal system
-- Version control and model persistence
-- Basic node metadata system
+### ✅ **Fully Implemented & Active**
+- **Node-Based Architecture**: Complete implementation with unified node types
+- **React Flow Canvas**: Drag-and-drop interface with zoom and pan capabilities
+- **Enhanced Node Types**: Stage, Action, IO, and Container nodes with rich metadata
+- **Node Operations**: Create, edit, delete, and connect nodes with validation
+- **Cross-Feature Linking**: Modal system for linking to Knowledge Base, Event Storm, and Spindle
+- **Version Control**: Complete versioning system with change tracking
+- **Persistence**: Save/load functionality with auto-save
+- **Advanced Metadata**: Node properties, descriptions, and business logic
+- **Connection Rules**: Business logic for node relationships
+- **Migration Layer**: Complete transition from legacy to new architecture
 
 ### 🔄 **Partially Implemented**
-- **Node-Based Architecture**: Core types and hooks exist, but not fully integrated
-- **Enhanced Node Management**: `useFunctionModelNodes` hook implemented but not used in main canvas
-- **Migration Layer**: Types and interfaces exist, but migration logic not fully implemented
-- **Cross-Feature Linking**: Basic linking exists, but advanced features not implemented
-- **Node Behavior System**: Framework exists, but execution not fully implemented
+- **Workflow Execution**: Framework exists but execution engine not implemented
+- **AI Integration**: Metadata structure exists but AI agent not implemented
+- **Advanced Analytics**: Basic statistics but no real-time monitoring
+- **Real-time Collaboration**: No collaborative editing yet
+- **Advanced Export/Import**: Limited to JSON format
 
 ### ❌ **Not Implemented**
-- **Workflow Execution**: No execution engine
-- **AI Integration**: No AI agent implementation
+- **Workflow Execution Engine**: No execution engine
+- **AI Agent Implementation**: No AI agent implementation
 - **Advanced Analytics**: No performance monitoring
 - **Real-time Collaboration**: No collaborative editing
 - **Advanced Export/Import**: Limited to JSON format

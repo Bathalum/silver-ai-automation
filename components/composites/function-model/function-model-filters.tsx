@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Search, Filter, X } from 'lucide-react'
-import type { FunctionModelFilters } from '@/lib/domain/entities/function-model-types'
+// FunctionModelFilters type is now defined inline
 
 interface FunctionModelFiltersProps {
   filters: FunctionModelFilters

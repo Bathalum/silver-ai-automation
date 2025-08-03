@@ -8,15 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Clock, User, FileText, AlertCircle, Download } from 'lucide-react'
-import { useFunctionModelVersionControl } from '@/lib/application/hooks/use-function-model-persistence'
-import { type FunctionModel } from '@/lib/domain/entities/function-model-types'
-import { type VersionEntry } from '@/lib/domain/entities/version-control-types'
+import { useFunctionModelVersionControl } from '@/lib/application/hooks/use-function-model-version-control'
+import { type FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
 
 interface LoadModelDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   modelId: string
-  onLoad: (model: FunctionModel) => void
+  onLoad: (model: FunctionModelNode) => void
 }
 
 export function LoadModelDialog({ 
@@ -35,8 +34,7 @@ export function LoadModelDialog({
     versions: versionHistory, 
     loading, 
     error, 
-    loadVersions: loadVersions, 
-    getVersion 
+    loadVersions: loadVersions
   } = useFunctionModelVersionControl(modelId)
 
   useEffect(() => {
@@ -63,18 +61,13 @@ export function LoadModelDialog({
   }
 
   const handleLoad = async () => {
-    if (!selectedVersion) return
+    if (!selectedVersion || !selectedVersionData) return
 
     try {
       setLoadingVersion(true)
-      const model = await getVersion(selectedVersion)
-      if (model) {
-        console.log('Loading version:', selectedVersion, model)
-        onLoad(model)
-      } else {
-        console.error('No model returned for version:', selectedVersion)
-        alert('Failed to load version: No model data returned')
-      }
+      // For now, just pass the version data directly
+      // TODO: Implement proper version loading
+      onLoad(selectedVersionData.snapshot as any)
     } catch (err) {
       console.error('Failed to load model:', err)
       alert(`Failed to load version: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -120,9 +113,6 @@ export function LoadModelDialog({
                     <SelectItem key={version.version} value={version.version}>
                       <div className="flex items-center gap-2">
                         <span>v{version.version}</span>
-                        {version.isPublished && (
-                          <Badge variant="default" className="text-xs">Published</Badge>
-                        )}
                       </div>
                     </SelectItem>
                   ))
@@ -165,44 +155,32 @@ export function LoadModelDialog({
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatDate(selectedVersionData.timestamp)}</span>
+                    <span>{formatDate(selectedVersionData.createdAt)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedVersionData.author}</span>
+                    <span>{selectedVersionData.createdBy || 'Unknown'}</span>
                   </div>
                 </div>
 
-                {/* Changes List */}
-                {selectedVersionData.changes.length > 0 && (
+                {/* Change Summary */}
+                {selectedVersionData.changeSummary && (
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Changes in this version:</h4>
-                    <div className="space-y-1">
-                      {selectedVersionData.changes.map((change: any, index: number) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          <Badge variant="outline" className="text-xs">
-                            {getChangeTypeDescription(change.changeType)}
-                          </Badge>
-                          <span className="text-muted-foreground">{change.description}</span>
-                        </div>
-                      ))}
+                    <h4 className="font-medium text-sm">Change Summary:</h4>
+                    <div className="text-sm text-muted-foreground">
+                      {selectedVersionData.changeSummary}
                     </div>
                   </div>
                 )}
 
                 {/* Snapshot Info */}
-                {selectedVersionData.snapshot && (
-                  <div className="p-3 bg-muted rounded-lg">
-                    <h4 className="font-medium text-sm mb-2">Snapshot Details</h4>
-                    <div className="space-y-1 text-sm text-muted-foreground">
-                      <div>Nodes: {selectedVersionData.snapshot.nodesData?.length || 0}</div>
-                      <div>Connections: {selectedVersionData.snapshot.edgesData?.length || 0}</div>
-                      {selectedVersionData.snapshot.metadata?.category && (
-                        <div>Category: {selectedVersionData.snapshot.metadata.category}</div>
-                      )}
-                    </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <h4 className="font-medium text-sm mb-2">Snapshot Details</h4>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <div>Nodes: {selectedVersionData.nodes?.length || 0}</div>
+                    <div>Connections: {selectedVersionData.edges?.length || 0}</div>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -222,22 +200,19 @@ export function LoadModelDialog({
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">v{version.version}</span>
-                            {version.isPublished && (
-                              <Badge variant="default" className="text-xs">Published</Badge>
-                            )}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {formatDate(version.timestamp)}
+                            {formatDate(version.createdAt)}
                           </div>
                         </div>
-                        {version.changes.length > 0 && (
+                        {version.changeSummary && (
                           <div className="mt-2 text-sm text-muted-foreground">
-                            {version.changes[0]?.description}
+                            {version.changeSummary}
                           </div>
                         )}
-                                             </CardContent>
-                     </Card>
-                   ))}
+                      </CardContent>
+                    </Card>
+                  ))}
               </div>
             </div>
           )}

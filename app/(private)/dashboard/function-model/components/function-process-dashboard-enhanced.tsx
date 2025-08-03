@@ -9,14 +9,14 @@ import { StageNodeModal } from "@/components/composites/stage-node-modal"
 import { ActionModal } from "@/components/composites/action-modal"
 import { FunctionModelModal } from "@/components/composites/function-model-modal"
 import { StageNode, IONode, ActionTableNode, FunctionModelContainerNode } from "./flow-nodes"
-import { SaveLoadPanel } from "@/components/composites/function-model/save-load-panel"
+// SaveLoadPanel removed - using node-based persistence instead
 import { CrossFeatureLinkingModal } from "@/components/composites/cross-feature-linking-modal"
-import type { FunctionModel, Stage, ActionItem, DataPort, NodeData } from "@/lib/domain/entities/function-model-types"
+import type { FunctionModelNode, Stage, ActionItem, DataPort } from "@/lib/domain/entities/function-model-node-types"
 import type { BackgroundVariant } from "reactflow"
 import { addEdge, type Connection, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, type Node } from "reactflow"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
-import type { NodeRelationship } from "@/lib/domain/entities/function-model-types"
+import type { NodeRelationship } from "@/lib/domain/entities/unified-node-types"
 import { IONodeModal } from "@/components/composites/io-node-modal"
 
 // NEW: Import node-based architecture components

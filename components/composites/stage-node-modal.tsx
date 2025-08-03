@@ -11,7 +11,7 @@ import { ModeSelector, getRowsForMode, ModeType } from "./shared/mode-selector"
 import { useModalForm } from "@/hooks/use-modal-form"
 import { NavigationTabContent } from "./shared/navigation-tab-content"
 
-import type { Stage, ActionItem, NodeRelationship } from "@/lib/domain/entities/function-model-types"
+import type { Stage, ActionItem, NodeRelationship } from "@/lib/domain/entities/unified-node-types"
 
 // Define a minimal Action type inline
 interface Action {
