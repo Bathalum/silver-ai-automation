@@ -1,8 +1,8 @@
 import { FunctionModelRepository } from '../repositories/function-model-repository'
 import { NodeMetadataRepository } from '../repositories/node-metadata-repository'
 import { NodeLinksRepository } from '../repositories/node-links-repository'
-import { FunctionModelNode, NodeLink, NodeBehavior, ExecutionResult, ValidationResult } from '@/lib/domain/entities/function-model-node-types'
-import { NodeBehaviorFactory } from '@/lib/domain/entities/function-model-node-types'
+import { FunctionModelNode, NodeLink } from '@/lib/domain/entities/function-model-node-types'
+import { NodeBehavior, ExecutionResult, ValidationResult, NodeBehaviorFactory } from '@/lib/domain/entities/node-behavior-types'
 
 export class UnifiedNodeOperations {
   private functionModelRepository: FunctionModelRepository

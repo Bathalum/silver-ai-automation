@@ -226,7 +226,7 @@ export function useFunctionModelNodes(modelId: string) {
   }, [])
 
   // Node hover management
-  const setHoveredNode = useCallback((node: FunctionModelNode | null) => {
+  const setHoveredNodeCallback = useCallback((node: FunctionModelNode | null) => {
     setHoveredNode(node)
   }, [])
 
@@ -298,7 +298,7 @@ export function useFunctionModelNodes(modelId: string) {
     clearSelection,
     
     // Hover management
-    setHoveredNode,
+    setHoveredNode: setHoveredNodeCallback,
     
     // Editing management
     startEditingName,
