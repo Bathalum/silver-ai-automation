@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ReactFlowProvider, ReactFlow, Controls, Background, useNodesState, useEdgesState, type Node } from "reactflow"
+import { ReactFlowProvider, ReactFlow, Controls, Background, useNodesState, useEdgesState } from "reactflow"
 import "reactflow/dist/style.css"
 import { Layers, Zap, Hammer, ArrowLeftRight, Settings, Save, Link, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react"
 import { StageNodeModal } from "@/components/composites/stage-node-modal"
@@ -11,9 +11,9 @@ import { FunctionModelModal } from "@/components/composites/function-model-modal
 import { StageNode, IONode, ActionTableNode, FunctionModelContainerNode } from "./flow-nodes"
 import { SaveLoadPanel } from "@/components/composites/function-model/save-load-panel"
 import { CrossFeatureLinkingModal } from "@/components/composites/cross-feature-linking-modal"
-import type { FunctionModel, Stage, ActionItem, DataPort } from "@/lib/domain/entities/function-model-types"
+import type { FunctionModel, Stage, ActionItem, DataPort, NodeData } from "@/lib/domain/entities/function-model-types"
 import type { BackgroundVariant } from "reactflow"
-import { addEdge, type Connection, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge } from "reactflow"
+import { addEdge, type Connection, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, type Node } from "reactflow"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import type { NodeRelationship } from "@/lib/domain/entities/function-model-types"
@@ -35,6 +35,36 @@ const generateUUID = (): string => {
   });
 };
 
+// Helper functions to convert between data formats
+const convertToReactFlowNode = (nodeData: any): Node => {
+  return {
+    id: nodeData.id,
+    type: nodeData.type,
+    position: nodeData.position,
+    data: nodeData.data,
+    ...(nodeData.parentNode && { parentNode: nodeData.parentNode }),
+    ...(nodeData.extent && { extent: nodeData.extent }),
+    ...(nodeData.draggable !== undefined && { draggable: nodeData.draggable }),
+    ...(nodeData.selectable !== undefined && { selectable: nodeData.selectable }),
+    ...(nodeData.deletable !== undefined && { deletable: nodeData.deletable }),
+    ...(nodeData.width && { width: nodeData.width }),
+    ...(nodeData.height && { height: nodeData.height })
+  };
+};
+
+const convertToReactFlowEdge = (edgeData: any): Edge => {
+  return {
+    id: edgeData.id,
+    source: edgeData.source,
+    target: edgeData.target,
+    ...(edgeData.sourceHandle && { sourceHandle: edgeData.sourceHandle }),
+    ...(edgeData.targetHandle && { targetHandle: edgeData.targetHandle }),
+    ...(edgeData.type && { type: edgeData.type }),
+    ...(edgeData.animated !== undefined && { animated: edgeData.animated }),
+    ...(edgeData.style && { style: edgeData.style })
+  };
+};
+
 // Sample data for initial state
 const sampleFunctionModel: FunctionModel = {
   modelId: 'sample-model-id', // Use a consistent ID for sample model
@@ -42,7 +72,49 @@ const sampleFunctionModel: FunctionModel = {
   description: "1 paragraph per goal that you want to achieve by the end of the process",
   version: "1.0.0",
   status: "draft",
-  nodesData: [],
+  nodesData: [
+    {
+      id: 'stage-1',
+      type: 'stageNode',
+      position: { x: 100, y: 100 },
+      data: {
+        label: 'Sample Stage',
+        type: 'stage',
+        description: 'This is a sample stage',
+        stageData: {
+          id: 'stage-1',
+          name: 'Sample Stage',
+          description: 'This is a sample stage',
+          position: { x: 100, y: 100 },
+          actions: [],
+          dataChange: [],
+          boundaryCriteria: [],
+          raci: {
+            inform: [],
+            consult: [],
+            accountable: [],
+            responsible: []
+          }
+        }
+      }
+    },
+    {
+      id: 'action-1',
+      type: 'actionTableNode',
+      position: { x: 300, y: 100 },
+      data: {
+        label: 'Sample Actions',
+        type: 'action',
+        description: 'This is a sample action table',
+        actionData: {
+          id: 'action-1',
+          name: 'Sample Action',
+          description: 'This is a sample action',
+          type: 'action'
+        }
+      }
+    }
+  ],
   edgesData: [],
   viewportData: { x: 0, y: 0, zoom: 1 },
   tags: [],
@@ -131,9 +203,14 @@ export function FunctionProcessDashboard({
           const { loadFunctionModel } = await import('@/lib/application/use-cases/function-model-persistence-use-cases')
           const loadedModel = await loadFunctionModel(functionModel.modelId, { includeMetadata: true })
           console.log('Model loaded successfully:', loadedModel)
+          console.log('Loaded model nodesData type:', typeof loadedModel.nodesData)
+          console.log('Loaded model nodesData length:', loadedModel.nodesData?.length)
+          console.log('Loaded model nodesData content:', JSON.stringify(loadedModel.nodesData, null, 2))
           setFunctionModel(loadedModel)
           
           // Update flow data with loaded model
+          console.log('Setting flow data with nodes:', loadedModel.nodesData)
+          console.log('Setting flow data with edges:', loadedModel.edgesData)
           setFlow(prev => ({
             ...prev,
             name: loadedModel.name,
@@ -266,23 +343,15 @@ export function FunctionProcessDashboard({
 
   // Navigate back to stage modal from action modal
   const navigateBackToStage = useCallback((stageId: string) => {
-    // First try to find the stage in functionModel.stages (for sample data)
-    let stage = functionModel.stages.find(s => s.id === stageId)
-    
-    // If not found in functionModel, look for it in flow nodes (for dynamically created stages)
-    if (!stage) {
-      const stageNode = flow.nodes.find(n => n.id === stageId && n.type === 'stageNode')
-      if (stageNode && stageNode.data.stage) {
-        stage = stageNode.data.stage
-      }
-    }
-    
-    if (stage) {
+    // Look for the stage in flow nodes (for dynamically created stages)
+    const stageNode = flow.nodes.find(n => n.id === stageId && n.type === 'stageNode')
+    if (stageNode && stageNode.data.stage) {
+      const stage = stageNode.data.stage
       setModalStack(prev => prev.filter(modal => modal.context?.stageId !== stageId))
       setSelectedStage(stage)
       setStageModalOpen(true)
     }
-  }, [functionModel.stages, flow.nodes])
+  }, [flow.nodes])
 
   // Helper to get node by id and type
   const getNodeById = (id: string) => flow.nodes.find((n) => n.id === id)
@@ -450,8 +519,6 @@ export function FunctionProcessDashboard({
             !(rel.sourceNodeId === edge.target && rel.targetNodeId === edge.source)
           )
           
-          let updatedStages = fm.stages;
-          
           // Handle Parent-Child relationship removal (StageNode ↔ ActionTableNode)
           let stageNode: Node | undefined, actionNode: Node | undefined
           if (sourceNode.type === "stageNode" && targetNode.type === "actionTableNode") {
@@ -463,16 +530,7 @@ export function FunctionProcessDashboard({
           }
           
           if (stageNode && actionNode) {
-            // Remove action id from stage's actions array (for sample data stages)
-            updatedStages = fm.stages.map((stage) => {
-              if (stage.id === stageNode!.id) {
-                const actions = (stage.actions || []).filter((id) => id !== actionNode!.id)
-                return { ...stage, actions }
-              }
-              return stage
-            })
-            
-            // Also update stage data in flow.nodes if it's a dynamically created stage
+            // Remove action id from stage's actions array (for dynamically created stages)
             setFlow((f) => {
               const updatedNodes = f.nodes.map((node) => {
                 if (node.id === stageNode!.id && node.type === 'stageNode' && node.data.stage) {
@@ -495,7 +553,7 @@ export function FunctionProcessDashboard({
             })
           }
           
-          return { ...fm, stages: updatedStages, relationships: updatedRelationships }
+          return { ...fm, relationships: updatedRelationships }
         })
       }
     })
@@ -1111,10 +1169,31 @@ export function FunctionProcessDashboard({
                   
                   setFunctionModel(updatedModel);
                   // Update flow data with loaded model
-                  const newFlow = {
+                  const newFlow: Flow = {
                     name: updatedModel.name,
-                    nodes: updatedModel.nodesData || [],
-                    edges: updatedModel.edgesData || [],
+                    nodes: (updatedModel.nodesData || []).map((nodeData: any) => ({
+                      id: nodeData.id,
+                      type: nodeData.type,
+                      position: nodeData.position,
+                      data: nodeData.data,
+                      ...(nodeData.parentNode && { parentNode: nodeData.parentNode }),
+                      ...(nodeData.extent && { extent: nodeData.extent }),
+                      ...(nodeData.draggable !== undefined && { draggable: nodeData.draggable }),
+                      ...(nodeData.selectable !== undefined && { selectable: nodeData.selectable }),
+                      ...(nodeData.deletable !== undefined && { deletable: nodeData.deletable }),
+                      ...(nodeData.width && { width: nodeData.width }),
+                      ...(nodeData.height && { height: nodeData.height })
+                    })),
+                    edges: (updatedModel.edgesData || []).map((edgeData: any) => ({
+                      id: edgeData.id,
+                      source: edgeData.source,
+                      target: edgeData.target,
+                      ...(edgeData.sourceHandle && { sourceHandle: edgeData.sourceHandle }),
+                      ...(edgeData.targetHandle && { targetHandle: edgeData.targetHandle }),
+                      ...(edgeData.type && { type: edgeData.type }),
+                      ...(edgeData.animated !== undefined && { animated: edgeData.animated }),
+                      ...(edgeData.style && { style: edgeData.style })
+                    })),
                     viewport: updatedModel.viewportData || { x: 0, y: 0, zoom: 1 }
                   };
                   console.log('Setting new flow:', newFlow);
@@ -1207,7 +1286,7 @@ export function FunctionProcessDashboard({
       {/* Render ActionModal from modal stack */}
       {modalStack.map((modal, index) => (
         <ActionModal
-          key={`${modal.type}-${modal.data.id}-${index}`}
+          key={`${modal.type}-${index}-${Date.now()}`}
           isOpen={true}
           onClose={() => {
             if (modal.context?.previousModal === 'stage' && modal.context?.stageId) {

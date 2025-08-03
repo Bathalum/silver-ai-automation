@@ -3,6 +3,7 @@
 
 import type { CrossFeatureLink } from './cross-feature-link-types'
 import type { VersionEntry, ChangeDescription, FunctionModelSnapshot } from './version-control-types'
+import type { Node, Edge } from 'reactflow'
 
 // NEW: Node-level linking types
 export interface NodeLinkedEntity {
@@ -21,8 +22,8 @@ export interface FunctionModel {
   status: 'draft' | 'published' | 'archived'
   
   // Visual representation (React Flow data)
-  nodesData: FunctionModelNode[]
-  edgesData: FunctionModelEdge[]
+  nodesData: Node[]
+  edgesData: Edge[]
   viewportData: Viewport
   
   // Function Model specific metadata
