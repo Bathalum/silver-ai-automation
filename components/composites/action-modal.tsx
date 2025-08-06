@@ -1,161 +1,187 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Plus } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
-import { Button } from "../ui/button"
-import { Input } from "../ui/input"
-import { Label } from "../ui/label"
-import { Textarea } from "../ui/textarea"
-import { Badge } from "../ui/badge"
-import { cn } from "../../lib/utils"
-import { SIDEBAR_ITEMS } from "./shared/constants"
-import { ModeSelector, ModeType } from "./shared/mode-selector"
-import { NavigationTabContent } from "./shared/navigation-tab-content"
-import type { ActionItem, TabType } from "../../lib/domain/entities/unified-node-types"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+
+export interface ActionItem {
+  id: string
+  name: string
+  description: string
+  type: string
+  status: 'pending' | 'in-progress' | 'completed' | 'failed'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  assignedTo?: string
+  dueDate?: Date
+  tags: string[]
+  metadata?: Record<string, any>
+}
+
+export type TabType = 'all' | 'pending' | 'in-progress' | 'completed' | 'failed'
 
 interface ActionModalProps {
   isOpen: boolean
   onClose: () => void
-  action: ActionItem
-  showBackButton?: boolean
-  onBackClick?: () => void
+  actions: ActionItem[]
+  onActionUpdate?: (actionId: string, updates: Partial<ActionItem>) => void
+  onActionDelete?: (actionId: string) => void
 }
 
-export function ActionModal({ 
-  isOpen, 
-  onClose, 
-  action, 
-  showBackButton = false, 
-  onBackClick 
+export function ActionModal({
+  isOpen,
+  onClose,
+  actions,
+  onActionUpdate,
+  onActionDelete
 }: ActionModalProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("details")
-  const [activeMode, setActiveMode] = useState<ModeType>("actions")
+  const [activeTab, setActiveTab] = useState<TabType>('all')
 
   if (!isOpen) return null
 
-  const renderDetailsTab = () => (
-    <div className="space-y-4">
-      <div>
-        <Label>Action Name</Label>
-        <Input value={action.name} readOnly />
-      </div>
-      <div>
-        <Label>Action ID</Label>
-        <Input value={action.id} readOnly />
-      </div>
-      <div>
-        <Label>Type</Label>
-        <Input value={action.type} readOnly />
-      </div>
-      <div>
-        <Label>Description</Label>
-        <Textarea value={action.description} readOnly />
-      </div>
-      
-      {/* Action Modes Section */}
-      <div>
-        <Label>Action Modes</Label>
-        <ModeSelector 
-          activeMode={activeMode}
-          onModeChange={setActiveMode}
-        />
-        <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
-          {activeMode === "actions" && (
-            <div className="space-y-2">
-              <div className="text-muted-foreground text-sm">Action details for: {action.name}</div>
-              <div className="flex items-center justify-between p-2 border rounded-md">
-                <span>Sample Action Item</span>
-                <Badge variant="default">action</Badge>
-              </div>
-            </div>
-          )}
-          {activeMode === "dataChange" && (
-            <div className="space-y-2">
-              <div className="text-muted-foreground text-sm">Data changes for: {action.name}</div>
-              <div className="flex items-center justify-between p-2 border rounded-md">
-                <span>Sample Data Change</span>
-                <Badge variant="outline">data change</Badge>
-              </div>
-            </div>
-          )}
-          {activeMode === "boundaryCriteria" && (
-            <div className="space-y-2">
-              <div className="text-muted-foreground text-sm">Boundary criteria for: {action.name}</div>
-              <div className="flex items-center justify-between p-2 border rounded-md">
-                <span>Sample Boundary Criteria</span>
-                <Badge variant="secondary">boundary</Badge>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+  const filteredActions = actions.filter(action => {
+    if (activeTab === 'all') return true
+    return action.status === activeTab
+  })
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "details":
-        return renderDetailsTab()
-      case "knowledge-base":
-        return <NavigationTabContent tabType="knowledge-base" onNavigate={() => {}} />
-      case "spindle":
-        return <NavigationTabContent tabType="spindle" onNavigate={() => {}} />
-      case "function-model":
-        return <NavigationTabContent tabType="function-model" onNavigate={() => {}} />
-      case "event-storm":
-        return <NavigationTabContent tabType="event-storm" onNavigate={() => {}} />
-      default:
-        return renderDetailsTab()
+  const getStatusColor = (status: ActionItem['status']) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800'
+      case 'in-progress': return 'bg-blue-100 text-blue-800'
+      case 'completed': return 'bg-green-100 text-green-800'
+      case 'failed': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPriorityColor = (priority: ActionItem['priority']) => {
+    switch (priority) {
+      case 'low': return 'bg-gray-100 text-gray-800'
+      case 'medium': return 'bg-blue-100 text-blue-800'
+      case 'high': return 'bg-orange-100 text-orange-800'
+      case 'critical': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
     }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-        <DialogHeader>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div className="p-6 border-b">
           <div className="flex items-center justify-between">
-            <DialogTitle>Action Details</DialogTitle>
-            {showBackButton && onBackClick && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onBackClick}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Stage
-              </Button>
-            )}
+            <h2 className="text-2xl font-bold">Action Management</h2>
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
           </div>
-        </DialogHeader>
-        <div className="flex h-[600px]">
-          {/* Sidebar */}
-          <div className="w-16 bg-gray-50 border-r flex flex-col items-center py-4 space-y-2">
-            {SIDEBAR_ITEMS.map((item) => {
-              const Icon = item.icon
-              return (
-                <Button
-                  key={item.id}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "w-12 h-12 p-0 flex flex-col items-center justify-center",
-                    activeTab === item.id ? "bg-blue-100 text-blue-600" : "text-gray-600 hover:text-gray-900",
-                  )}
-                  onClick={() => setActiveTab(item.id as TabType)}
-                  title={item.label}
-                >
-                  <Icon className="w-5 h-5" />
-                </Button>
-              )
-            })}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 p-6 overflow-y-auto">{renderContent()}</div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="p-6">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)}>
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="all">All ({actions.length})</TabsTrigger>
+              <TabsTrigger value="pending">
+                Pending ({actions.filter(a => a.status === 'pending').length})
+              </TabsTrigger>
+              <TabsTrigger value="in-progress">
+                In Progress ({actions.filter(a => a.status === 'in-progress').length})
+              </TabsTrigger>
+              <TabsTrigger value="completed">
+                Completed ({actions.filter(a => a.status === 'completed').length})
+              </TabsTrigger>
+              <TabsTrigger value="failed">
+                Failed ({actions.filter(a => a.status === 'failed').length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={activeTab} className="mt-6">
+              <div className="grid gap-4">
+                {filteredActions.map((action) => (
+                  <Card key={action.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{action.name}</CardTitle>
+                          <CardDescription className="mt-2">
+                            {action.description}
+                          </CardDescription>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <Badge className={getStatusColor(action.status)}>
+                            {action.status}
+                          </Badge>
+                          <Badge className={getPriorityColor(action.priority)}>
+                            {action.priority}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span>Type: {action.type}</span>
+                          {action.assignedTo && (
+                            <span>Assigned to: {action.assignedTo}</span>
+                          )}
+                          {action.dueDate && (
+                            <span>Due: {action.dueDate.toLocaleDateString()}</span>
+                          )}
+                        </div>
+                        
+                        {action.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {action.tags.map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        <Separator />
+
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onActionUpdate?.(action.id, { status: 'in-progress' })}
+                            disabled={action.status === 'in-progress'}
+                          >
+                            Start
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onActionUpdate?.(action.id, { status: 'completed' })}
+                            disabled={action.status === 'completed'}
+                          >
+                            Complete
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => onActionDelete?.(action.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {filteredActions.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No actions found for the selected filter.
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </div>
   )
 } 

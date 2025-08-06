@@ -11,17 +11,9 @@ import { SIDEBAR_ITEMS } from "./shared/constants"
 import { ModeSelector, getRowsForMode, ModeType } from "./shared/mode-selector"
 import { useModalForm } from "@/hooks/use-modal-form"
 import { NavigationTabContent } from "./shared/navigation-tab-content"
-import type { DataPort, NodeRelationship } from "@/lib/domain/entities/unified-node-types"
+import type { DataPort } from "@/lib/domain/entities/function-model-node-types"
 
-// Define a minimal Stage type inline
-interface Stage {
-  id: string
-  name: string
-  description?: string
-  actions?: string[]
-}
-
-// Define Action types to match StageNodeModal
+// Define Action types to match our node-based architecture
 interface Action {
   id: string
   modes?: {

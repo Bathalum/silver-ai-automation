@@ -10,7 +10,7 @@ export interface ConnectionRule {
 }
 
 export const FUNCTION_MODEL_CONNECTION_RULES: ConnectionRule[] = [
-  // ActionTableNode to StageNode/IONode (parent-child)
+  // ActionTableNode to StageNode/IONode (parent-child) - Action connects TO stage/IO
   {
     sourceHandle: 'header-source',
     targetHandle: 'bottom-target',
@@ -19,7 +19,7 @@ export const FUNCTION_MODEL_CONNECTION_RULES: ConnectionRule[] = [
     relationshipType: 'parent-child'
   },
   
-  // StageNode/IONode to StageNode/IONode (siblings)
+  // StageNode/IONode to StageNode/IONode (siblings) - Left to Right
   {
     sourceHandle: 'right-source',
     targetHandle: 'left-target',
@@ -35,6 +35,12 @@ export function validateConnection(
   sourceHandle: string,
   targetHandle: string
 ): boolean {
+  // Prevent self-connections
+  if (sourceNode.nodeId === targetNode.nodeId) {
+    return false
+  }
+  
+  // Check if this is a valid handle combination
   const rule = FUNCTION_MODEL_CONNECTION_RULES.find(r => 
     r.sourceHandle === sourceHandle && 
     r.targetHandle === targetHandle
@@ -53,17 +59,12 @@ export function validateConnection(
     return false
   }
   
-  // Prevent self-connections
-  if (sourceNode.nodeId === targetNode.nodeId) {
-    return false
-  }
-  
   // Prevent duplicate connections
-  const existingConnection = sourceNode.relationships.find(rel => 
-    rel.sourceNodeId === sourceNode.nodeId &&
-    rel.targetNodeId === targetNode.nodeId &&
-    rel.sourceHandle === sourceHandle &&
-    rel.targetHandle === targetHandle
+  const existingConnection = sourceNode.nodeLinks?.find(link => 
+    link.sourceNodeId === sourceNode.nodeId &&
+    link.targetNodeId === targetNode.nodeId &&
+    link.sourceHandle === sourceHandle &&
+    link.targetHandle === targetHandle
   )
   
   if (existingConnection) {

@@ -7,6 +7,7 @@ import {
   getFunctionModelVersions,
   getLatestFunctionModelVersion,
   deleteFunctionModelVersion,
+  restoreModelFromVersion,
   VersionEntry,
   VersionMetadata,
   compareVersions
@@ -17,6 +18,15 @@ export function useFunctionModelVersionControl(modelId: string) {
   const [currentVersion, setCurrentVersion] = useState<VersionEntry | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [restorationProgress, setRestorationProgress] = useState<{
+    isRestoring: boolean
+    progress: number
+    message: string
+  }>({
+    isRestoring: false,
+    progress: 0,
+    message: ''
+  })
 
   // Load all versions for the model
   const loadVersions = useCallback(async () => {
@@ -90,6 +100,82 @@ export function useFunctionModelVersionControl(modelId: string) {
       setLoading(false)
     }
   }, [modelId, versions])
+
+  // NEW: Complete version restoration with progress tracking
+  const restoreVersion = useCallback(async (
+    version: string,
+    options?: {
+      validateBeforeRestore?: boolean
+      backupCurrentState?: boolean
+      userContext?: string
+    }
+  ) => {
+    setRestorationProgress({
+      isRestoring: true,
+      progress: 0,
+      message: 'Starting version restoration...'
+    })
+    setError(null)
+
+    try {
+      // Step 1: Validation
+      setRestorationProgress(prev => ({
+        ...prev,
+        progress: 20,
+        message: 'Validating version data...'
+      }))
+
+      // Step 2: Backup current state (if requested)
+      if (options?.backupCurrentState) {
+        setRestorationProgress(prev => ({
+          ...prev,
+          progress: 40,
+          message: 'Backing up current state...'
+        }))
+      }
+
+      // Step 3: Perform restoration
+      setRestorationProgress(prev => ({
+        ...prev,
+        progress: 60,
+        message: 'Restoring model state...'
+      }))
+
+      const result = await restoreModelFromVersion(modelId, version, options)
+
+      if (result.success) {
+        setRestorationProgress(prev => ({
+          ...prev,
+          progress: 100,
+          message: `Restoration complete: ${result.restoredNodes} nodes, ${result.restoredEdges} edges restored`
+        }))
+
+        // Show warnings if any
+        if (result.warnings.length > 0) {
+          console.warn('Version restoration warnings:', result.warnings)
+        }
+
+        // Refresh versions list
+        await loadVersions()
+
+        return result
+      } else {
+        throw new Error(`Restoration failed: ${result.errors.join(', ')}`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restore version')
+      throw err
+    } finally {
+      // Clear restoration progress after a delay
+      setTimeout(() => {
+        setRestorationProgress({
+          isRestoring: false,
+          progress: 0,
+          message: ''
+        })
+      }, 2000)
+    }
+  }, [modelId, loadVersions])
 
   // Load the latest version
   const loadLatestVersion = useCallback(async () => {
@@ -204,11 +290,13 @@ export function useFunctionModelVersionControl(modelId: string) {
     currentVersion,
     loading,
     error,
+    restorationProgress,
     
     // Actions
     loadVersions,
     createVersion,
     loadVersion,
+    restoreVersion, // NEW: Complete restoration
     loadLatestVersion,
     deleteVersion,
     compareVersionsById,

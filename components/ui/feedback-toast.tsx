@@ -90,11 +90,11 @@ export function FeedbackToast({
   return (
     <div
       className={cn(
-        "fixed top-4 left-4 z-[9999] max-w-sm w-full p-4 rounded-lg border-2 shadow-2xl transition-all duration-300 ease-in-out backdrop-blur-sm",
+        "fixed bottom-4 right-4 z-[9999] max-w-sm w-full p-4 rounded-lg border-2 shadow-2xl transition-all duration-300 ease-in-out backdrop-blur-sm",
         config.bgColor,
         config.borderColor,
         config.glowColor,
-        "animate-in slide-in-from-left-full fade-in-0",
+        "animate-in slide-in-from-bottom-full fade-in-0",
         "hover:scale-105 transition-transform",
         className
       )}
@@ -185,7 +185,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   return (
     <FeedbackContext.Provider value={contextValue}>
       {children}
-      <div className="fixed top-4 left-4 z-[9999] space-y-2">
+      <div className="fixed bottom-4 right-4 z-[9999] space-y-2">
         {toasts.map((toast) => (
           <FeedbackToast
             key={toast.id}

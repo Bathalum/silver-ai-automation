@@ -8,13 +8,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, X, Save, Plus } from 'lucide-react'
+import { ModalData } from '@/lib/application/hooks/use-modal-management'
 
 interface ModalStackProps {
-  modals: Array<{
-    type: "function" | "stage" | "action" | "input" | "output"
-    data: any
-    context?: { previousModal?: string; stageId?: string }
-  }>
+  modals: ModalData[]
   onClose: () => void
   onGoBack: () => void
 }
@@ -80,11 +77,11 @@ export function ModalStack({ modals, onClose, onGoBack }: ModalStackProps) {
 
 // Modal Content Components
 function StageModalContent({ data }: { data: any }) {
-  const [name, setName] = React.useState(data.name || '')
-  const [description, setDescription] = React.useState(data.description || '')
-  const [actions, setActions] = React.useState(data.actions || [])
-  const [dataChanges, setDataChanges] = React.useState(data.dataChange || [])
-  const [boundaryCriteria, setBoundaryCriteria] = React.useState(data.boundaryCriteria || [])
+  const [name, setName] = React.useState(data?.name || '')
+  const [description, setDescription] = React.useState(data?.description || '')
+  const [actions, setActions] = React.useState(data?.actions || [])
+  const [dataChanges, setDataChanges] = React.useState(data?.dataChange || [])
+  const [boundaryCriteria, setBoundaryCriteria] = React.useState(data?.boundaryCriteria || [])
 
   return (
     <div className="space-y-4">
@@ -145,6 +142,76 @@ function StageModalContent({ data }: { data: any }) {
         </div>
       </div>
 
+      <div>
+        <Label>Data Changes</Label>
+        <div className="space-y-2 mt-2">
+          {dataChanges.map((change: string, index: number) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                value={change}
+                onChange={(e) => {
+                  const newChanges = [...dataChanges]
+                  newChanges[index] = e.target.value
+                  setDataChanges(newChanges)
+                }}
+                placeholder="Enter data change"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDataChanges(dataChanges.filter((_, i) => i !== index))}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDataChanges([...dataChanges, ''])}
+            className="w-full"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Data Change
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <Label>Boundary Criteria</Label>
+        <div className="space-y-2 mt-2">
+          {boundaryCriteria.map((criteria: string, index: number) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                value={criteria}
+                onChange={(e) => {
+                  const newCriteria = [...boundaryCriteria]
+                  newCriteria[index] = e.target.value
+                  setBoundaryCriteria(newCriteria)
+                }}
+                placeholder="Enter boundary criteria"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setBoundaryCriteria(boundaryCriteria.filter((_, i) => i !== index))}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBoundaryCriteria([...boundaryCriteria, ''])}
+            className="w-full"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Boundary Criteria
+          </Button>
+        </div>
+      </div>
+
       <div className="flex gap-2">
         <Button className="flex-1">
           <Save className="w-4 h-4 mr-2" />
@@ -159,9 +226,15 @@ function StageModalContent({ data }: { data: any }) {
 }
 
 function ActionModalContent({ data }: { data: any }) {
-  const [name, setName] = React.useState(data.name || '')
-  const [description, setDescription] = React.useState(data.description || '')
-  const [type, setType] = React.useState(data.type || 'action')
+  const [name, setName] = React.useState(data?.name || '')
+  const [description, setDescription] = React.useState(data?.description || '')
+  const [type, setType] = React.useState(data?.type || 'action')
+  const [raci, setRaci] = React.useState(data?.raci || {
+    responsible: '',
+    accountable: '',
+    consult: '',
+    inform: ''
+  })
 
   return (
     <div className="space-y-4">
@@ -177,15 +250,12 @@ function ActionModalContent({ data }: { data: any }) {
         </div>
         <div>
           <Label htmlFor="action-type">Type</Label>
-          <select
+          <Input
             id="action-type"
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md"
-          >
-            <option value="action">Action</option>
-            <option value="action-group">Action Group</option>
-          </select>
+            placeholder="Enter action type"
+          />
         </div>
       </div>
 
@@ -198,6 +268,48 @@ function ActionModalContent({ data }: { data: any }) {
           placeholder="Enter action description"
           rows={3}
         />
+      </div>
+
+      <div>
+        <Label>RACI Matrix</Label>
+        <div className="grid grid-cols-2 gap-4 mt-2">
+          <div>
+            <Label htmlFor="responsible">Responsible</Label>
+            <Input
+              id="responsible"
+              value={raci.responsible}
+              onChange={(e) => setRaci({ ...raci, responsible: e.target.value })}
+              placeholder="Who is responsible?"
+            />
+          </div>
+          <div>
+            <Label htmlFor="accountable">Accountable</Label>
+            <Input
+              id="accountable"
+              value={raci.accountable}
+              onChange={(e) => setRaci({ ...raci, accountable: e.target.value })}
+              placeholder="Who is accountable?"
+            />
+          </div>
+          <div>
+            <Label htmlFor="consult">Consult</Label>
+            <Input
+              id="consult"
+              value={raci.consult}
+              onChange={(e) => setRaci({ ...raci, consult: e.target.value })}
+              placeholder="Who should be consulted?"
+            />
+          </div>
+          <div>
+            <Label htmlFor="inform">Inform</Label>
+            <Input
+              id="inform"
+              value={raci.inform}
+              onChange={(e) => setRaci({ ...raci, inform: e.target.value })}
+              placeholder="Who should be informed?"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -214,10 +326,11 @@ function ActionModalContent({ data }: { data: any }) {
 }
 
 function InputModalContent({ data }: { data: any }) {
-  const [name, setName] = React.useState(data.name || '')
-  const [description, setDescription] = React.useState(data.description || '')
-  const [masterData, setMasterData] = React.useState(data.masterData || [])
-  const [referenceData, setReferenceData] = React.useState(data.referenceData || [])
+  const [name, setName] = React.useState(data?.name || '')
+  const [description, setDescription] = React.useState(data?.description || '')
+  const [masterData, setMasterData] = React.useState(data?.masterData || [])
+  const [referenceData, setReferenceData] = React.useState(data?.referenceData || [])
+  const [transactionData, setTransactionData] = React.useState(data?.transactionData || [])
 
   return (
     <div className="space-y-4">
@@ -278,6 +391,76 @@ function InputModalContent({ data }: { data: any }) {
         </div>
       </div>
 
+      <div>
+        <Label>Reference Data</Label>
+        <div className="space-y-2 mt-2">
+          {referenceData.map((item: string, index: number) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                value={item}
+                onChange={(e) => {
+                  const newData = [...referenceData]
+                  newData[index] = e.target.value
+                  setReferenceData(newData)
+                }}
+                placeholder="Enter reference data item"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReferenceData(referenceData.filter((_, i) => i !== index))}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setReferenceData([...referenceData, ''])}
+            className="w-full"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Reference Data
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <Label>Transaction Data</Label>
+        <div className="space-y-2 mt-2">
+          {transactionData.map((item: string, index: number) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                value={item}
+                onChange={(e) => {
+                  const newData = [...transactionData]
+                  newData[index] = e.target.value
+                  setTransactionData(newData)
+                }}
+                placeholder="Enter transaction data item"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTransactionData(transactionData.filter((_, i) => i !== index))}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTransactionData([...transactionData, ''])}
+            className="w-full"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Transaction Data
+          </Button>
+        </div>
+      </div>
+
       <div className="flex gap-2">
         <Button className="flex-1">
           <Save className="w-4 h-4 mr-2" />
@@ -292,9 +475,9 @@ function InputModalContent({ data }: { data: any }) {
 }
 
 function OutputModalContent({ data }: { data: any }) {
-  const [name, setName] = React.useState(data.name || '')
-  const [description, setDescription] = React.useState(data.description || '')
-  const [transactionData, setTransactionData] = React.useState(data.transactionData || [])
+  const [name, setName] = React.useState(data?.name || '')
+  const [description, setDescription] = React.useState(data?.description || '')
+  const [transactionData, setTransactionData] = React.useState(data?.transactionData || [])
 
   return (
     <div className="space-y-4">
@@ -369,9 +552,9 @@ function OutputModalContent({ data }: { data: any }) {
 }
 
 function FunctionModalContent({ data }: { data: any }) {
-  const [name, setName] = React.useState(data.name || '')
-  const [description, setDescription] = React.useState(data.description || '')
-  const [complexity, setComplexity] = React.useState(data.businessLogic?.complexity || 'simple')
+  const [name, setName] = React.useState(data?.name || '')
+  const [description, setDescription] = React.useState(data?.description || '')
+  const [complexity, setComplexity] = React.useState(data?.businessLogic?.complexity || 'simple')
 
   return (
     <div className="space-y-4">
@@ -387,16 +570,12 @@ function FunctionModalContent({ data }: { data: any }) {
         </div>
         <div>
           <Label htmlFor="function-complexity">Complexity</Label>
-          <select
+          <Input
             id="function-complexity"
             value={complexity}
             onChange={(e) => setComplexity(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md"
-          >
-            <option value="simple">Simple</option>
-            <option value="moderate">Moderate</option>
-            <option value="complex">Complex</option>
-          </select>
+            placeholder="Enter complexity level"
+          />
         </div>
       </div>
 

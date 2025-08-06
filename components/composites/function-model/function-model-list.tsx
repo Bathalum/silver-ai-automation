@@ -9,19 +9,19 @@ import { AlertCircle, Search, Filter, Plus } from 'lucide-react'
 import { FunctionModelTableRow } from './function-model-table-row'
 import { FunctionModelFilters } from './function-model-filters'
 import { NodeTypeIndicator } from './node-type-indicator'
-import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
+import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
 
 interface FunctionModelListProps {
-  models: FunctionModelNode[]
+  models: (FunctionModel & { nodeStats: { totalNodes: number; nodesByType: Record<string, number>; totalConnections: number } })[]
   loading: boolean
   error: string | null
   onModelSelect: (modelId: string) => void
   onModelDelete: (modelId: string) => void
   onModelDuplicate: (modelId: string) => void
-  onFiltersChange?: (filters: any) => void
-  onSearchChange?: (query: string) => void
-  filters?: any
-  searchQuery?: string
+  onFiltersChange: (filters: any) => void
+  onSearchChange: (query: string) => void
+  filters: any
+  searchQuery: string
 }
 
 export function FunctionModelList({

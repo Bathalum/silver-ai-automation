@@ -1,9 +1,9 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import { FunctionProcessDashboardNodeBased } from '../components/function-process-dashboard-node-based'
+import { FunctionModelDashboard } from '@/components/composites/function-model/function-model-dashboard'
 
-export default function FunctionModelCanvasPage() {
+export default function FunctionModelPage() {
   const params = useParams()
   const modelId = params.modelId as string
   
@@ -20,11 +20,7 @@ export default function FunctionModelCanvasPage() {
   
   return (
     <div className="w-full h-full">
-      <FunctionProcessDashboardNodeBased 
-        modelId={modelId}
-        initialModelName="Function / Process Name"
-        initialModelDescription="1 paragraph per goal that you want to achieve by the end of the process"
-      />
+      <FunctionModelDashboard modelId={modelId} />
     </div>
   )
 } 

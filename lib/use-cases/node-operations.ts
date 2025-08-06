@@ -1,16 +1,14 @@
-// Node Operations Use Cases
-// Business logic and validation for the unified node system
-
-import type { 
-  BaseNode, 
+// Business logic and validation for the node-based architecture
+import { 
   NodeRelationship, 
-  AIAgentConfig,
-  RelationshipType,
-  FeatureType
-} from '@/lib/domain/entities/unified-node-types'
-import { SupabaseNodeRepository } from '@/lib/infrastructure/unified-node-repository'
+  RelationshipType, 
+  FeatureType,
+  AIAgentConfig
+} from '@/lib/domain/entities/node-relationship-types'
+import { NodeRelationshipRepository } from '@/lib/infrastructure/repositories/node-relationship-repository'
 
-const nodeRepository = new SupabaseNodeRepository()
+// Initialize repository
+const nodeRelationshipRepository = new NodeRelationshipRepository()
 
 // Node CRUD Operations
 export const createNode = async (node: Omit<BaseNode, 'nodeId' | 'createdAt' | 'updatedAt'>): Promise<BaseNode> => {

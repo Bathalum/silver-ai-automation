@@ -1,7 +1,7 @@
-import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
+import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
 
 // Generate placeholder performance data for table display
-export const generatePerformanceData = (nodes: FunctionModelNode[]) => {
+export const generatePerformanceData = (nodes: any[] = []) => {
   // Extract node types from model data
   const nodeTypes = extractNodeTypes(nodes)
   
@@ -68,7 +68,7 @@ export const formatLastModified = (date: Date): string => {
 }
 
 // Get category from model metadata or generate default
-export const getModelCategory = (model: FunctionModelNode): string => {
+export const getModelCategory = (model: FunctionModel): string => {
   return model.metadata?.tags?.find(tag => tag.startsWith('category:'))?.replace('category:', '') || 'General'
 }
 

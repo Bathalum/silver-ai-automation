@@ -1,8 +1,21 @@
 import { createClient } from '@/lib/supabase/client'
-import { NodeRelationship } from '@/lib/domain/entities/unified-node-types'
+
+export interface NodeRelationship {
+  relationshipId: string
+  sourceNodeId: string
+  targetNodeId: string
+  relationshipType: 'parent-child' | 'sibling' | 'reference' | 'dependency'
+  metadata: {
+    sourceHandle?: string
+    targetHandle?: string
+    strength: number
+    bidirectional: boolean
+  }
+  createdAt: Date
+}
 
 export interface NodeRelationshipRepository {
-  create(relationship: Omit<NodeRelationship, 'id' | 'createdAt'>): Promise<NodeRelationship>
+  create(relationship: Omit<NodeRelationship, 'relationshipId' | 'createdAt'>): Promise<NodeRelationship>
   getById(relationshipId: string): Promise<NodeRelationship | null>
   getByNodeId(nodeId: string): Promise<NodeRelationship[]>
   getByNodeIds(nodeIds: string[]): Promise<NodeRelationship[]>
@@ -15,7 +28,7 @@ export interface NodeRelationshipRepository {
 }
 
 export class SupabaseNodeRelationshipRepository implements NodeRelationshipRepository {
-  async create(relationship: Omit<NodeRelationship, 'id' | 'createdAt'>): Promise<NodeRelationship> {
+  async create(relationship: Omit<NodeRelationship, 'relationshipId' | 'createdAt'>): Promise<NodeRelationship> {
     const supabase = createClient()
     
     const { data, error } = await supabase
@@ -27,11 +40,12 @@ export class SupabaseNodeRelationshipRepository implements NodeRelationshipRepos
         target_feature: 'function-model',
         target_entity_id: relationship.targetNodeId,
         target_node_id: relationship.targetNodeId,
-        link_type: relationship.type,
-        link_strength: 1.0,
+        link_type: relationship.relationshipType,
+        link_strength: relationship.metadata.strength || 1.0,
         link_context: {
-          sourceHandle: relationship.sourceHandle,
-          targetHandle: relationship.targetHandle
+          sourceHandle: relationship.metadata.sourceHandle || '',
+          targetHandle: relationship.metadata.targetHandle || '',
+          bidirectional: relationship.metadata.bidirectional || false
         }
       })
       .select()
@@ -113,7 +127,7 @@ export class SupabaseNodeRelationshipRepository implements NodeRelationshipRepos
         target_feature: 'function-model',
         target_entity_id: modelId,
         target_node_id: targetNodeId,
-        link_type: 'default',
+        link_type: 'references',
         link_strength: 1.0,
         link_context: {
           sourceHandle,
@@ -219,9 +233,19 @@ export class SupabaseNodeRelationshipRepository implements NodeRelationshipRepos
     const supabase = createClient()
     
     const updateData: any = {}
-    if (updates.sourceHandle !== undefined) updateData.link_context = { ...updates.sourceHandle }
-    if (updates.targetHandle !== undefined) updateData.link_context = { ...updates.targetHandle }
-    if (updates.type !== undefined) updateData.link_type = updates.type
+    if (updates.metadata?.sourceHandle !== undefined) {
+      updateData.link_context = { 
+        ...updateData.link_context,
+        sourceHandle: updates.metadata.sourceHandle 
+      }
+    }
+    if (updates.metadata?.targetHandle !== undefined) {
+      updateData.link_context = { 
+        ...updateData.link_context,
+        targetHandle: updates.metadata.targetHandle 
+      }
+    }
+    if (updates.relationshipType !== undefined) updateData.link_type = updates.relationshipType
     
     const { data, error } = await supabase
       .from('node_links')
@@ -285,15 +309,16 @@ export class SupabaseNodeRelationshipRepository implements NodeRelationshipRepos
   // IMPROVE error handling and logging
   private mapToNodeRelationship(data: any): NodeRelationship {
     return {
-      id: data.link_id,
+      relationshipId: data.link_id, // Fix: map to relationshipId instead of id
       sourceNodeId: data.source_node_id,
       targetNodeId: data.target_node_id,
-      sourceHandle: data.link_context?.sourceHandle || '',
-      targetHandle: data.link_context?.targetHandle || '',
-      type: data.link_type,
-      sourceNodeType: 'function-model',
-      targetNodeType: 'function-model',
-      metadata: data.link_context || {},
+      relationshipType: data.link_type, // Fix: map to relationshipType instead of type
+      metadata: {
+        sourceHandle: data.link_context?.sourceHandle || '',
+        targetHandle: data.link_context?.targetHandle || '',
+        strength: data.link_strength || 1.0,
+        bidirectional: false // Default to false for now
+      },
       createdAt: new Date(data.created_at)
     }
   }

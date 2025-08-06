@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge"
 import { FileText, Brain, GitBranch, Settings, Layers, Info, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { type FunctionModelNode } from "@/lib/domain/entities/function-model-node-types"
-import { useCrossFeatureLinking } from "@/lib/application/hooks/use-cross-feature-linking"
 
 // 1:1 copy of StageNode, but for IONode
 export function IONode(props: NodeProps) {
@@ -86,13 +85,6 @@ export function StageNode(props: NodeProps) {
   // Debug: Log when StageNode is rendered
   console.log('StageNode rendered:', { id: props.id, data, stage })
   
-  // NEW: Load node links for visualization
-  const { links } = useCrossFeatureLinking({
-    sourceFeature: 'function-model',
-    sourceEntityId: data.modelId || 'sample-model-id',
-    sourceNodeId: props.id
-  })
-  
   return (
     <div className="w-[340px] cursor-pointer relative">
       {/* Left target handle for sibling connections */}
@@ -124,21 +116,6 @@ export function StageNode(props: NodeProps) {
           <span className="font-bold text-blue-900 w-full text-center block">{stage?.name || "New Stage"}</span>
         </CardHeader>
       </Card>
-      
-      {/* Link indicators */}
-      {links.length > 0 && (
-        <div className="absolute -top-2 -right-2 flex gap-1">
-          {links.map((link: any) => (
-            <div
-              key={link.linkId}
-              className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center"
-              title={`${link.linkType} ${link.targetFeature}`}
-            >
-              <Link className="w-3 h-3" />
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

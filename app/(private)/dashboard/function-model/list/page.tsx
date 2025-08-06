@@ -5,22 +5,25 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { FunctionModelList } from '@/components/composites/function-model/function-model-list'
+import { getAllFunctionModelsWithNodeStats, createFunctionModel, deleteFunctionModelWithConfirmation, duplicateFunctionModelWithName } from '@/lib/application/use-cases/function-model-use-cases'
+import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
 
 export default function FunctionModelListPage() {
   const router = useRouter()
-  const [models, setModels] = useState([])
+  const [models, setModels] = useState<(FunctionModel & { nodeStats: { totalNodes: number; nodesByType: Record<string, number>; totalConnections: number } })[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState({})
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    // Load models using node-based approach
+    // Load models using the correct function model approach with node stats
     const loadModels = async () => {
       try {
         setLoading(true)
-        // TODO: Implement model loading using node-based use cases
-        setModels([])
+        setError(null)
+        const functionModelsWithStats = await getAllFunctionModelsWithNodeStats()
+        setModels(functionModelsWithStats)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load models')
       } finally {
@@ -41,33 +44,15 @@ export default function FunctionModelListPage() {
 
   const handleCreateNew = async () => {
     try {
-      // Use node-based use cases instead of legacy persistence
-      const { createFunctionModelNode } = await import('@/lib/application/use-cases/function-model-use-cases')
-      
-      // Create a new model using node-based approach
-      const newModelNode = await createFunctionModelNode(
-        'functionModelContainerNode',
-        'New Function Model',
-        { x: 0, y: 0 },
-        'new-model-id',
-        {
-          description: 'A new function model',
-          businessLogic: {
-            complexity: 'simple',
-            estimatedDuration: 0,
-            sla: undefined,
-            kpis: []
-          },
-          processBehavior: {
-            executionType: 'sequential',
-            dependencies: [],
-            triggers: []
-          }
-        }
-      )
+      // Create a new function model using the correct approach
+      const newModel = await createFunctionModel({
+        name: 'New Function Model',
+        description: 'A new function model',
+        status: 'draft'
+      })
       
       // Navigate to the new model
-      router.push(`/dashboard/function-model/${newModelNode.modelId}`)
+      router.push(`/dashboard/function-model/${newModel.modelId}`)
     } catch (err) {
       console.error('Failed to create new model:', err)
       // You might want to show a toast notification here
@@ -80,8 +65,10 @@ export default function FunctionModelListPage() {
   
   const handleModelDelete = async (modelId: string) => {
     try {
-      // TODO: Implement model deletion using node-based use cases
-      console.log('Delete model:', modelId)
+      await deleteFunctionModelWithConfirmation(modelId)
+      // Reload models after deletion
+      const functionModels = await getAllFunctionModelsWithNodeStats()
+      setModels(functionModels)
     } catch (err) {
       console.error('Failed to delete model:', err)
       // You might want to show a toast notification here
@@ -90,8 +77,12 @@ export default function FunctionModelListPage() {
   
   const handleModelDuplicate = async (modelId: string) => {
     try {
-      // TODO: Implement model duplication using node-based use cases
-      console.log('Duplicate model:', modelId)
+      const duplicatedModel = await duplicateFunctionModelWithName(modelId)
+      // Reload models after duplication
+      const functionModels = await getAllFunctionModelsWithNodeStats()
+      setModels(functionModels)
+      // Navigate to the new duplicated model
+      router.push(`/dashboard/function-model/${duplicatedModel.modelId}`)
     } catch (err) {
       console.error('Failed to duplicate model:', err)
       // You might want to show a toast notification here

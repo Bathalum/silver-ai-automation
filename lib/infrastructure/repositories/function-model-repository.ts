@@ -1,463 +1,501 @@
 // Function Model Repository Implementation
 // This file implements the repository pattern for Function Model persistence using Supabase
+// Following the Infrastructure Layer Complete Guide
 
 import { createClient } from '@/lib/supabase/client'
 import { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
+import { FunctionModel } from '@/lib/domain/entities/function-model-types'
+import { InfrastructureException, NotFoundException } from '@/lib/infrastructure/exceptions/infrastructure-exceptions'
+import { ExecutionType } from '@/lib/domain/value-objects/function-model-value-objects'
 
-export class FunctionModelRepository {
+// Remove inheritance from BaseNodeRepositoryImpl since we're using feature-specific tables
+export interface FunctionModelRepository {
+  // Function Model specific operations
+  createFunctionModel(model: Omit<FunctionModel, 'modelId' | 'createdAt' | 'updatedAt'>): Promise<FunctionModel>
+  getFunctionModel(modelId: string): Promise<FunctionModel | null>
+  updateFunctionModel(modelId: string, updates: Partial<FunctionModel>): Promise<FunctionModel>
+  deleteFunctionModel(modelId: string): Promise<void>
+  
+  // Node operations within Function Model
+  addNodeToFunctionModel(modelId: string, node: Omit<FunctionModelNode, 'nodeId' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode>
+  updateNodeInFunctionModel(modelId: string, nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode>
+  removeNodeFromFunctionModel(modelId: string, nodeId: string): Promise<void>
+  
+  // Process-specific operations
+  getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]>
+  getFunctionModelWithNodes(modelId: string): Promise<FunctionModel & { nodes: FunctionModelNode[] }>
+  
+  // Additional operations needed by use cases
+  getAllFunctionModels(): Promise<FunctionModel[]>
+  getFunctionModelById(modelId: string): Promise<FunctionModel | null>
+  duplicateFunctionModel(modelId: string, newName: string): Promise<FunctionModel>
+}
+
+export class SupabaseFunctionModelRepository implements FunctionModelRepository {
   private supabase = createClient()
 
-  // Node-based operations for the new architecture
-  async createFunctionModelNode(node: Omit<FunctionModelNode, 'nodeId' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .insert({
-        model_id: node.modelId,
-        node_type: node.nodeType,
-        name: node.name,
-        description: node.description,
-        position_x: node.position.x,
-        position_y: node.position.y,
-        execution_type: node.processBehavior.executionType,
-        dependencies: node.processBehavior.dependencies,
-        sla: node.businessLogic.sla,
-        kpis: node.businessLogic.kpis,
-        stage_data: node.functionModelData.stage || null,
-        action_data: node.functionModelData.action || null,
-        io_data: node.functionModelData.io || null,
-        container_data: node.functionModelData.container || null,
-        metadata: node.metadata
-      })
-      .select()
-      .single()
+  // Function Model specific operations
+  async createFunctionModel(model: Omit<FunctionModel, 'modelId' | 'createdAt' | 'updatedAt'>): Promise<FunctionModel> {
+    try {
+      const { data, error } = await this.supabase
+        .from('function_models')
+        .insert({
+          name: model.name,
+          description: model.description || '',
+          version: model.version || '1.0.0',
+          status: model.status || 'draft',
+          current_version: model.version || '1.0.0',
+          version_count: 1,
+          ai_agent_config: model.aiAgentConfig || {},
+          metadata: model.metadata || {},
+          permissions: model.permissions || {}
+        })
+        .select()
+        .single()
 
-    if (error) {
-      console.error('Failed to create function model node:', error)
-      throw new Error(`Failed to create function model node: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to create function model: ${error.message}`, 'FUNCTION_MODEL_CREATE_ERROR', 500, { model })
+      }
+
+      return this.mapDbToFunctionModel(data)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to create function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODEL_CREATE_ERROR',
+        500,
+        { model }
+      )
     }
-
-    return this.mapDbToFunctionModelNode(data)
   }
 
+  async getFunctionModel(modelId: string): Promise<FunctionModel | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from('function_models')
+        .select('*')
+        .eq('model_id', modelId)
+        .is('deleted_at', null)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null
+        }
+        throw new InfrastructureException(`Failed to get function model: ${error.message}`, 'FUNCTION_MODEL_GET_ERROR', 500, { modelId })
+      }
+
+      return this.mapDbToFunctionModel(data)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODEL_GET_ERROR',
+        500,
+        { modelId }
+      )
+    }
+  }
+
+  async updateFunctionModel(modelId: string, updates: Partial<FunctionModel>): Promise<FunctionModel> {
+    try {
+      const updateData: any = {}
+      
+      if (updates.name !== undefined) updateData.name = updates.name
+      if (updates.description !== undefined) updateData.description = updates.description
+      if (updates.version !== undefined) updateData.version = updates.version
+      if (updates.status !== undefined) updateData.status = updates.status
+      if (updates.currentVersion !== undefined) updateData.current_version = updates.currentVersion
+      if (updates.aiAgentConfig !== undefined) updateData.ai_agent_config = updates.aiAgentConfig
+      if (updates.metadata !== undefined) updateData.metadata = updates.metadata
+      if (updates.permissions !== undefined) updateData.permissions = updates.permissions
+      
+      // Update last_saved_at when model is modified
+      updateData.last_saved_at = new Date().toISOString()
+
+      const { data, error } = await this.supabase
+        .from('function_models')
+        .update(updateData)
+        .eq('model_id', modelId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new InfrastructureException(`Failed to update function model: ${error.message}`, 'FUNCTION_MODEL_UPDATE_ERROR', 500, { modelId, updates })
+      }
+
+      return this.mapDbToFunctionModel(data)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to update function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODEL_UPDATE_ERROR',
+        500,
+        { modelId, updates }
+      )
+    }
+  }
+
+  async deleteFunctionModel(modelId: string, deletedBy?: string): Promise<void> {
+    try {
+      const { error } = await this.supabase
+        .from('function_models')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: deletedBy
+        })
+        .eq('model_id', modelId)
+
+      if (error) {
+        throw new InfrastructureException(`Failed to delete function model: ${error.message}`, 'FUNCTION_MODEL_DELETE_ERROR', 500, { modelId })
+      }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to delete function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODEL_DELETE_ERROR',
+        500,
+        { modelId }
+      )
+    }
+  }
+
+  // Node operations within Function Model
+  async addNodeToFunctionModel(modelId: string, node: Omit<FunctionModelNode, 'nodeId' | 'createdAt' | 'updatedAt'>): Promise<FunctionModelNode> {
+    try {
+      // Add missing properties
+      const completeNode: FunctionModelNode = {
+        ...node,
+        nodeId: crypto.randomUUID(), // Generate proper UUID
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+      
+      // Map the node to database format
+      const dbNode = this.mapNodeToDb(completeNode, modelId)
+      
+      const { data, error } = await this.supabase
+        .from('function_model_nodes')
+        .insert(dbNode)
+        .select()
+        .single()
+
+      if (error) {
+        throw new InfrastructureException(`Failed to add node to function model: ${error.message}`, 'NODE_ADD_ERROR', 500, { modelId, node })
+      }
+
+      return this.mapDbToFunctionModelNode(data)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to add node to function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NODE_ADD_ERROR',
+        500,
+        { modelId, node }
+      )
+    }
+  }
+
+  async updateNodeInFunctionModel(modelId: string, nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode> {
+    try {
+      return await this.updateFunctionModelNode(modelId, nodeId, updates)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to update node in function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NODE_UPDATE_ERROR',
+        500,
+        { modelId, nodeId, updates }
+      )
+    }
+  }
+
+  // Add proper function model node update method
+  async updateFunctionModelNode(modelId: string, nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode> {
+    try {
+      // Map updates to database format
+      const dbUpdates: any = {}
+      
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.description !== undefined) dbUpdates.description = updates.description
+      if (updates.position !== undefined) {
+        dbUpdates.position_x = updates.position.x
+        dbUpdates.position_y = updates.position.y
+      }
+      if (updates.nodeType !== undefined) dbUpdates.node_type = updates.nodeType
+      if (updates.processBehavior !== undefined) {
+        dbUpdates.execution_type = updates.processBehavior.executionType
+        dbUpdates.dependencies = updates.processBehavior.dependencies
+        dbUpdates.timeout = updates.processBehavior.timeout
+        dbUpdates.retry_policy = updates.processBehavior.retryPolicy
+      }
+      if (updates.businessLogic !== undefined) {
+        dbUpdates.raci_matrix = updates.businessLogic.raciMatrix
+        dbUpdates.sla = updates.businessLogic.sla
+        dbUpdates.kpis = updates.businessLogic.kpis
+      }
+      if (updates.functionModelData !== undefined) {
+        dbUpdates.stage_data = updates.functionModelData.stage
+        dbUpdates.action_data = updates.functionModelData.action
+        dbUpdates.io_data = updates.functionModelData.io
+        dbUpdates.container_data = updates.functionModelData.container
+      }
+      if (updates.metadata !== undefined) dbUpdates.metadata = updates.metadata
+      if (updates.visualProperties !== undefined) dbUpdates.visual_properties = updates.visualProperties
+      if (updates.status !== undefined) dbUpdates.status = updates.status
+      
+      // Add updated_at timestamp
+      dbUpdates.updated_at = new Date().toISOString()
+
+      const { data, error } = await this.supabase
+        .from('function_model_nodes')
+        .update(dbUpdates)
+        .eq('model_id', modelId)
+        .eq('node_id', nodeId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new InfrastructureException(`Failed to update function model node: ${error.message}`, 'NODE_UPDATE_ERROR', 500, { modelId, nodeId, updates })
+      }
+
+      return this.mapDbToFunctionModelNode(data)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to update function model node: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NODE_UPDATE_ERROR',
+        500,
+        { modelId, nodeId, updates }
+      )
+    }
+  }
+
+  async removeNodeFromFunctionModel(modelId: string, nodeId: string): Promise<void> {
+    try {
+      const { error } = await this.supabase
+        .from('function_model_nodes')
+        .delete()
+        .eq('model_id', modelId)
+        .eq('node_id', nodeId)
+
+      if (error) {
+        throw new InfrastructureException(`Failed to remove node from function model: ${error.message}`, 'NODE_DELETE_ERROR', 500, { modelId, nodeId })
+      }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to remove node from function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NODE_DELETE_ERROR',
+        500,
+        { modelId, nodeId }
+      )
+    }
+  }
+
+  // Process-specific operations
   async getFunctionModelNodes(modelId: string): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
+    try {
+      console.log(`getFunctionModelNodes called for modelId: ${modelId}`)
+      
+      const { data, error } = await this.supabase
+        .from('function_model_nodes')
+        .select('*')
+        .eq('model_id', modelId)
 
-    if (error) {
-      console.error('Failed to get function model nodes:', error)
-      throw new Error(`Failed to get function model nodes: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  async getFunctionModelNodeById(modelId: string, nodeId: string): Promise<FunctionModelNode | null> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .eq('node_id', nodeId)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null
+      if (error) {
+        console.error('Database error in getFunctionModelNodes:', error)
+        throw new InfrastructureException(`Failed to get function model nodes: ${error.message}`, 'NODES_GET_ERROR', 500, { modelId })
       }
-      console.error('Failed to get function model node by ID:', error)
-      throw new Error(`Failed to get function model node by ID: ${error.message}`)
-    }
 
-    return this.mapDbToFunctionModelNode(data)
-  }
+      console.log(`getFunctionModelNodes raw data:`, data)
+      console.log(`getFunctionModelNodes data length:`, data?.length || 0)
 
-  async updateFunctionModelNode(nodeId: string, updates: Partial<FunctionModelNode>): Promise<FunctionModelNode> {
-    const updateData = this.mapFunctionModelNodeToDb(updates)
-    
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .update(updateData)
-      .eq('node_id', nodeId)
-      .select()
-      .single()
+      const mappedNodes = data.map(this.mapDbToFunctionModelNode)
+      console.log(`getFunctionModelNodes mapped nodes:`, mappedNodes)
+      console.log(`getFunctionModelNodes mapped nodes length:`, mappedNodes.length)
 
-    if (error) {
-      console.error('Failed to update function model node:', error)
-      throw new Error(`Failed to update function model node: ${error.message}`)
-    }
-
-    return this.mapDbToFunctionModelNode(data)
-  }
-
-  async deleteFunctionModelNode(nodeId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('function_model_nodes')
-      .delete()
-      .eq('node_id', nodeId)
-
-    if (error) {
-      console.error('Failed to delete function model node:', error)
-      throw new Error(`Failed to delete function model node: ${error.message}`)
+      return mappedNodes
+    } catch (error) {
+      console.error('Error in getFunctionModelNodes:', error)
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get function model nodes: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NODES_GET_ERROR',
+        500,
+        { modelId }
+      )
     }
   }
 
-  // Mapping functions to match actual database schema
-  private mapFunctionModelNodeToDb(node: Partial<FunctionModelNode>): any {
-    return {
-      model_id: node.modelId,
-      node_type: node.nodeType,
-      name: node.name,
-      description: node.description,
-      position_x: node.position?.x,
-      position_y: node.position?.y,
-      execution_type: node.processBehavior?.executionType,
-      dependencies: node.processBehavior?.dependencies,
-      sla: node.businessLogic?.sla,
-      kpis: node.businessLogic?.kpis,
-      stage_data: node.functionModelData?.stage,
-      action_data: node.functionModelData?.action,
-      io_data: node.functionModelData?.io,
-      container_data: node.functionModelData?.container,
-      metadata: node.metadata
+  async getFunctionModelWithNodes(modelId: string): Promise<FunctionModel & { nodes: FunctionModelNode[] }> {
+    try {
+      const [model, nodes] = await Promise.all([
+        this.getFunctionModel(modelId),
+        this.getFunctionModelNodes(modelId)
+      ])
+
+      if (!model) {
+        throw new NotFoundException(`Function model not found: ${modelId}`, 'function-model', { modelId })
+      }
+
+      return { ...model, nodes }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get function model with nodes: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODEL_WITH_NODES_ERROR',
+        500,
+        { modelId }
+      )
     }
   }
 
-  private mapDbToFunctionModelNode(row: any): FunctionModelNode {
-    return {
-      nodeId: row.node_id,
-      modelId: row.model_id,
-      type: 'function-model',
-      nodeType: row.node_type,
-      name: row.name,
-      description: row.description,
-      position: { x: row.position_x, y: row.position_y },
-      metadata: row.metadata,
-      functionModelData: {
-        stage: row.stage_data,
-        action: row.action_data,
-        io: row.io_data,
-        container: row.container_data
-      },
-      businessLogic: {
-        sla: row.sla,
-        kpis: row.kpis,
-        complexity: 'simple',
-        estimatedDuration: 0
-      },
-      processBehavior: {
-        executionType: row.execution_type,
-        dependencies: row.dependencies || [],
-        triggers: []
-      },
-      reactFlowData: {
-        draggable: true,
-        selectable: true,
-        deletable: true
-      },
-      relationships: [],
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
+  async executeFunctionModel(modelId: string, context?: any): Promise<ExecutionResult> {
+    try {
+      const model = await this.getFunctionModelWithNodes(modelId)
+      if (!model) {
+        throw new NotFoundException(`Function model not found: ${modelId}`, 'function-model', { modelId })
+      }
+
+      // TODO: Implement actual execution logic
+      return {
+        success: true,
+        result: 'Execution completed',
+        executionTime: 0,
+        nodesProcessed: model.nodes.length
+      }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to execute function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODEL_EXECUTE_ERROR',
+        500,
+        { modelId, context }
+      )
     }
   }
 
-  // Node-based query methods
-  async getNodesByType(modelId: string, nodeType: FunctionModelNode['nodeType']): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .eq('node_type', nodeType)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to get nodes by type: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  async searchNodes(modelId: string, query: string): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to search nodes: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  async getNodesWithDependencies(modelId: string): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .not('dependencies', 'eq', '{}')
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to get nodes with dependencies: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  async getNodesByExecutionType(modelId: string, executionType: string): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .eq('execution_type', executionType)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to get nodes by execution type: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  async getNodesWithSLA(modelId: string): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .not('sla', 'is', null)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to get nodes with SLA: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  async getNodesWithKPIs(modelId: string): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-      .not('kpis', 'is', null)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to get nodes with KPIs: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  // Batch operations for performance optimization
-  async bulkCreateNodes(nodes: Omit<FunctionModelNode, 'nodeId' | 'createdAt' | 'updatedAt'>[]): Promise<FunctionModelNode[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .insert(nodes.map(node => this.mapFunctionModelNodeToDb(node)))
-      .select()
-
-    if (error) {
-      console.error('Failed to bulk create nodes:', error)
-      throw new Error(`Failed to bulk create nodes: ${error.message}`)
-    }
-
-    return data.map(this.mapDbToFunctionModelNode)
-  }
-
-  async bulkUpdateNodesById(updates: Array<{ nodeId: string; updates: Partial<FunctionModelNode> }>): Promise<void> {
-    const updatePromises = updates.map(({ nodeId, updates }) => 
-      this.updateFunctionModelNode(nodeId, updates)
-    )
-    
-    await Promise.all(updatePromises)
-  }
-
-  async bulkDeleteNodes(nodeIds: string[]): Promise<void> {
-    const { error } = await this.supabase
-      .from('function_model_nodes')
-      .delete()
-      .in('node_id', nodeIds)
-
-    if (error) {
-      console.error('Failed to bulk delete nodes:', error)
-      throw new Error(`Failed to bulk delete nodes: ${error.message}`)
-    }
-  }
-
-  // Statistics and analytics
-  async getNodeStatistics(modelId: string): Promise<{
-    totalNodes: number
-    nodesByType: Record<string, number>
-    nodesByExecutionType: Record<string, number>
-    nodesWithSLA: number
-    nodesWithKPIs: number
-  }> {
-    const { data, error } = await this.supabase
-      .from('function_model_nodes')
-      .select('*')
-      .eq('model_id', modelId)
-
-    if (error) {
-      throw new Error(`Failed to get node statistics: ${error.message}`)
-    }
-
-    const nodes = data.map(this.mapDbToFunctionModelNode)
-    
-    const nodesByType = nodes.reduce((acc, node) => {
-      acc[node.nodeType] = (acc[node.nodeType] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    const nodesByExecutionType = nodes.reduce((acc, node) => {
-      acc[node.processBehavior.executionType] = (acc[node.processBehavior.executionType] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    const nodesWithSLA = nodes.filter(node => node.businessLogic.sla).length
-    const nodesWithKPIs = nodes.filter(node => node.businessLogic.kpis).length
-
-    return {
-      totalNodes: nodes.length,
-      nodesByType,
-      nodesByExecutionType,
-      nodesWithSLA,
-      nodesWithKPIs
-    }
-  }
-
-  // Version control methods
+  // Version control operations
   async getVersionHistory(modelId: string): Promise<any[]> {
-    const { data, error } = await this.supabase
-      .from('function_model_versions')
-      .select('*')
-      .eq('model_id', modelId)
-      .order('created_at', { ascending: false })
+    try {
+      const { data, error } = await this.supabase
+        .from('function_model_versions')
+        .select('*')
+        .eq('model_id', modelId)
+        .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Failed to get version history:', error)
-      throw new Error(`Failed to get version history: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to get version history: ${error.message}`, 'VERSION_HISTORY_ERROR', 500, { modelId })
+      }
+
+      return data.map((version: any) => ({
+        version: version.version_number,
+        timestamp: new Date(version.created_at),
+        author: version.author_id || 'unknown',
+        changes: [],
+        snapshot: version.version_data,
+        isPublished: version.is_published || false
+      }))
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get version history: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'VERSION_HISTORY_ERROR',
+        500,
+        { modelId }
+      )
     }
-
-    return data.map((data: any) => ({
-      version: data.version_number,
-      timestamp: new Date(data.created_at),
-      author: data.author_id || 'unknown',
-      changes: [], // TODO: Parse changes from version_data if available
-      snapshot: {
-        modelId: modelId,
-        version: data.version_number,
-        nodes: data.version_data?.nodes || [],
-        edges: data.version_data?.edges || [],
-        viewportData: data.version_data?.viewportData || {},
-        metadata: data.version_data?.metadata || {},
-        name: data.version_data?.name,
-        description: data.version_data?.description,
-        status: data.version_data?.status,
-        processType: data.version_data?.processType,
-        complexityLevel: data.version_data?.complexityLevel,
-        estimatedDuration: data.version_data?.estimatedDuration,
-        tags: data.version_data?.tags,
-        permissions: data.version_data?.permissions,
-        relationships: data.version_data?.relationships,
-        createdAt: data.version_data?.createdAt,
-        updatedAt: data.version_data?.updatedAt,
-        lastSavedAt: data.version_data?.lastSavedAt,
-        timestamp: new Date(data.created_at)
-      },
-      isPublished: data.is_published || false
-    }))
   }
 
-  async getVersionById(modelId: string, version: string): Promise<FunctionModelNode | null> {
-    const { data, error } = await this.supabase
-      .from('function_model_versions')
-      .select('*')
-      .eq('model_id', modelId)
-      .eq('version', version)
-      .single()
+  async getVersionById(modelId: string, version: string): Promise<any | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from('function_model_versions')
+        .select('*')
+        .eq('model_id', modelId)
+        .eq('version_number', version)
+        .single()
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null
+        }
+        throw new InfrastructureException(`Failed to get version: ${error.message}`, 'VERSION_GET_ERROR', 500, { modelId, version })
       }
-      throw new Error(`Failed to get function model version: ${error.message}`)
-    }
 
-    return {
-      nodeId: data.model_id,
-      type: 'function-model',
-      nodeType: 'stageNode',
-      name: data.name || '',
-      description: data.description || '',
-      position: { x: 0, y: 0 },
-      metadata: data.version_data?.metadata || {},
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      modelId: data.model_id,
-      functionModelData: {},
-      businessLogic: {},
-      processBehavior: {
-        executionType: 'sequential'
-      },
-      reactFlowData: {},
-      relationships: data.version_data?.relationships || []
+      return {
+        version: data.version_number,
+        timestamp: new Date(data.created_at),
+        author: data.author_id || 'unknown',
+        changes: [],
+        snapshot: data.version_data,
+        isPublished: data.is_published || false
+      }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get version: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'VERSION_GET_ERROR',
+        500,
+        { modelId, version }
+      )
     }
   }
 
   async getLatestVersion(modelId: string): Promise<FunctionModelNode | null> {
-    const { data, error } = await this.supabase
-      .from('function_model_versions')
-      .select('*')
-      .eq('model_id', modelId)
-      .order('version', { ascending: false })
-      .limit(1)
-      .single()
+    try {
+      const { data, error } = await this.supabase
+        .from('function_model_versions')
+        .select('*')
+        .eq('model_id', modelId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null
+        }
+        throw new InfrastructureException(`Failed to get latest version: ${error.message}`, 'LATEST_VERSION_ERROR', 500, { modelId })
       }
-      throw new Error(`Failed to get latest function model version: ${error.message}`)
-    }
 
-    return {
-      nodeId: data.model_id,
-      type: 'function-model',
-      nodeType: 'stageNode',
-      name: data.name || '',
-      description: data.description || '',
-      position: { x: 0, y: 0 },
-      metadata: data.version_data?.metadata || {},
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      modelId: data.model_id,
-      functionModelData: {},
-      businessLogic: {},
-      processBehavior: {
-        executionType: 'sequential'
-      },
-      reactFlowData: {},
-      relationships: data.version_data?.relationships || []
+      // Map version data to FunctionModelNode
+      return this.mapVersionDataToFunctionModelNode(data, modelId)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get latest version: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'LATEST_VERSION_ERROR',
+        500,
+        { modelId }
+      )
     }
   }
 
   async saveVersion(modelId: string, versionEntry: any): Promise<void> {
-    const { error } = await this.supabase
-      .from('function_model_versions')
-      .insert({
-        model_id: modelId,
-        version_number: versionEntry.version,
-        version_data: versionEntry.snapshot,
-        author_id: versionEntry.author || 'unknown',
-        is_published: versionEntry.isPublished || false
-      })
+    try {
+      const { error } = await this.supabase
+        .from('function_model_versions')
+        .insert({
+          model_id: modelId,
+          version_number: versionEntry.version,
+          version_data: versionEntry.snapshot,
+          author_id: versionEntry.author || 'unknown',
+          is_published: versionEntry.isPublished || false
+        })
 
-    if (error) {
-      console.error('Failed to save version:', error)
-      throw new Error(`Failed to save version: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to save version: ${error.message}`, 'VERSION_SAVE_ERROR', 500, { modelId, versionEntry })
+      }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to save version: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'VERSION_SAVE_ERROR',
+        500,
+        { modelId, versionEntry }
+      )
     }
   }
 
@@ -472,85 +510,369 @@ export class FunctionModelRepository {
     linkType: string,
     context?: Record<string, any>
   ): Promise<any> {
-    const { data, error } = await this.supabase
-      .from('cross_feature_links')
-      .insert({
-        source_feature: sourceFeature,
-        source_id: sourceId,
-        source_node_id: sourceNodeId,
-        target_feature: targetFeature,
-        target_id: targetId,
-        target_node_id: targetNodeId,
-        link_type: linkType,
-        link_context: context || {},
-        link_strength: 1.0,
-        node_context: sourceNodeId ? { nodeId: sourceNodeId } : {}
-      })
-      .select()
-      .single()
+    try {
+      const { data, error } = await this.supabase
+        .from('cross_feature_links')
+        .insert({
+          source_feature: sourceFeature,
+          source_id: sourceId,
+          source_node_id: sourceNodeId,
+          target_feature: targetFeature,
+          target_id: targetId,
+          target_node_id: targetNodeId,
+          link_type: linkType,
+          link_context: context || {},
+          link_strength: 1.0,
+          node_context: sourceNodeId ? { nodeId: sourceNodeId } : {}
+        })
+        .select()
+        .single()
 
-    if (error) {
-      console.error('Failed to create cross-feature link:', error)
-      throw new Error(`Failed to create cross-feature link: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to create cross-feature link: ${error.message}`, 'CROSS_FEATURE_LINK_CREATE_ERROR', 500, { sourceFeature, sourceId, targetFeature, targetId })
+      }
+
+      return data
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to create cross-feature link: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'CROSS_FEATURE_LINK_CREATE_ERROR',
+        500,
+        { sourceFeature, sourceId, targetFeature, targetId }
+      )
     }
-
-    return data
   }
 
   async getCrossFeatureLinks(sourceId: string, sourceFeature: string): Promise<any[]> {
-    const { data, error } = await this.supabase
-      .from('cross_feature_links')
-      .select('*')
-      .eq('source_id', sourceId)
-      .eq('source_feature', sourceFeature)
+    try {
+      const { data, error } = await this.supabase
+        .from('cross_feature_links')
+        .select('*')
+        .eq('source_id', sourceId)
+        .eq('source_feature', sourceFeature)
 
-    if (error) {
-      console.error('Failed to get cross-feature links:', error)
-      throw new Error(`Failed to get cross-feature links: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to get cross-feature links: ${error.message}`, 'CROSS_FEATURE_LINKS_GET_ERROR', 500, { sourceId, sourceFeature })
+      }
+
+      return data
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get cross-feature links: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'CROSS_FEATURE_LINKS_GET_ERROR',
+        500,
+        { sourceId, sourceFeature }
+      )
     }
-
-    return data
   }
 
   async getNodeLinks(modelId: string, nodeId: string): Promise<any[]> {
-    const { data, error } = await this.supabase
-      .from('cross_feature_links')
-      .select('*')
-      .eq('source_id', modelId)
-      .eq('source_feature', 'function-model')
-      .eq('source_node_id', nodeId)
+    try {
+      const { data, error } = await this.supabase
+        .from('cross_feature_links')
+        .select('*')
+        .eq('source_id', modelId)
+        .eq('source_feature', 'function-model')
+        .eq('source_node_id', nodeId)
 
-    if (error) {
-      console.error('Failed to get node links:', error)
-      throw new Error(`Failed to get node links: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to get node links: ${error.message}`, 'NODE_LINKS_GET_ERROR', 500, { modelId, nodeId })
+      }
+
+      return data
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get node links: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NODE_LINKS_GET_ERROR',
+        500,
+        { modelId, nodeId }
+      )
     }
-
-    return data
   }
 
   async updateCrossFeatureLinkContext(linkId: string, context: Record<string, any>): Promise<void> {
-    const { error } = await this.supabase
-      .from('cross_feature_links')
-      .update({ link_context: context })
-      .eq('link_id', linkId)
+    try {
+      const { error } = await this.supabase
+        .from('cross_feature_links')
+        .update({ link_context: context })
+        .eq('link_id', linkId)
 
-    if (error) {
-      console.error('Failed to update cross-feature link context:', error)
-      throw new Error(`Failed to update cross-feature link context: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to update cross-feature link context: ${error.message}`, 'CROSS_FEATURE_LINK_UPDATE_ERROR', 500, { linkId, context })
+      }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to update cross-feature link context: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'CROSS_FEATURE_LINK_UPDATE_ERROR',
+        500,
+        { linkId, context }
+      )
     }
   }
 
   async deleteCrossFeatureLink(linkId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('cross_feature_links')
-      .delete()
-      .eq('link_id', linkId)
+    try {
+      const { error } = await this.supabase
+        .from('cross_feature_links')
+        .delete()
+        .eq('link_id', linkId)
 
-    if (error) {
-      console.error('Failed to delete cross-feature link:', error)
-      throw new Error(`Failed to delete cross-feature link: ${error.message}`)
+      if (error) {
+        throw new InfrastructureException(`Failed to delete cross-feature link: ${error.message}`, 'CROSS_FEATURE_LINK_DELETE_ERROR', 500, { linkId })
+      }
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to delete cross-feature link: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'CROSS_FEATURE_LINK_DELETE_ERROR',
+        500,
+        { linkId }
+      )
     }
   }
+
+  // Statistics and analytics
+  async getAllFunctionModels(): Promise<FunctionModel[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('function_models')
+        .select('*')
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+
+      if (error) {
+        throw new InfrastructureException(`Failed to get function models: ${error.message}`, 'FUNCTION_MODELS_GET_ERROR', 500)
+      }
+
+      return data.map(this.mapDbToFunctionModel)
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get function models: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODELS_GET_ERROR',
+        500
+      )
+    }
+  }
+
+  async getAllFunctionModelsWithNodeStats(): Promise<(FunctionModel & { nodeStats: { totalNodes: number; nodesByType: Record<string, number>; totalConnections: number } })[]> {
+    try {
+      const models = await this.getAllFunctionModels()
+      const results = []
+
+      for (const model of models) {
+        const nodes = await this.getFunctionModelNodes(model.modelId)
+        const connections = await this.getNodeLinks(model.modelId, '')
+        
+        // Calculate node stats manually
+        const nodesByType: Record<string, number> = {}
+        nodes.forEach(node => {
+          nodesByType[node.nodeType] = (nodesByType[node.nodeType] || 0) + 1
+        })
+        
+        results.push({
+          ...model,
+          nodeStats: {
+            totalNodes: nodes.length,
+            nodesByType,
+            totalConnections: connections.length
+          }
+        })
+      }
+
+      return results
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to get function models with node stats: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODELS_WITH_STATS_ERROR',
+        500
+      )
+    }
+  }
+
+  async getFunctionModelById(modelId: string): Promise<FunctionModel | null> {
+    return await this.getFunctionModel(modelId)
+  }
+
+  async duplicateFunctionModel(modelId: string, newName: string): Promise<FunctionModel> {
+    try {
+      const originalModel = await this.getFunctionModelById(modelId)
+      if (!originalModel) {
+        throw new NotFoundException(`Original model not found: ${modelId}`, 'function-model', { modelId })
+      }
+
+      const newModel = await this.createFunctionModel({
+        name: newName,
+        description: originalModel.description,
+        version: '1.0.0',
+        status: 'draft',
+        currentVersion: '1.0.0',
+        versionCount: 1,
+        lastSavedAt: new Date(),
+        aiAgentConfig: originalModel.aiAgentConfig,
+        metadata: originalModel.metadata,
+        permissions: originalModel.permissions
+      })
+
+      // TODO: Copy all nodes from the original model to the new model
+      return newModel
+    } catch (error) {
+      if (error instanceof InfrastructureException) throw error
+      throw new InfrastructureException(
+        `Failed to duplicate function model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'FUNCTION_MODEL_DUPLICATE_ERROR',
+        500,
+        { modelId, newName }
+      )
+    }
+  }
+
+  // Database mapping methods (required for clean architecture)
+  private mapDbToFunctionModel(row: any): FunctionModel {
+    return {
+      modelId: row.model_id,
+      name: row.name,
+      description: row.description,
+      version: row.version,
+      status: row.status,
+      currentVersion: row.current_version,
+      versionCount: row.version_count,
+      lastSavedAt: new Date(row.last_saved_at),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      deletedAt: row.deleted_at ? new Date(row.deleted_at) : undefined,
+      deletedBy: row.deleted_by,
+      aiAgentConfig: row.ai_agent_config,
+      metadata: row.metadata,
+      permissions: row.permissions
+    }
+  }
+
+  private mapNodeToDb(node: FunctionModelNode, modelId: string): any {
+    return {
+      node_id: node.nodeId,
+      model_id: modelId,
+      node_type: node.nodeType,
+      name: node.name,
+      description: node.description,
+      position_x: node.position.x,
+      position_y: node.position.y,
+      metadata: node.metadata,
+      visual_properties: node.visualProperties,
+      status: node.status || 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  }
+
+  private mapDbToFunctionModelNode(row: any): FunctionModelNode {
+    console.log('mapDbToFunctionModelNode called with row:', row)
+    
+    const mappedNode: FunctionModelNode = {
+      nodeId: row.node_id,
+      featureType: 'function-model' as const,
+      entityId: row.model_id,
+      nodeType: row.node_type,
+      name: row.name,
+      description: row.description,
+      position: { x: Number(row.position_x) || 0, y: Number(row.position_y) || 0 },
+      visualProperties: row.visual_properties || {
+        color: '#3b82f6',
+        icon: '📊',
+        size: 'medium',
+        style: {},
+        featureSpecific: {}
+      },
+      metadata: {
+        tags: row.metadata?.tags || [],
+        searchKeywords: row.metadata?.searchKeywords || []
+      },
+      status: row.status || 'active',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      functionModelData: {
+        stage: row.stage_data,
+        action: row.action_data,
+        io: row.io_data,
+        container: row.container_data
+      },
+      processBehavior: {
+        executionType: new ExecutionType(row.execution_type || 'sequential'),
+        dependencies: row.dependencies || [],
+        timeout: row.timeout,
+        retryPolicy: row.retry_policy
+      },
+      businessLogic: {
+        raciMatrix: row.raci_matrix,
+        sla: row.sla,
+        kpis: row.kpis || []
+      },
+      nodeLinks: []
+    }
+    
+    console.log('Mapped node:', mappedNode)
+    return mappedNode
+  }
+
+  private mapVersionDataToFunctionModelNode(versionData: any, modelId: string): FunctionModelNode {
+    return {
+      nodeId: modelId,
+      featureType: 'function-model',
+      entityId: modelId,
+      nodeType: 'stageNode',
+      name: versionData.version_data?.name || '',
+      description: versionData.version_data?.description || '',
+      position: { x: 0, y: 0 },
+      visualProperties: versionData.version_data?.visualProperties || {
+        color: '#3b82f6',
+        icon: '📊',
+        size: 'medium',
+        style: {},
+        featureSpecific: {}
+      },
+      metadata: versionData.version_data?.metadata || {
+        tags: [],
+        searchKeywords: [],
+        crossFeatureLinks: [],
+        aiAgent: undefined,
+        vectorEmbedding: undefined
+      },
+      status: 'active',
+      createdAt: new Date(versionData.created_at),
+      updatedAt: new Date(versionData.created_at),
+      functionModelData: {
+        stage: undefined,
+        action: undefined,
+        io: undefined,
+        container: undefined
+      },
+      processBehavior: {
+        executionType: new ExecutionType('sequential'),
+        dependencies: [],
+        timeout: undefined,
+        retryPolicy: undefined
+      },
+      businessLogic: {
+        raciMatrix: undefined,
+        sla: undefined,
+        kpis: []
+      },
+      nodeLinks: []
+    }
+  }
+}
+
+// Execution result interface
+interface ExecutionResult {
+  success: boolean
+  result: any
+  executionTime: number
+  nodesProcessed: number
 }
 
  

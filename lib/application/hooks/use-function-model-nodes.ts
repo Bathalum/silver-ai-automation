@@ -1,236 +1,233 @@
 // Function Model Nodes Hook
-// This file implements the enhanced function model nodes hook for the node-based architecture
+// This file implements the Application Layer hook for function model node operations
 
 import { useState, useCallback, useEffect } from 'react'
-import { Edge, Connection, NodeChange, EdgeChange } from 'reactflow'
-import { FunctionModelNode } from '../../domain/entities/function-model-node-types'
-import { Stage, ActionItem, DataPort } from '../../domain/entities/function-model-node-types'
-import { validateConnection } from '../../domain/entities/function-model-connection-rules'
-import {
+import { FunctionModelNode, FunctionModelNodeLink } from '../../domain/entities/function-model-node-types'
+import { FunctionModel } from '../../domain/entities/function-model-types'
+import { 
   createFunctionModelNode,
   updateFunctionModelNode,
-  createNodeRelationship,
-  deleteNodeRelationship,
-  getFunctionModelNodes,
-  getNodeRelationships,
   deleteFunctionModelNode,
-  getNodeById,
-  searchFunctionModelNodes,
-  getNodesByType,
-  getConnectedNodes
+  getFunctionModelNodes,
+  getNodeLinks,
+  createNodeLink,
+  deleteNodeLink,
+  getFunctionModelById
 } from '../use-cases/function-model-use-cases'
+import { useFeedback } from '@/components/ui/feedback-toast'
+import { useModalManagement, ModalData } from './use-modal-management'
 
 export function useFunctionModelNodes(modelId: string) {
   const [nodes, setNodes] = useState<FunctionModelNode[]>([])
-  const [edges, setEdges] = useState<Edge[]>([])
+  const [links, setLinks] = useState<FunctionModelNodeLink[]>([])
+  const [model, setModel] = useState<FunctionModel | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { showSuccess, showError } = useFeedback()
   
-  // Preserve ALL existing state management
-  const [modalStack, setModalStack] = useState<Array<{
-    type: "function" | "stage" | "action" | "input" | "output"
-    data: FunctionModelNode | Stage | ActionItem | DataPort
-    context?: { previousModal?: string; stageId?: string }
-  }>>([])
-
+  // Modal management
+  const modalManagement = useModalManagement()
+  
+  // Additional state for UI interactions
   const [selectedNodes, setSelectedNodes] = useState<FunctionModelNode[]>([])
   const [hoveredNode, setHoveredNode] = useState<FunctionModelNode | null>(null)
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
 
+  // Load nodes and model data
   const loadNodes = useCallback(async () => {
+    if (!modelId) return
+
+    console.log('loadNodes called for modelId:', modelId)
     setLoading(true)
     setError(null)
-    
+
     try {
-      const functionModelNodes = await getFunctionModelNodes(modelId)
-      const relationships = await getNodeRelationships(modelId)
-      
-      setNodes(functionModelNodes)
-      
-      // Convert relationships to React Flow edges
-      const reactFlowEdges = relationships.map(rel => ({
-        id: rel.id,
-        source: rel.sourceNodeId,
-        target: rel.targetNodeId,
-        sourceHandle: rel.sourceHandle,
-        targetHandle: rel.targetHandle,
-        type: rel.type
-      }))
-      
-      setEdges(reactFlowEdges)
+      const [nodesData, linksData, modelData] = await Promise.all([
+        getFunctionModelNodes(modelId),
+        getNodeLinks(modelId),
+        getFunctionModelById(modelId)
+      ])
+
+      console.log('loadNodes results:', {
+        nodesCount: nodesData.length,
+        linksCount: linksData.length,
+        modelData: modelData ? 'loaded' : 'null'
+      })
+
+      setNodes(nodesData)
+      setLinks(linksData)
+      setModel(modelData)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load nodes')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load nodes'
+      console.error('loadNodes error:', err)
+      setError(errorMessage)
+      showError(errorMessage)
     } finally {
       setLoading(false)
     }
   }, [modelId])
 
+  // Create a new node
   const createNode = useCallback(async (
     nodeType: FunctionModelNode['nodeType'],
     name: string,
     position: { x: number; y: number },
-    options: Partial<FunctionModelNode> = {}
+    options?: any
   ) => {
+    if (!modelId) return
+
+    setLoading(true)
+    setError(null)
+
     try {
-      const newNode = await createFunctionModelNode(nodeType, name, position, modelId, options)
+      const newNode = await createFunctionModelNode(
+        nodeType,
+        name,
+        position,
+        modelId,
+        options
+      )
+
       setNodes(prev => [...prev, newNode])
+      showSuccess('Node created successfully')
       return newNode
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create node')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create node'
+      setError(errorMessage)
+      showError(errorMessage)
       throw err
+    } finally {
+      setLoading(false)
     }
   }, [modelId])
 
-  const updateNode = useCallback(async (nodeId: string, updates: Partial<FunctionModelNode>) => {
+  // Update a node
+  const updateNode = useCallback(async (
+    nodeId: string,
+    updates: Partial<FunctionModelNode>
+  ) => {
+    if (!modelId) return
+
+    setLoading(true)
+    setError(null)
+
     try {
-      const updatedNode = await updateFunctionModelNode(nodeId, updates)
-      setNodes(prev => prev.map(node => node.nodeId === nodeId ? updatedNode : node))
+      const updatedNode = await updateFunctionModelNode(nodeId, updates, modelId)
+      
+      setNodes(prev => prev.map(node => 
+        node.nodeId === nodeId ? updatedNode : node
+      ))
+      
+      showSuccess('Node updated successfully')
       return updatedNode
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update node')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update node'
+      setError(errorMessage)
+      showError(errorMessage)
       throw err
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }, [modelId])
 
-  const createConnection = useCallback(async (
+  // Delete a node
+  const deleteNode = useCallback(async (nodeId: string) => {
+    if (!modelId) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      await deleteFunctionModelNode(nodeId, modelId)
+      
+      setNodes(prev => prev.filter(node => node.nodeId !== nodeId))
+      setLinks(prev => prev.filter(link => 
+        link.sourceNodeId !== nodeId && link.targetNodeId !== nodeId
+      ))
+      
+      showSuccess('Node deleted successfully')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete node'
+      setError(errorMessage)
+      showError(errorMessage)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [modelId])
+
+  // Create a link between nodes
+  const createLink = useCallback(async (
     sourceNodeId: string,
     targetNodeId: string,
     sourceHandle: string,
     targetHandle: string
   ) => {
+    if (!modelId) return
+
+    setLoading(true)
+    setError(null)
+
     try {
-      const relationship = await createNodeRelationship(sourceNodeId, targetNodeId, sourceHandle, targetHandle, modelId)
-      
-      // Add edge to React Flow state
-      const newEdge: Edge = {
-        id: relationship.id,
-        source: relationship.sourceNodeId,
-        target: relationship.targetNodeId,
-        sourceHandle: relationship.sourceHandle,
-        targetHandle: relationship.targetHandle,
-        type: relationship.type
-      }
-      
-      setEdges(prev => [...prev, newEdge])
-      
-      // Update relationships in nodes
-      setNodes(prev => prev.map(node => {
-        if (node.nodeId === sourceNodeId) {
-          return {
-            ...node,
-            relationships: [...node.relationships, relationship]
-          }
-        }
-        return node
-      }))
-      
-      return relationship
+      const newLink = await createNodeLink(
+        sourceNodeId,
+        targetNodeId,
+        sourceHandle,
+        targetHandle,
+        modelId
+      )
+
+      setLinks(prev => [...prev, newLink])
+      showSuccess('Link created successfully')
+      return newLink
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create connection')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create link'
+      setError(errorMessage)
+      showError(errorMessage)
       throw err
+    } finally {
+      setLoading(false)
     }
   }, [modelId])
 
-  const deleteConnection = useCallback(async (edgeId: string) => {
+  // Delete a link
+  const deleteLink = useCallback(async (linkId: string) => {
+    setLoading(true)
+    setError(null)
+
     try {
-      await deleteNodeRelationship(edgeId)
-      setEdges(prev => prev.filter(edge => edge.id !== edgeId))
+      await deleteNodeLink(linkId)
       
-      // Remove relationship from nodes
-      setNodes(prev => prev.map(node => ({
-        ...node,
-        relationships: node.relationships.filter(rel => rel.id !== edgeId)
-      })))
+      setLinks(prev => prev.filter(link => link.linkId !== linkId))
+      showSuccess('Link deleted successfully')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete connection')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete link'
+      setError(errorMessage)
+      showError(errorMessage)
       throw err
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  const deleteNode = useCallback(async (nodeId: string) => {
-    try {
-      await deleteFunctionModelNode(nodeId)
-      setNodes(prev => prev.filter(node => node.nodeId !== nodeId))
-      setEdges(prev => prev.filter(edge => edge.source !== nodeId && edge.target !== nodeId))
-      setSelectedNodes(prev => prev.filter(node => node.nodeId !== nodeId))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete node')
-      throw err
-    }
-  }, [])
-
-  const searchNodes = useCallback(async (searchTerm: string) => {
-    try {
-      const searchResults = await searchFunctionModelNodes(modelId, searchTerm)
-      return searchResults
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to search nodes')
-      return []
-    }
-  }, [modelId])
-
-  const getNodesByType = useCallback(async (nodeType: FunctionModelNode['nodeType']) => {
-    try {
-      return await getNodesByType(modelId, nodeType)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get nodes by type')
-      return []
-    }
-  }, [modelId])
-
-  const getConnectedNodesForNode = useCallback(async (nodeId: string) => {
-    try {
-      return await getConnectedNodes(nodeId, modelId)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get connected nodes')
-      return { incoming: [], outgoing: [] }
-    }
-  }, [modelId])
-
-  // Modal management functions
-  const openModal = useCallback((type: "function" | "stage" | "action" | "input" | "output", data: any, context?: any) => {
-    setModalStack(prev => [...prev, { type, data, context }])
-  }, [])
-
-  const closeModal = useCallback(() => {
-    setModalStack(prev => prev.slice(0, -1))
-  }, [])
-
-  const closeAllModals = useCallback(() => {
-    setModalStack([])
-  }, [])
-
-  const goBackToPreviousModal = useCallback(() => {
-    setModalStack(prev => prev.slice(0, -1))
-  }, [])
-
-  // Node selection management
+  // UI interaction functions
   const selectNode = useCallback((node: FunctionModelNode) => {
-    setSelectedNodes(prev => {
-      const isSelected = prev.some(n => n.nodeId === node.nodeId)
-      if (isSelected) {
-        return prev.filter(n => n.nodeId !== node.nodeId)
-      } else {
-        return [...prev, node]
-      }
-    })
+    setSelectedNodes(prev => [...prev, node])
   }, [])
 
-  const selectNodes = useCallback((nodesToSelect: FunctionModelNode[]) => {
-    setSelectedNodes(nodesToSelect)
+  const selectNodes = useCallback((nodes: FunctionModelNode[]) => {
+    setSelectedNodes(nodes)
   }, [])
 
   const clearSelection = useCallback(() => {
     setSelectedNodes([])
   }, [])
 
-  // Node hover management
-  const setHoveredNodeCallback = useCallback((node: FunctionModelNode | null) => {
+  const setHoveredNodeState = useCallback((node: FunctionModelNode | null) => {
     setHoveredNode(node)
   }, [])
 
-  // Editing state management
   const startEditingName = useCallback(() => {
     setIsEditingName(true)
   }, [])
@@ -247,28 +244,29 @@ export function useFunctionModelNodes(modelId: string) {
     setIsEditingDescription(false)
   }, [])
 
-  // Connection validation
-  const isValidConnection = useCallback((connection: Connection) => {
-    const sourceNode = nodes.find(n => n.nodeId === connection.source)
-    const targetNode = nodes.find(n => n.nodeId === connection.target)
-    
-    if (!sourceNode || !targetNode) return false
-    
-    return validateConnection(sourceNode, targetNode, connection.sourceHandle!, connection.targetHandle!)
-  }, [nodes])
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
 
-  // Load nodes on mount
+  // Connection functions (aliases for links)
+  const createConnection = createLink
+  const deleteConnection = deleteLink
+  const edges = links // Alias for compatibility
+
+  // Load data on mount and when modelId changes
   useEffect(() => {
     loadNodes()
   }, [loadNodes])
 
   return {
-    // State
+    // Data
     nodes,
-    edges,
+    links,
+    model,
     loading,
     error,
-    modalStack,
+    
+    // UI State
     selectedNodes,
     hoveredNode,
     isEditingName,
@@ -278,38 +276,41 @@ export function useFunctionModelNodes(modelId: string) {
     loadNodes,
     createNode,
     updateNode,
-    createConnection,
-    deleteConnection,
     deleteNode,
-    searchNodes,
-    getNodesByType,
-    getConnectedNodesForNode,
+    createLink,
+    deleteLink,
     
-    // Modal management
-    openModal,
-    closeModal,
-    closeAllModals,
-    goBackToPreviousModal,
-    setModalStack,
-    
-    // Selection management
+    // UI Actions
     selectNode,
     selectNodes,
     clearSelection,
-    
-    // Hover management
-    setHoveredNode: setHoveredNodeCallback,
-    
-    // Editing management
+    setHoveredNode: setHoveredNodeState,
     startEditingName,
     stopEditingName,
     startEditingDescription,
     stopEditingDescription,
+    clearError,
     
-    // Validation
-    isValidConnection,
+    // Connection aliases
+    createConnection,
+    deleteConnection,
+    edges,
     
-    // Error handling
-    clearError: () => setError(null)
+    // Modal Management
+    ...modalManagement,
+    
+    // Utilities
+    getNodeById: (nodeId: string) => nodes.find(node => node.nodeId === nodeId),
+    getNodesByType: (nodeType: FunctionModelNode['nodeType']) => 
+      nodes.filter(node => node.nodeType === nodeType),
+    getConnectedNodes: (nodeId: string) => {
+      const connectedLinks = links.filter(link => 
+        link.sourceNodeId === nodeId || link.targetNodeId === nodeId
+      )
+      const connectedNodeIds = new Set(
+        connectedLinks.flatMap(link => [link.sourceNodeId, link.targetNodeId])
+      )
+      return nodes.filter(node => connectedNodeIds.has(node.nodeId))
+    }
   }
 } 

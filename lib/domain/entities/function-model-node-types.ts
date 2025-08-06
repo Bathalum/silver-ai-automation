@@ -1,52 +1,51 @@
 // Function Model Node Types
-// This file defines the FunctionModelNode interface that extends BaseNode with function model specific properties
+// This file defines the FunctionModelNode interface for the node-based architecture
 
-import { BaseNode, NodeMetadata, NodeRelationship } from './unified-node-types'
+import type { BaseNode } from './base-node-types'
+import type { 
+  Stage as StageValueObject, 
+  ActionItem as ActionItemValueObject, 
+  DataPort as DataPortValueObject, 
+  RACIMatrix as RACIMatrixValueObject, 
+  DataChange, 
+  BoundaryCriteria,
+  ExecutionType,
+  RetryPolicy as RetryPolicyValueObject
+} from '../value-objects/function-model-value-objects'
 
+// FunctionModelNode extends BaseNode according to node-based architecture
 export interface FunctionModelNode extends BaseNode {
-  type: 'function-model'
-  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainerNode'
-  modelId: string
+  featureType: 'function-model'
+  nodeType: 'stageNode' | 'actionTableNode' | 'ioNode' | 'functionModelContainer'
   
-  // Preserve ALL existing data structures
+  // Function Model specific properties
   functionModelData: {
-    stage?: Stage
-    action?: ActionItem
-    io?: DataPort
+    stage?: StageValueObject
+    action?: ActionItemValueObject
+    io?: DataPortValueObject
     container?: FunctionModelContainer
   }
   
-  // Preserve complex business logic
-  businessLogic: {
-    sla?: number
-    kpis?: string[]
-    complexity?: 'simple' | 'moderate' | 'complex'
-    estimatedDuration?: number
-  }
-  
-  // Preserve process behavior
+  // Process-specific behavior
   processBehavior: {
-    executionType: 'sequential' | 'parallel' | 'conditional'
-    dependencies?: string[]
-    triggers?: string[]
+    executionType: ExecutionType
+    dependencies: string[] // IDs of dependent nodes
+    timeout?: number
+    retryPolicy?: RetryPolicyValueObject
   }
   
-  // Preserve React Flow specific data
-  reactFlowData: {
-    parentNode?: string
-    extent?: 'parent' | [number, number, number, number]
-    draggable?: boolean
-    selectable?: boolean
-    deletable?: boolean
-    width?: number
-    height?: number
+  // Business logic properties
+  businessLogic: {
+    raciMatrix?: RACIMatrixValueObject
+    sla?: ServiceLevelAgreement
+    kpis?: KeyPerformanceIndicator[]
   }
   
-  // Preserve complex relationships
-  relationships: NodeRelationship[]
+  // Relationships with other nodes (using nodeLinks for clarity)
+  nodeLinks: FunctionModelNodeLink[]
 }
 
-// Preserve ALL existing complex types
+// Preserve ALL existing complex types for backward compatibility
 export interface Stage {
   id: string
   name: string
@@ -96,27 +95,30 @@ export interface RACIMatrix {
   responsible: string[]
 }
 
-// Preserve complex relationship system
+// Cross-feature linking system
 export interface NodeLinkedEntity {
   id: string
   type: 'knowledge-base' | 'event-storm' | 'spindle' | 'function-model'
   name: string
   description: string
-  linkType: 'input' | 'output' | 'reference' | 'dependency'
+  linkType: 'documents' | 'implements' | 'references' | 'supports' | 'nested' | 'triggers' | 'consumes' | 'produces'
   context?: Record<string, any>
 }
 
-// Preserve complex relationship system
-export interface FunctionModelNodeRelationship extends NodeRelationship {
-  id: string
-  sourceNodeId: string
-  targetNodeId: string
-  sourceHandle: string
-  targetHandle: string
-  type: 'parent-child' | 'sibling'
+// Node relationship system (renamed from FunctionModelNodeRelationship for clarity)
+export interface FunctionModelNodeLink {
+  linkId: string // Maps to node_links.link_id
+  sourceNodeId: string // Maps to node_links.source_node_id
+  targetNodeId: string // Maps to node_links.target_node_id
+  sourceHandle?: string // Maps to node_links.source_handle
+  targetHandle?: string // Maps to node_links.target_handle
+  linkType: 'parent-child' | 'sibling' | 'references' | 'implements' | 'documents' | 'supports' | 'nested'
   sourceNodeType: 'stageNode' | 'actionTableNode' | 'ioNode'
   targetNodeType: 'stageNode' | 'actionTableNode' | 'ioNode'
-  createdAt: Date
+  linkStrength?: number // Maps to node_links.link_strength
+  linkContext?: Record<string, any> // Maps to node_links.link_context
+  createdAt: Date // Maps to node_links.created_at
+  createdBy?: string // Maps to node_links.created_by
 }
 
 // Validation types for node updates
@@ -131,6 +133,25 @@ export interface FunctionModelNodeOptions {
   description?: string
   businessLogic?: Partial<FunctionModelNode['businessLogic']>
   processBehavior?: Partial<FunctionModelNode['processBehavior']>
-  reactFlowData?: Partial<FunctionModelNode['reactFlowData']>
-  metadata?: Partial<NodeMetadata>
+  metadata?: Partial<FunctionModelNode['metadata']>
+}
+
+// Additional types for business logic
+export interface ServiceLevelAgreement {
+  responseTime: number
+  availability: number
+  uptime: number
+}
+
+export interface KeyPerformanceIndicator {
+  name: string
+  target: number
+  current: number
+  unit: string
+}
+
+export interface RetryPolicy {
+  maxRetries: number
+  backoff: 'linear' | 'exponential' | 'constant'
+  delay: number
 } 

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, Save, Link, Settings } from 'lucide-react'
+import { Settings, Zap, Layers, Hammer, ArrowLeftRight } from 'lucide-react'
 
 interface FloatingToolbarProps {
   onAddStage: () => void
@@ -10,8 +10,10 @@ interface FloatingToolbarProps {
   onAddIO: () => void
   onTogglePersistence: () => void
   onSave?: () => void
+  onQuickSave?: () => void
   onLink?: () => void
   onSettings?: () => void
+  hasUnsavedChanges?: boolean
 }
 
 export function FloatingToolbar({
@@ -20,21 +22,28 @@ export function FloatingToolbar({
   onAddIO,
   onTogglePersistence,
   onSave,
+  onQuickSave,
   onLink,
-  onSettings
+  onSettings,
+  hasUnsavedChanges = false
 }: FloatingToolbarProps) {
   return (
-    <div className="fixed top-4 left-4 z-50 flex flex-col gap-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg p-2">
+    <div 
+      className="flex flex-row gap-2 bg-white/80 backdrop-blur-sm border border-transparent hover:border-gray-300 rounded-lg shadow px-3 py-2"
+      role="toolbar"
+      aria-label="Function model toolbar"
+    >
       {/* Node Creation Buttons */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-row gap-1" role="group" aria-label="Node creation tools">
         <Button
           variant="outline"
           size="sm"
           onClick={onAddStage}
           className="w-10 h-10 p-0 flex items-center justify-center"
           title="Add Stage Node"
+          aria-label="Add stage node"
         >
-          <Plus className="w-4 h-4" />
+          <Layers className="w-4 h-4" />
         </Button>
         
         <Button
@@ -43,8 +52,9 @@ export function FloatingToolbar({
           onClick={onAddAction}
           className="w-10 h-10 p-0 flex items-center justify-center"
           title="Add Action Node"
+          aria-label="Add action node"
         >
-          <Plus className="w-4 h-4" />
+          <Hammer className="w-4 h-4" />
         </Button>
         
         <Button
@@ -53,16 +63,17 @@ export function FloatingToolbar({
           onClick={onAddIO}
           className="w-10 h-10 p-0 flex items-center justify-center"
           title="Add I/O Node"
+          aria-label="Add input/output node"
         >
-          <Plus className="w-4 h-4" />
+          <ArrowLeftRight className="w-4 h-4" />
         </Button>
       </div>
       
       {/* Divider */}
-      <div className="w-full h-px bg-gray-200 my-1" />
+      <div className="w-px h-8 bg-gray-200 mx-1" aria-hidden="true" />
       
       {/* Action Buttons */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-row gap-1" role="group" aria-label="Model actions">
         {onSave && (
           <Button
             variant="outline"
@@ -70,8 +81,24 @@ export function FloatingToolbar({
             onClick={onSave}
             className="w-10 h-10 p-0 flex items-center justify-center"
             title="Save Model"
+            aria-label="Save model"
           >
-            <Save className="w-4 h-4" />
+            <Zap className="w-4 h-4" />
+          </Button>
+        )}
+        
+        {onQuickSave && (
+          <Button
+            variant={hasUnsavedChanges ? "default" : "outline"}
+            size="sm"
+            onClick={onQuickSave}
+            className={`w-10 h-10 p-0 flex items-center justify-center ${
+              hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''
+            }`}
+            title={hasUnsavedChanges ? "Quick Save (Unsaved Changes)" : "Quick Save"}
+            aria-label={hasUnsavedChanges ? "Quick save model with unsaved changes" : "Quick save model"}
+          >
+            <Zap className="w-4 h-4" />
           </Button>
         )}
         
@@ -82,20 +109,11 @@ export function FloatingToolbar({
             onClick={onLink}
             className="w-10 h-10 p-0 flex items-center justify-center"
             title="Cross-Feature Links"
+            aria-label="Manage cross-feature links"
           >
-            <Link className="w-4 h-4" />
+            <ArrowLeftRight className="w-4 h-4" />
           </Button>
         )}
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onTogglePersistence}
-          className="w-10 h-10 p-0 flex items-center justify-center"
-          title="Toggle Persistence Sidebar"
-        >
-          <Settings className="w-4 h-4" />
-        </Button>
         
         {onSettings && (
           <Button
@@ -104,10 +122,28 @@ export function FloatingToolbar({
             onClick={onSettings}
             className="w-10 h-10 p-0 flex items-center justify-center"
             title="Settings"
+            aria-label="Open settings"
           >
             <Settings className="w-4 h-4" />
           </Button>
         )}
+      </div>
+      
+      {/* Divider */}
+      <div className="w-px h-8 bg-gray-200 mx-1" aria-hidden="true" />
+      
+      {/* Persistence Button */}
+      <div role="group" aria-label="Persistence tools">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onTogglePersistence}
+          className="w-10 h-10 p-0 flex items-center justify-center"
+          title="Toggle Persistence Sidebar"
+          aria-label="Toggle persistence sidebar"
+        >
+          <Layers className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   )

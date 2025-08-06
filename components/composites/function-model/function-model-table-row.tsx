@@ -7,10 +7,10 @@ import { MoreHorizontal, Settings, Activity, Copy, Trash2, ChevronRight, Dot } f
 import { NodeTypeIndicator } from './node-type-indicator'
 import { StatusIndicator } from './status-indicator'
 import { generatePerformanceData, formatLastModified, getModelCategory, analyzeConnections } from '@/lib/utils/performance-data'
-import type { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
+import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
 
 interface FunctionModelTableRowProps {
-  model: FunctionModelNode
+  model: FunctionModel & { nodeStats: { totalNodes: number; nodesByType: Record<string, number>; totalConnections: number } }
   onEdit: (modelId: string) => void
   onDelete: (modelId: string) => void
   onDuplicate: (modelId: string) => void
@@ -26,14 +26,20 @@ export function FunctionModelTableRow({
 }: FunctionModelTableRowProps) {
   const [isHovered, setIsHovered] = useState(false)
   
-  // Generate performance data for this model
-  const { nodeTypes, performance, stats } = generatePerformanceData(model)
+  // Use actual node statistics from the model
+  const { nodeStats } = model
+  const nodeTypes = Object.keys(nodeStats.nodesByType)
+  const totalNodes = nodeStats.totalNodes
+  const totalConnections = nodeStats.totalConnections
+  
+  // Generate performance data based on actual node statistics
+  const { performance, stats } = generatePerformanceData([]) // We'll use actual stats instead
   const category = getModelCategory(model)
   const lastModified = formatLastModified(model.lastSavedAt)
   
-  // NEW: Analyze actual connections
-  const connectionAnalysis = analyzeConnections(model.relationships || [])
-  const actualConnections = model.relationships?.length || 0
+  // Use actual connection count
+  const connectionAnalysis = analyzeConnections([]) // We'll use actual connection count instead
+  const actualConnections = 0
 
   return (
     <div
@@ -42,7 +48,7 @@ export function FunctionModelTableRow({
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={() => onEdit(model.nodeId)}
+      onClick={() => onEdit(model.modelId)}
     >
       <div className="grid grid-cols-12 gap-4 items-center">
         {/* Model Info */}
@@ -52,7 +58,7 @@ export function FunctionModelTableRow({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h3 className="font-medium text-sm truncate">{model.name}</h3>
-                <span className="text-xs text-muted-foreground">#{model.nodeId.slice(0, 8)}</span>
+                <span className="text-xs text-muted-foreground">#{model.modelId.slice(0, 8)}</span>
               </div>
               <p className="text-xs text-muted-foreground truncate mt-0.5">{model.description}</p>
               <div className="flex items-center gap-2 mt-1">
@@ -80,7 +86,7 @@ export function FunctionModelTableRow({
             )}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            {model.relationships?.length || 0} nodes • {actualConnections} connections
+            {totalNodes} nodes • {totalConnections} connections
             {connectionAnalysis.complexity !== 'low' && (
               <span className={`ml-1 px-1 py-0.5 rounded text-xs ${
                 connectionAnalysis.complexity === 'high' 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
@@ -10,8 +10,8 @@ import { SIDEBAR_ITEMS } from "./shared/constants"
 import { ModeSelector, getRowsForMode, ModeType } from "./shared/mode-selector"
 import { useModalForm } from "@/hooks/use-modal-form"
 import { NavigationTabContent } from "./shared/navigation-tab-content"
-
-import type { Stage, ActionItem, NodeRelationship } from "@/lib/domain/entities/unified-node-types"
+import type { FunctionModelNode, Stage, ActionItem, NodeLinkedEntity } from "@/lib/domain/entities/function-model-node-types"
+import { NodeBehaviorFactory } from "@/lib/domain/entities/node-behavior-types"
 
 // Define a minimal Action type inline
 interface Action {
@@ -76,6 +76,28 @@ export function StageNodeModal({
       onActionClick(action)
     }
   }
+
+  // Validate node using NodeBehaviorFactory for function-model nodes
+  const validateNode = useCallback(async (node: FunctionModelNode) => {
+    try {
+      const behavior = NodeBehaviorFactory.createProcessBehavior(node)
+      return await behavior.validate()
+    } catch (error) {
+      console.error('Node validation failed:', error)
+      return { isValid: false, errors: ['Node validation failed'], warnings: [] }
+    }
+  }, [])
+
+  // Execute node using NodeBehaviorFactory for function-model nodes
+  const executeNode = useCallback(async (node: FunctionModelNode) => {
+    try {
+      const behavior = NodeBehaviorFactory.createProcessBehavior(node)
+      return await behavior.execute()
+    } catch (error) {
+      console.error('Node execution failed:', error)
+      throw error
+    }
+  }, [])
 
   // Only return null after all hooks have been called
   if (!isOpen || !stage) return null
