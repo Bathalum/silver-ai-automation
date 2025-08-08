@@ -34,7 +34,7 @@ import { FunctionModelNode } from '../../domain/entities/function-model-node-typ
 import { SOP } from '../../domain/entities/knowledge-base-types'
 import { NodeHandlerFactory } from '../../domain/services/node-handler-factory'
 import { FunctionModelValidationService } from '../../domain/services/function-model-validation-service'
-import { ApplicationError } from '../exceptions/application-exceptions'
+import { ApplicationException } from '../exceptions/application-exceptions'
 
 export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
   constructor(
@@ -62,7 +62,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
       
       return newNode
     } catch (error) {
-      throw new ApplicationError(`Failed to create node: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new ApplicationException(`Failed to create node: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -70,7 +70,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
     try {
       return await this.retrieveNodeByType<T>(nodeType, nodeId)
     } catch (error) {
-      throw new ApplicationError(`Failed to get node: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new ApplicationException(`Failed to get node: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -78,7 +78,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
     try {
       const existingNode = await this.getNode<T>(nodeType, nodeId)
       if (!existingNode) {
-        throw new ApplicationError(`Node not found: ${nodeId}`)
+        throw new ApplicationException(`Node not found: ${nodeId}`)
       }
 
       const updatedNode = {
@@ -90,7 +90,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
       await this.storeNodeByType(updatedNode)
       return updatedNode
     } catch (error) {
-      throw new ApplicationError(`Failed to update node: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new ApplicationException(`Failed to update node: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -100,7 +100,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
       // Also remove any associated links
       await this.nodeRelationshipRepository.deleteByNode(nodeId)
     } catch (error) {
-      throw new ApplicationError(`Failed to delete node: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new ApplicationException(`Failed to delete node: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -132,7 +132,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
       await this.nodeRelationshipRepository.create(relationship)
       return newLink
     } catch (error) {
-      throw new ApplicationError(`Failed to create node link: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new ApplicationException(`Failed to create node link: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -146,7 +146,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
         return []
       }
     } catch (error) {
-      throw new ApplicationError(`Failed to get node links: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new ApplicationException(`Failed to get node links: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -170,7 +170,7 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
 
       return connectedNodes
     } catch (error) {
-      throw new ApplicationError(`Failed to get connected nodes: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new ApplicationException(`Failed to get connected nodes: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -178,9 +178,9 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
   async executeNode(nodeType: string, nodeId: string, context?: any): Promise<any> {
     try {
       // For now, return a placeholder as NodeHandlerFactory.getHandler doesn't exist
-      throw new ApplicationError('Node execution not implemented yet')
+      throw new ApplicationException('Node execution not implemented yet')
     } catch (error) {
-      throw new ApplicationError(`Failed to execute node: ${error instanceof Error ? error.message : 'Unknown error'}`)
+              throw new ApplicationException(`Failed to execute node: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -214,9 +214,9 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
   async getNodeBehavior(nodeType: string, nodeId: string): Promise<NodeBehavior> {
     try {
       // For now, return a placeholder as NodeHandlerFactory.getHandler doesn't exist
-      throw new ApplicationError('Node behavior not implemented yet')
+      throw new ApplicationException('Node behavior not implemented yet')
     } catch (error) {
-      throw new ApplicationError(`Failed to get node behavior: ${error instanceof Error ? error.message : 'Unknown error'}`)
+              throw new ApplicationException(`Failed to get node behavior: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -255,15 +255,15 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
         break
       case 'knowledge-base':
         // TODO: Implement knowledge base repository
-        throw new ApplicationError('Knowledge base repository not implemented')
+        throw new ApplicationException('Knowledge base repository not implemented')
       case 'spindle':
         // TODO: Implement spindle repository
-        throw new ApplicationError('Spindle repository not implemented')
+        throw new ApplicationException('Spindle repository not implemented')
       case 'event-storm':
         // TODO: Implement event storm repository
-        throw new ApplicationError('Event storm repository not implemented')
+        throw new ApplicationException('Event storm repository not implemented')
       default:
-        throw new ApplicationError(`Unsupported node type: ${node.featureType}`)
+        throw new ApplicationException(`Unsupported node type: ${node.featureType}`)
     }
   }
 
@@ -275,15 +275,15 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
         return null
       case 'knowledge-base':
         // TODO: Implement knowledge base repository
-        throw new ApplicationError('Knowledge base repository not implemented')
+        throw new ApplicationException('Knowledge base repository not implemented')
       case 'spindle':
         // TODO: Implement spindle repository
-        throw new ApplicationError('Spindle repository not implemented')
+        throw new ApplicationException('Spindle repository not implemented')
       case 'event-storm':
         // TODO: Implement event storm repository
-        throw new ApplicationError('Event storm repository not implemented')
+        throw new ApplicationException('Event storm repository not implemented')
       default:
-        throw new ApplicationError(`Unsupported node type: ${nodeType}`)
+        throw new ApplicationException(`Unsupported node type: ${nodeType}`)
     }
   }
 
@@ -295,15 +295,15 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
         break
       case 'knowledge-base':
         // TODO: Implement knowledge base repository
-        throw new ApplicationError('Knowledge base repository not implemented')
+        throw new ApplicationException('Knowledge base repository not implemented')
       case 'spindle':
         // TODO: Implement spindle repository
-        throw new ApplicationError('Spindle repository not implemented')
+        throw new ApplicationException('Spindle repository not implemented')
       case 'event-storm':
         // TODO: Implement event storm repository
-        throw new ApplicationError('Event storm repository not implemented')
+        throw new ApplicationException('Event storm repository not implemented')
       default:
-        throw new ApplicationError(`Unsupported node type: ${nodeType}`)
+        throw new ApplicationException(`Unsupported node type: ${nodeType}`)
     }
   }
 

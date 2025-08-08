@@ -26,13 +26,28 @@ First, ask informative questions to fully understand:
 ### 3. **Consider process or design issues.**
 After identifying technical causes, reflect on whether design oversights, miscommunications, or process failures contributed to the bug, particularly violations of clean architecture or component architecture principles.
 
-### 4. **Propose fixes that respect clean architecture and component architecture.**
-- Ensure fixes align with clean architecture layers (e.g., changes in the presentation layer should not directly access data layer; use cases should mediate interactions).
-- For UI-related issues, ensure fixes follow the component architecture flow (e.g., maintain proper state management, event handling, and component composition).
+### 4. **Propose fixes that respect clean architecture, component architecture, and dependency inversion.**
+- **Ensure fixes align with clean architecture layers**:
+  - **Presentation Layer**: UI components should only handle display logic and user interactions. They should not contain business logic or directly access data sources. Use cases should mediate all business operations.
+  - **Domain Layer**: Business logic and rules should be isolated here. Domain entities should be pure and not depend on external frameworks or infrastructure concerns.
+  - **Application Layer**: Use cases should orchestrate domain entities and coordinate between presentation and infrastructure layers. They should implement application-specific business rules and workflows.
+  - **Infrastructure Layer**: Data access, external API calls, and framework-specific implementations should be isolated here. Repository implementations should depend on domain interfaces, not the other way around.
+  - **Cross-Layer Communication**: Changes in one layer should not directly impact other layers. Use interfaces and dependency injection to maintain loose coupling. For example, if a UI component needs data, it should call a use case, which then calls a repository through an interface.
+  - **Data Flow Direction**: Data should flow from high-level layers to low-level layers through well-defined interfaces. Low-level layers should not know about high-level layers.
+  - **Framework Independence**: Domain and application layers should remain independent of specific frameworks (React, Next.js, etc.). Framework-specific code should be isolated to the presentation and infrastructure layers.
+- **Respect Dependency Inversion Principle**: 
+  - High-level modules (use cases, services) should not depend on low-level modules (repositories, external APIs)
+  - Both should depend on abstractions (interfaces)
+  - Abstractions should not depend on details; details should depend on abstractions
+  - Design fixes to use interfaces and dependency injection rather than direct dependencies
+  - Consolidate overlapping functionality rather than creating new functions.
+- **For UI-related issues, ensure fixes follow the component architecture flow** (e.g., maintain proper state management, event handling, and component composition).
+- **Avoid Duplicate Functions**: Before proposing a fix, check for existing functions that perform similar operations. 
+- **Check for existing patterns** in the codebase and follow established architectural patterns rather than creating new ones.
 - Once the RCA is complete and the scenario is clearly explained, produce:
   - A **root cause summary**: one clear sentence of the fundamental fault.
-  - A **corrective suggestion**: minimal description of change(s) that resolve the issue while adhering to clean architecture and, for UI issues, the component architecture.
-  - A **considerations for the fix**: brief thoughts on potential side effects or long-term implications (e.g., scalability, maintainability, alignment with clean architecture or component architecture).
+  - A **corrective suggestion**: minimal description of change(s) that resolve the issue while adhering to clean architecture, avoiding duplicates, and respecting dependency inversion.
+  - A **considerations for the fix**: brief thoughts on potential side effects or long-term implications (e.g., scalability, maintainability, alignment with clean architecture, dependency inversion compliance).
 
 ## Output Format
 
@@ -50,12 +65,15 @@ After identifying technical causes, reflect on whether design oversights, miscom
     "Are there any recent changes that might have introduced this issue?",
     "Is this issue reproducible consistently or intermittently?",
     "What is the impact on other parts of the system?",
-    "Are there any performance implications or resource constraints?"
+    "Are there any performance implications or resource constraints?",
+    "Are there existing functions or services that perform similar operations to what might be needed in the fix?",
+    "What are the current dependency relationships between the modules involved in this issue?",
+    "Are there any violations of the Dependency Inversion Principle in the current implementation?"
   ],
-  "traceAnalysis": "narrative of data-flow and failures via 5 Whys, including second-order effects, respecting clean architecture layers or component architecture flow",
+  "traceAnalysis": "narrative of data-flow and failures via 5 Whys, including second-order effects, respecting clean architecture layers, component architecture flow, and dependency inversion principles",
   "rootCause": "…",
   "suggestedFix": "…",
-  "fixConsiderations": "…"
+  "fixConsiderations": "always include in Clean Architecture, and Dependency Inversion Principle"
 }
 ```
 
@@ -76,6 +94,9 @@ After identifying technical causes, reflect on whether design oversights, miscom
 10. What is the rollback capability? (Can users revert to previous versions?)
 11. What is the long-term scalability impact? (Version number exhaustion, performance)
 12. For UI issues, what is the component architecture? (N/A for this backend-focused issue)
+13. Are there existing functions or services that perform similar operations to what might be needed in the fix? (Check for existing version management functions)
+14. What are the current dependency relationships between the modules involved in this issue? (Domain layer depends on presentation data)
+15. Are there any violations of the Dependency Inversion Principle in the current implementation? (Domain layer directly depends on presentation layer data)
 
 **Trace Analysis:**
 1. **User loads old version (Presentation Layer)** → UI form calls `LoadModelVersionUseCase` to fetch historical snapshot.
@@ -102,12 +123,17 @@ After identifying technical causes, reflect on whether design oversights, miscom
 
 **Root Cause:** The `CreateVersionSnapshotUseCase` in the domain layer uses the model's current version number directly instead of querying the `ModelVersionRepository` for the latest version, violating clean architecture principles and causing database constraint violations.
 
-**Suggested Fix:** Update `CreateVersionSnapshotUseCase` to query `ModelVersionRepository` for the latest version number, increment it, and use the new version for the snapshot, ensuring proper separation of concerns between domain and data layers.
+**Suggested Fix:** Update `CreateVersionSnapshotUseCase` to query `ModelVersionRepository` for the latest version number, increment it, and use the new version for the snapshot. This fix:
+- **Avoids Duplicates**: Uses existing `ModelVersionRepository` interface rather than creating new version management functions
+- **Respects Dependency Inversion**: Domain layer depends on repository interface (abstraction), not concrete implementation
+- **Ensures Proper Separation**: Domain layer independent of presentation layer data
 
 **Fix Considerations:**
 - **Scalability**: Version numbers may eventually reach limits (e.g., 999.999.999).
 - **Performance**: Additional repository query to get the latest version.
 - **Maintainability**: More complex versioning logic but aligns with clean architecture.
 - **Architecture**: Enforces proper separation of concerns (domain layer independent of presentation).
+- **Dependency Inversion**: Domain layer depends on repository interface, not concrete implementation.
 - **Data Integrity**: Preserves complete version history.
-- **User Experience**: Clear version progression and rollback capability 
+- **User Experience**: Clear version progression and rollback capability.
+- **Code Reuse**: Leverages existing repository pattern rather than creating duplicate functionality. 

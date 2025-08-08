@@ -7,7 +7,7 @@ import { CrossFeatureLink } from '../../domain/entities/cross-feature-link-types
 import { FunctionModelRepository } from '../../infrastructure/repositories/function-model-repository'
 import { SupabaseNodeRelationshipRepository } from '../../infrastructure/repositories/node-relationship-repository'
 import { 
-  ApplicationError, 
+  ApplicationException, 
   FunctionModelNodeError, 
   FunctionModelValidationError,
   CrossFeatureLinkError 
@@ -96,7 +96,7 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
     try {
       return await this.functionModelRepository.createFunctionModelNode(node, modelId)
     } catch (error) {
-      if (error instanceof ApplicationError) throw error
+      if (error instanceof ApplicationException) throw error
       throw new FunctionModelNodeError(
         `Failed to create function model node: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'unknown',
@@ -151,7 +151,7 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
   async executeFunctionModelNode(nodeId: string, modelId: string, context?: any): Promise<any> {
     try {
       const node = await this.getFunctionModelNode(nodeId, modelId)
-      if (!node) throw new ApplicationError('Function model node not found')
+      if (!node) throw new ApplicationException('Function model node not found')
       
       switch (node.nodeType) {
         case 'stageNode':
@@ -163,7 +163,7 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
         case 'functionModelContainer':
           return await this.executeContainerNode(node, context)
         default:
-          throw new ApplicationError(`Unsupported function model node type: ${node.nodeType}`)
+          throw new ApplicationException(`Unsupported function model node type: ${node.nodeType}`)
       }
     } catch (error) {
       if (error instanceof ApplicationError) throw error
@@ -178,7 +178,7 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
   async validateFunctionModelNode(nodeId: string, modelId: string): Promise<NodeUpdateValidation> {
     try {
       const node = await this.getFunctionModelNode(nodeId, modelId)
-      if (!node) throw new ApplicationError('Function model node not found')
+      if (!node) throw new ApplicationException('Function model node not found')
       
       // Basic validation
       const errors: string[] = []
@@ -202,7 +202,7 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
         warnings
       }
     } catch (error) {
-      if (error instanceof ApplicationError) throw error
+      if (error instanceof ApplicationException) throw error
       throw new FunctionModelValidationError(
         `Failed to validate function model node: ${error instanceof Error ? error.message : 'Unknown error'}`,
         modelId,
@@ -214,7 +214,7 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
   async getFunctionModelNodeBehavior(nodeId: string, modelId: string): Promise<any> {
     try {
       const node = await this.getFunctionModelNode(nodeId, modelId)
-      if (!node) throw new ApplicationError('Function model node not found')
+      if (!node) throw new ApplicationException('Function model node not found')
       
       return {
         nodeType: node.nodeType,
@@ -225,7 +225,7 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
         businessLogic: node.businessLogic
       }
     } catch (error) {
-      if (error instanceof ApplicationError) throw error
+      if (error instanceof ApplicationException) throw error
       throw new FunctionModelNodeError(
         `Failed to get function model node behavior: ${error instanceof Error ? error.message : 'Unknown error'}`,
         nodeId,
@@ -247,12 +247,12 @@ export class FunctionModelNodeOperationsImpl implements FunctionModelNodeOperati
       const targetNode = await this.getFunctionModelNode(targetNodeId, modelId)
       
       if (!sourceNode || !targetNode) {
-        throw new ApplicationError('Source or target node not found')
+        throw new ApplicationException('Source or target node not found')
       }
       
       if (!validateConnection(sourceNode, targetNode, sourceHandle, targetHandle)) {
         const message = getConnectionValidationMessage(sourceNode, targetNode, sourceHandle, targetHandle)
-        throw new ApplicationError(message || 'Invalid connection')
+        throw new ApplicationException(message || 'Invalid connection')
       }
       
       const createdLink = await this.nodeRelationshipRepository.createFunctionModelRelationship(

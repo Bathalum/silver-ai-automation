@@ -27,6 +27,7 @@ export interface FunctionModelRepository {
   
   // Additional operations needed by use cases
   getAllFunctionModels(): Promise<FunctionModel[]>
+  getAllFunctionModelsWithNodeStats(): Promise<(FunctionModel & { nodeStats: { totalNodes: number; nodesByType: Record<string, number>; totalConnections: number } })[]>
   getFunctionModelById(modelId: string): Promise<FunctionModel | null>
   duplicateFunctionModel(modelId: string, newName: string): Promise<FunctionModel>
 }
@@ -216,15 +217,65 @@ export class SupabaseFunctionModelRepository implements FunctionModelRepository 
       // Map updates to database format
       const dbUpdates: any = {}
       
-      if (updates.name !== undefined) dbUpdates.name = updates.name
-      if (updates.description !== undefined) dbUpdates.description = updates.description
+      if (updates.name !== undefined) {
+        // Validate name field length to prevent constraint violations
+        if (updates.name.length > 255) {
+          throw new InfrastructureException(
+            `Name value too long: ${updates.name.length} characters. Maximum allowed: 255`,
+            'NODE_UPDATE_ERROR',
+            400,
+            { modelId, nodeId, updates }
+          )
+        }
+        dbUpdates.name = updates.name
+      }
+      if (updates.description !== undefined) {
+        // Description is text type, no length limit, but validate for reasonable size
+        if (updates.description.length > 10000) {
+          throw new InfrastructureException(
+            `Description value too long: ${updates.description.length} characters. Maximum allowed: 10000`,
+            'NODE_UPDATE_ERROR',
+            400,
+            { modelId, nodeId, updates }
+          )
+        }
+        dbUpdates.description = updates.description
+      }
       if (updates.position !== undefined) {
         dbUpdates.position_x = updates.position.x
         dbUpdates.position_y = updates.position.y
       }
       if (updates.nodeType !== undefined) dbUpdates.node_type = updates.nodeType
       if (updates.processBehavior !== undefined) {
-        dbUpdates.execution_type = updates.processBehavior.executionType
+        // Extract string value from ExecutionType object to prevent constraint violations
+        if (updates.processBehavior.executionType) {
+          const executionTypeValue = typeof updates.processBehavior.executionType === 'string' 
+            ? updates.processBehavior.executionType 
+            : updates.processBehavior.executionType.value
+          
+          // Validate execution type value length and content
+          if (executionTypeValue.length > 20) {
+            throw new InfrastructureException(
+              `Execution type value too long: ${executionTypeValue.length} characters. Maximum allowed: 20`,
+              'NODE_UPDATE_ERROR',
+              400,
+              { modelId, nodeId, updates }
+            )
+          }
+          
+          // Validate that the execution type is one of the allowed values
+          const validExecutionTypes = ['sequential', 'parallel', 'conditional']
+          if (!validExecutionTypes.includes(executionTypeValue)) {
+            throw new InfrastructureException(
+              `Invalid execution type: ${executionTypeValue}. Must be one of: ${validExecutionTypes.join(', ')}`,
+              'NODE_UPDATE_ERROR',
+              400,
+              { modelId, nodeId, updates }
+            )
+          }
+          
+          dbUpdates.execution_type = executionTypeValue
+        }
         dbUpdates.dependencies = updates.processBehavior.dependencies
         dbUpdates.timeout = updates.processBehavior.timeout
         dbUpdates.retry_policy = updates.processBehavior.retryPolicy
@@ -242,7 +293,19 @@ export class SupabaseFunctionModelRepository implements FunctionModelRepository 
       }
       if (updates.metadata !== undefined) dbUpdates.metadata = updates.metadata
       if (updates.visualProperties !== undefined) dbUpdates.visual_properties = updates.visualProperties
-      if (updates.status !== undefined) dbUpdates.status = updates.status
+      if (updates.status !== undefined) {
+        // Validate status field to prevent constraint violations
+        const validStatuses = ['active', 'inactive', 'draft', 'archived', 'error']
+        if (!validStatuses.includes(updates.status)) {
+          throw new InfrastructureException(
+            `Invalid status value: ${updates.status}. Must be one of: ${validStatuses.join(', ')}`,
+            'NODE_UPDATE_ERROR',
+            400,
+            { modelId, nodeId, updates }
+          )
+        }
+        dbUpdates.status = updates.status
+      }
       
       // Add updated_at timestamp
       dbUpdates.updated_at = new Date().toISOString()
@@ -570,12 +633,18 @@ export class SupabaseFunctionModelRepository implements FunctionModelRepository 
 
   async getNodeLinks(modelId: string, nodeId: string): Promise<any[]> {
     try {
-      const { data, error } = await this.supabase
+      let query = this.supabase
         .from('cross_feature_links')
         .select('*')
         .eq('source_id', modelId)
         .eq('source_feature', 'function-model')
-        .eq('source_node_id', nodeId)
+
+      // Only add source_node_id filter if nodeId is provided and not empty
+      if (nodeId && nodeId.trim() !== '') {
+        query = query.eq('source_node_id', nodeId)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         throw new InfrastructureException(`Failed to get node links: ${error.message}`, 'NODE_LINKS_GET_ERROR', 500, { modelId, nodeId })

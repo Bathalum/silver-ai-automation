@@ -1,66 +1,52 @@
-// Application Exceptions
-// This file contains application-specific exceptions following the application layer guide
+// Application Layer Exceptions
+// This file defines exceptions specific to the Application Layer
+// Following the Application Layer Complete Guide
 
-export class ApplicationError extends Error {
-  constructor(message: string, public readonly cause?: Error) {
+export class ApplicationException extends Error {
+  public readonly code: string
+  public readonly statusCode: number
+  public readonly context: Record<string, any>
+
+  constructor(
+    message: string,
+    code: string,
+    statusCode: number = 500,
+    context: Record<string, any> = {}
+  ) {
     super(message)
-    this.name = 'ApplicationError'
+    this.name = 'ApplicationException'
+    this.code = code
+    this.statusCode = statusCode
+    this.context = context
   }
 }
 
-export class NodeExecutionError extends ApplicationError {
-  constructor(message: string, public readonly nodeId: string, public readonly nodeType: string) {
-    super(message)
-    this.name = 'NodeExecutionError'
+export class VersionRestorationException extends ApplicationException {
+  constructor(
+    message: string,
+    context: Record<string, any> = {}
+  ) {
+    super(message, 'VERSION_RESTORATION_ERROR', 500, context)
+    this.name = 'VersionRestorationException'
   }
 }
 
-export class CrossNodeLinkError extends ApplicationError {
-  constructor(message: string, public readonly sourceNodeType: string, public readonly targetNodeType: string) {
-    super(message)
-    this.name = 'CrossNodeLinkError'
+export class ModelNotFoundException extends ApplicationException {
+  constructor(
+    modelId: string,
+    context: Record<string, any> = {}
+  ) {
+    super(`Model not found: ${modelId}`, 'MODEL_NOT_FOUND', 404, { modelId, ...context })
+    this.name = 'ModelNotFoundException'
   }
 }
 
-export class AIAgentExecutionError extends ApplicationError {
-  constructor(message: string, public readonly agentId: string, public readonly nodeId: string) {
-    super(message)
-    this.name = 'AIAgentExecutionError'
-  }
-}
-
-export class WorkflowExecutionError extends ApplicationError {
-  constructor(message: string, public readonly workflowId: string) {
-    super(message)
-    this.name = 'WorkflowExecutionError'
-  }
-}
-
-// Function Model specific exceptions
-export class FunctionModelNodeError extends ApplicationError {
-  constructor(message: string, public readonly nodeId: string, public readonly modelId: string) {
-    super(message)
-    this.name = 'FunctionModelNodeError'
-  }
-}
-
-export class FunctionModelValidationError extends ApplicationError {
-  constructor(message: string, public readonly modelId: string, public readonly validationErrors: string[]) {
-    super(message)
-    this.name = 'FunctionModelValidationError'
-  }
-}
-
-export class FunctionModelVersionError extends ApplicationError {
-  constructor(message: string, public readonly modelId: string, public readonly version: string) {
-    super(message)
-    this.name = 'FunctionModelVersionError'
-  }
-}
-
-export class CrossFeatureLinkError extends ApplicationError {
-  constructor(message: string, public readonly sourceFeature: string, public readonly targetFeature: string) {
-    super(message)
-    this.name = 'CrossFeatureLinkError'
+export class VersionDataInvalidException extends ApplicationException {
+  constructor(
+    message: string,
+    context: Record<string, any> = {}
+  ) {
+    super(message, 'VERSION_DATA_INVALID', 400, context)
+    this.name = 'VersionDataInvalidException'
   }
 } 

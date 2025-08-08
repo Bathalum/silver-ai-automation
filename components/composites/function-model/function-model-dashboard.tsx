@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useParams } from 'next/navigation'
-import { FunctionModelCanvas } from '@/app/(private)/dashboard/function-model/components/function-model-canvas'
+import { FunctionModelContainer } from '@/components/composites/function-model/function-model-container'
 
 interface FunctionModelDashboardProps {
   modelId?: string
@@ -29,7 +29,7 @@ export function FunctionModelDashboard({
   
   return (
     <div className="w-full h-full">
-      <FunctionModelCanvas modelId={modelId} readOnly={readOnly} />
+      <FunctionModelContainer modelId={modelId} readOnly={readOnly} />
     </div>
   )
 } 

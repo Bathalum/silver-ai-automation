@@ -15,6 +15,14 @@ export interface SearchResult {
   metadata?: Record<string, any>
 }
 
+export interface EntitySearchResult {
+  id: string
+  name: string
+  type: string
+  description: string
+  metadata: Record<string, any>
+}
+
 export class EntitySearchService {
   private functionModelRepository: FunctionModelRepository
   private knowledgeBaseRepository: KnowledgeBaseRepository

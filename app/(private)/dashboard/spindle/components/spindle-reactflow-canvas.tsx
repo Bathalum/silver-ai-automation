@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -107,7 +107,7 @@ export function SpindleReactFlowCanvas() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: "node" | "edge" | null; id: string | null }>({ x: 0, y: 0, type: null, id: null });
 
   // nodeTypes closure so setNodes is available for EditableNodeLabel
-  const nodeTypes: NodeTypes = React.useMemo(() => ({
+  const nodeTypes: NodeTypes = useMemo(() => ({
     input: (props: any) => (
       <>
         <div className="rf-mindmap-node-inner">
@@ -171,7 +171,7 @@ export function SpindleReactFlowCanvas() {
         <Handle type="target" position={Position.Top} style={{ background: '#2563eb' }} />
       </>
     ),
-  }), [setNodes]);
+  }), []); // ✅ Remove setNodes from dependency array
 
   const onConnect: OnConnect = useCallback((connection: Connection) => setEdges((eds: Edge[]) => addEdge(connection, eds)), [setEdges]);
 

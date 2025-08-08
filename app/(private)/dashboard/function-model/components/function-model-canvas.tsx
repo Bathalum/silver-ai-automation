@@ -19,10 +19,11 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Edit, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-import { useFunctionModelNodes } from '@/lib/application/hooks/use-function-model-nodes'
+
 import { validateConnection } from '@/lib/domain/entities/function-model-connection-rules'
 import { FunctionModelNode } from '@/lib/domain/entities/function-model-node-types'
-import { getFunctionModelById, updateFunctionModel } from '@/lib/application/use-cases/function-model-use-cases'
+
+import { useFunctionModelSaveUseCases } from '@/lib/application/hooks/use-function-model-save-use-cases'
 import { useFeedback } from '@/components/ui/feedback-toast'
 
 // Import existing node components
@@ -39,6 +40,7 @@ import { FloatingNameField, FloatingDescriptionField } from '@/components/compos
 // Import the new edge context menu component
 import { EdgeContextMenu } from './edge-context-menu'
 
+// Define nodeTypes outside component to prevent React Flow warnings
 const nodeTypes = {
   stageNode: StageNode,
   actionTableNode: ActionTableNode,
@@ -97,48 +99,118 @@ function ContextMenu({ x, y, nodeId, onDelete, onEdit, onCopy, onClose }: Contex
   )
 }
 
-export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: string; readOnly?: boolean }) {
+interface FunctionModelCanvasProps {
+  modelId: string
+  readOnly?: boolean
+  // State data
+  nodes?: any[]
+  links?: any[]
+  model?: any
+  loading?: boolean
+  error?: string | null
+  // State management functions
+  createNode?: (nodeType: string, name: string, position: any, options?: any) => Promise<any>
+  updateNode?: (nodeId: string, updates: any) => Promise<void>
+  deleteNode?: (nodeId: string) => Promise<void>
+  createConnection?: (source: string, target: string, sourceHandle: string, targetHandle: string) => Promise<void>
+  deleteConnection?: (connectionId: string) => Promise<void>
+  persistChanges?: () => Promise<void>
+  hasUnsavedChanges?: () => boolean
+  // Modal management
+  modalStack?: any[]
+  openModal?: (modal: any) => void
+  closeModal?: () => void
+  // Other functions
+  loadNodes?: () => Promise<void>
+  updateModel?: (updates: any) => void
+  // Additional state management functions
+  selectNode?: (nodeId: string) => void
+  selectNodes?: (nodeIds: string[]) => void
+  clearSelection?: () => void
+  setHoveredNode?: (nodeId: string | null) => void
+  startEditingName?: (nodeId: string) => void
+  stopEditingName?: () => void
+  startEditingDescription?: (nodeId: string) => void
+  stopEditingDescription?: () => void
+  clearError?: () => void
+  discardChanges?: () => void
+  // Modal stack management
+  currentModal?: any
+  canGoBack?: boolean
+  closeAllModals?: () => void
+  goBackToPreviousModal?: () => void
+  closeModalsByContext?: (context: string) => void
+  updateCurrentModal?: (updates: any) => void
+  hasModals?: boolean
+  modalCount?: number
+}
+
+export function FunctionModelCanvas({ 
+  modelId, 
+  readOnly = false,
+  // State data
+  nodes: appNodes = [],
+  links: appLinks = [],
+  model,
+  loading = false, 
+  error,
+  // State management functions
+  createNode,
+  updateNode,
+  deleteNode,
+  createConnection,
+  deleteConnection,
+  persistChanges,
+  hasUnsavedChanges = () => false,
+  // Modal management
+  modalStack = [],
+  openModal,
+  closeModal,
+  // Other functions
+  loadNodes,
+  updateModel,
+  // Additional state management functions
+  selectNode,
+  selectNodes,
+  clearSelection,
+  setHoveredNode,
+  startEditingName,
+  stopEditingName,
+  startEditingDescription,
+  stopEditingDescription,
+  clearError,
+  discardChanges,
+  // Modal stack management
+  currentModal,
+  canGoBack = false,
+  closeAllModals,
+  goBackToPreviousModal,
+  closeModalsByContext,
+  updateCurrentModal,
+  hasModals = false,
+  modalCount = 0
+}: FunctionModelCanvasProps) {
+  // Initialize Application layer save use cases
+  const {
+    saveFunctionModel,
+    loadFunctionModel,
+    createVersion,
+    restoreFromVersion,
+    updateFunctionModelMetadata,
+    isSaving,
+    isLoading: isSaveLoading,
+    isCreatingVersion,
+    isRestoring,
+    isUpdatingMetadata,
+    lastSaveResult,
+    lastLoadResult,
+    error: saveError
+  } = useFunctionModelSaveUseCases()
   const router = useRouter()
-  
-  // SINGLE SOURCE OF TRUTH: Application Layer State Only
-  const { 
-    nodes: appNodes,
-    links: appLinks,
-    model,
-    loading, 
-    error, 
-    loadNodes,
-    modalStack,
-    currentModal,
-    canGoBack,
-    openModal,
-    closeModal,
-    closeAllModals,
-    goBackToPreviousModal,
-    closeModalsByContext,
-    updateCurrentModal,
-    hasModals,
-    modalCount,
-    createNode, 
-    updateNode, 
-    createConnection,
-    deleteConnection,
-    deleteNode,
-    selectNode,
-    selectNodes,
-    clearSelection,
-    setHoveredNode,
-    startEditingName,
-    stopEditingName,
-    startEditingDescription,
-    stopEditingDescription,
-    clearError
-  } = useFunctionModelNodes(modelId)
   
   // UI State (Presentation Layer Only)
   const [modelLoading, setModelLoading] = useState(true)
   const [isEditingModel, setIsEditingModel] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -164,12 +236,12 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
   const pendingPositionUpdates = useRef<Map<string, { x: number; y: number }>>(new Map())
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Load model data ONCE on mount
+  // Load nodes when modelId changes
   useEffect(() => {
-    console.log('Initial load for modelId:', modelId)
-    loadNodes()
-    setModelLoading(false)
-  }, [modelId, loadNodes])
+    if (modelId && loadNodes) {
+      loadNodes()
+    }
+  }, [modelId]) // Remove loadNodes from dependencies to prevent infinite loops
 
   // OPTIMIZED: Node conversion function with memoization
   const convertToReactFlowNode = useCallback((unifiedNode: FunctionModelNode): Node => {
@@ -193,33 +265,82 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
   // Convert application nodes to React Flow nodes (SINGLE SOURCE OF TRUTH)
   const reactFlowNodes = useMemo(() => {
-    return appNodes?.map(convertToReactFlowNode) || []
+    if (!appNodes || appNodes.length === 0) {
+      return []
+    }
+    return appNodes.map(convertToReactFlowNode)
   }, [appNodes, convertToReactFlowNode])
 
   // Convert application links to React Flow edges (SINGLE SOURCE OF TRUTH)
   const reactFlowEdges = useMemo(() => {
-    return appLinks?.map(link => ({
-      id: link.linkId,
-      source: link.sourceNodeId,
-      target: link.targetNodeId,
-      sourceHandle: link.sourceHandle,
-      targetHandle: link.targetHandle,
-      type: 'default'
-    })) || []
+    if (!appLinks || appLinks.length === 0) {
+      return []
+    }
+
+    const validEdges: any[] = []
+    const invalidEdges: any[] = []
+
+    for (const link of appLinks) {
+      try {
+        // Validate the link has required fields
+        if (!link.sourceNodeId || !link.targetNodeId) {
+          console.warn('Invalid link - missing source or target:', link)
+          invalidEdges.push(link)
+          continue
+        }
+
+        // Create React Flow edge
+        const edge = {
+          id: link.id || link.linkId || `edge-${link.sourceNodeId}-${link.targetNodeId}`,
+          source: link.sourceNodeId,
+          target: link.targetNodeId,
+          sourceHandle: link.sourceHandle,
+          targetHandle: link.targetHandle,
+          type: link.type || 'default'
+        }
+
+        // Additional validation
+        if (edge.source === edge.target) {
+          console.warn('Invalid edge - self-loop detected:', edge)
+          invalidEdges.push(link)
+          continue
+        }
+
+        validEdges.push(edge)
+      } catch (error) {
+        console.error('Error converting link to edge:', link, error)
+        invalidEdges.push(link)
+      }
+    }
+
+    if (invalidEdges.length > 0) {
+      console.warn(`Found ${invalidEdges.length} invalid edges that were skipped:`, invalidEdges)
+    }
+
+    console.debug(`Converted ${validEdges.length} valid edges for React Flow`)
+    return validEdges
   }, [appLinks])
 
+  // Create stable references for empty arrays to prevent infinite loops
+  const stableEmptyNodes = useMemo(() => [], [])
+  const stableEmptyEdges = useMemo(() => [], [])
+
+  // Use stable references when arrays are empty
+  const finalReactFlowNodes = reactFlowNodes.length === 0 ? stableEmptyNodes : reactFlowNodes
+  const finalReactFlowEdges = reactFlowEdges.length === 0 ? stableEmptyEdges : reactFlowEdges
+
   // REQUIRED: React Flow internal state management (for interactive operations)
-  const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowEdges)
+  const [nodes, setNodes, onNodesChange] = useNodesState(finalReactFlowNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(finalReactFlowEdges)
 
   // SYNC: Keep React Flow state in sync with application state
   useEffect(() => {
-    setNodes(reactFlowNodes)
-  }, [reactFlowNodes, setNodes])
+    setNodes(finalReactFlowNodes)
+  }, [finalReactFlowNodes]) // Use stable references to prevent infinite loops
 
   useEffect(() => {
-    setEdges(reactFlowEdges)
-  }, [reactFlowEdges, setEdges])
+    setEdges(finalReactFlowEdges)
+  }, [finalReactFlowEdges]) // Use stable references to prevent infinite loops
 
   // REQUIRED: Handle edge changes (deletions)
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -228,7 +349,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
     
     // Handle edge deletion immediately
     changes.forEach(change => {
-      if (change.type === 'remove') {
+      if (change.type === 'remove' && deleteConnection) {
         deleteConnection(change.id).catch(error => {
           console.error('Failed to delete connection:', error)
         })
@@ -243,10 +364,14 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
     // Add to pending updates for batching
     pendingPositionUpdates.current.set(node.id, node.position)
     
-    // NO DATABASE UPDATE HERE - only track for later persistence
-    // This prevents canvas reload and follows React Flow best practices
+    // CRITICAL FIX: Update application state immediately to prevent position reversion
+    // This ensures the single source of truth stays in sync while deferring database persistence
+    if (updateNode) {
+      updateNode(node.id, { position: node.position })
+    }
+    
     console.log(`Position change tracked for node ${node.id}, will persist on save`)
-  }, [])
+  }, [updateNode])
 
   // NEW: Function to persist all pending position updates
   const persistPendingPositions = useCallback(async () => {
@@ -255,14 +380,14 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
       position
     }))
     
-    if (updates.length > 0) {
+    if (updates.length > 0 && persistChanges) {
       try {
         console.log(`Persisting ${updates.length} position updates to database`)
         
-        // Update all positions in parallel
-        await Promise.all(updates.map(({ nodeId, position }) => 
-          updateNode(nodeId, { position })
-        ))
+        // Since we now update application state immediately on drag, 
+        // we only need to persist the changes to the database
+        // The application state is already up to date
+        await persistChanges()
         
         console.log(`Successfully persisted ${updates.length} node positions`)
         
@@ -275,10 +400,10 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
         showError(`Failed to save node positions: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
-  }, [updateNode, showSuccess, showError])
+  }, [persistChanges, showSuccess, showError])
 
   // NEW: Check if there are unsaved position changes
-  const hasUnsavedChanges = useCallback(() => {
+  const hasUnsavedPositionChanges = useCallback(() => {
     return pendingPositionUpdates.current.size > 0
   }, [])
 
@@ -295,7 +420,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
   }, [])
 
   const handleContextMenuDelete = useCallback((nodeId: string) => {
-    if (!appNodes) return
+    if (!appNodes || !deleteNode) return
     const functionModelNode = appNodes.find(n => n.nodeId === nodeId)
     if (!functionModelNode) return
     
@@ -323,7 +448,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
   }, [appNodes])
 
   const handleContextMenuCopy = useCallback((nodeId: string) => {
-    if (!appNodes) return
+    if (!appNodes || !createNode) return
     const functionModelNode = appNodes.find(n => n.nodeId === nodeId)
     if (!functionModelNode) return
     
@@ -369,6 +494,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
   // Preserve ALL existing node creation handlers
   const handleAddStageNode = useCallback(async () => {
+    if (!createNode) return
     try {
       const position = { x: Math.random() * 400, y: Math.random() * 400 }
       await createNode('stageNode', 'New Stage', position, {})
@@ -380,6 +506,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
   }, [createNode])
 
   const handleAddActionNode = useCallback(async () => {
+    if (!createNode) return
     try {
       const position = { x: Math.random() * 400, y: Math.random() * 400 }
       await createNode('actionTableNode', 'New Action', position, {})
@@ -391,6 +518,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
   }, [createNode])
 
   const handleAddIONode = useCallback(async () => {
+    if (!createNode) return
     try {
       const position = { x: Math.random() * 400, y: Math.random() * 400 }
       await createNode('ioNode', 'New I/O', position, {})
@@ -403,7 +531,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
   // Preserve ALL existing connection handlers
   const handleConnect = useCallback(async (connection: Connection) => {
-    if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return
+    if (!createConnection || !connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return
     
     try {
       await createConnection(
@@ -419,7 +547,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
   // Preserve ALL existing node click handling
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    if (!appNodes) return
+    if (!appNodes || !selectNode || !openModal) return
     const functionModelNode = appNodes.find(n => n.nodeId === node.id)
     if (!functionModelNode) return
     
@@ -476,6 +604,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
   // Edge context menu action handlers
   const handleEdgeContextMenuDelete = useCallback((edgeId: string) => {
+    if (!deleteConnection) return
     try {
       deleteConnection(edgeId)
       setEdgeContextMenu(null)
@@ -490,7 +619,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
   // Preserve ALL existing node double-click handling
   const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
-    if (!appNodes) return
+    if (!appNodes || !startEditingName) return
     const functionModelNode = appNodes.find(n => n.nodeId === node.id)
     if (!functionModelNode) return
     
@@ -500,7 +629,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
   // Preserve ALL existing node mouse enter/leave handling
   const handleNodeMouseEnter = useCallback((event: React.MouseEvent, node: Node) => {
-    if (!appNodes) return
+    if (!appNodes || !setHoveredNode) return
     const functionModelNode = appNodes.find(n => n.nodeId === node.id)
     if (functionModelNode) {
       setHoveredNode(functionModelNode)
@@ -508,6 +637,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
   }, [appNodes, setHoveredNode])
 
   const handleNodeMouseLeave = useCallback(() => {
+    if (!setHoveredNode) return
     setHoveredNode(null)
   }, [setHoveredNode])
 
@@ -546,14 +676,23 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
 
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        await updateFunctionModel(modelId, updates)
-        showSuccess('Model saved successfully!')
+        const result = await updateFunctionModelMetadata(modelId, updates, 'user') // This should come from auth context
+        if (result.success) {
+          showSuccess('Model saved successfully!')
+          
+          // Update local model state to reflect the changes
+          if (result.model && updateModel) {
+            updateModel(updates)
+          }
+        } else {
+          showError(`Failed to save model: ${result.error}`)
+        }
       } catch (error) {
         console.error('Failed to save model:', error)
         showError('Failed to save model')
       }
     }, 1000) // 1 second debounce
-  }, [modelId, showSuccess, showError])
+  }, [modelId, updateFunctionModelMetadata, showSuccess, showError]) // Remove updateModel from dependencies to prevent infinite loops
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -566,26 +705,45 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
     }
   }, [])
 
-  // Quick save function for toolbar - now includes position persistence
+  // Quick save function for toolbar - now uses Application layer
   const handleQuickSave = useCallback(async () => {
     try {
-      if (!model) return
+      if (!model || !appNodes || !persistChanges) return
       
       // First persist any pending position changes
       await persistPendingPositions()
       
-      // Then save model metadata
-      await updateFunctionModel(modelId, {
-        name: model.name,
-        description: model.description
-      })
+      // Then persist all unsaved changes (nodes, links, deletions)
+      await persistChanges()
       
-      showSuccess('Model saved successfully!')
+      // Use Application layer to save the model
+      const saveResult = await saveFunctionModel(
+        modelId,
+        appNodes,
+        appLinks || [],
+        {
+          changeSummary: 'Quick save',
+          author: 'user', // This should come from auth context
+          isPublished: false
+        },
+        {
+          validateBeforeSave: true,
+          createBackup: false,
+          updateVersion: true,
+          createNewVersion: false
+        }
+      )
+      
+      if (saveResult.success) {
+        showSuccess('Model saved successfully!')
+      } else {
+        showError(`Failed to save model: ${saveResult.errors.join(', ')}`)
+      }
     } catch (error) {
       console.error('Failed to quick save:', error)
       showError('Failed to save model')
     }
-  }, [model, modelId, persistPendingPositions, showSuccess, showError])
+  }, [model, modelId, appNodes, appLinks, persistPendingPositions, persistChanges, saveFunctionModel, showSuccess, showError])
 
   if (loading) {
     return (
@@ -595,26 +753,34 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
     )
   }
 
-  if (isVersionLoading) {
+  if (isVersionLoading || isSaveLoading || isCreatingVersion || isRestoring || isUpdatingMetadata) {
     return (
       <div className="w-full h-full flex items-center justify-center">
-        <div className="text-lg">Loading version...</div>
+        <div className="text-lg">
+          {isVersionLoading && 'Loading version...'}
+          {isSaveLoading && 'Saving model...'}
+          {isCreatingVersion && 'Creating version...'}
+          {isRestoring && 'Restoring version...'}
+          {isUpdatingMetadata && 'Updating model...'}
+        </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error || saveError) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="text-red-500">
           <div className="text-lg font-semibold">Error loading function model</div>
-          <div className="text-sm">{error}</div>
-          <button 
-            onClick={clearError}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
+          <div className="text-sm">{error || saveError}</div>
+          {clearError && (
+            <button 
+              onClick={clearError}
+              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Retry
+            </button>
+          )}
         </div>
       </div>
     )
@@ -678,7 +844,7 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
              onAddIO={handleAddIONode}
              onTogglePersistence={() => setPersistenceSidebarOpen(!persistenceSidebarOpen)}
              onQuickSave={handleQuickSave}
-             hasUnsavedChanges={hasUnsavedChanges()}
+             hasUnsavedChanges={hasUnsavedChanges() || hasUnsavedPositionChanges()}
            />
          </div>
 
@@ -725,6 +891,22 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
             size={1}
             aria-label="Background grid"
           />
+          
+          {/* Empty State Message */}
+          {nodes.length === 0 && !loading && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg p-6 shadow-lg border border-gray-200 pointer-events-auto">
+                <div className="text-center space-y-2">
+                  <div className="text-gray-500 text-lg font-medium">
+                    No nodes in this model
+                  </div>
+                  <div className="text-gray-400 text-sm">
+                    Use the toolbar to add stages, actions, or I/O nodes
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </ReactFlow>
 
         {/* Context Menu */}
@@ -756,49 +938,58 @@ export function FunctionModelCanvas({ modelId, readOnly = false }: { modelId: st
           />
         )}
 
-        {/* Preserve ALL existing modals and sidebars */}
-        <PersistenceModal
-          isOpen={persistenceSidebarOpen}
-          onClose={() => setPersistenceSidebarOpen(false)}
-          activeTab={activePersistenceTab}
-          onTabChange={setActivePersistenceTab}
-          modelId={modelId}
-          onVersionLoaded={async () => {
-            console.log('Version loaded callback triggered - refreshing model data')
-            
-            // Prevent race conditions by setting loading state
-            setIsVersionLoading(true)
-            
-            try {
-              // First persist any pending position changes before loading version
-              await persistPendingPositions()
-              
-              // Clear any remaining pending position updates
-              pendingPositionUpdates.current.clear()
-              
-              // Add a small delay to ensure database operations complete
-              setTimeout(async () => {
-                try {
-                  // Refresh the model data when a version is loaded
-                  await loadNodes()
-                  console.log('Version loading completed successfully')
-                  // Show success feedback to user
-                  showSuccess('Version loaded successfully!')
-                  announceToScreenReader('Model version loaded successfully')
-                } catch (error) {
-                  console.error('Failed to load version data:', error)
-                  showError('Failed to load version data')
-                } finally {
-                  setIsVersionLoading(false)
-                }
-              }, 500) // 500ms delay to ensure database operations complete
-            } catch (error) {
-              console.error('Failed to persist positions before version load:', error)
-              showError('Failed to save current changes before loading version')
-              setIsVersionLoading(false)
-            }
-          }}
-        />
+                 {/* Preserve ALL existing modals and sidebars */}
+         <PersistenceModal
+           isOpen={persistenceSidebarOpen}
+           onClose={() => setPersistenceSidebarOpen(false)}
+           activeTab={activePersistenceTab}
+           onTabChange={setActivePersistenceTab}
+           modelId={modelId}
+           // Pass application state to share with persistence sidebar
+           appNodes={appNodes}
+           appLinks={appLinks}
+           persistChanges={persistChanges}
+           hasUnsavedChanges={hasUnsavedChanges() || hasUnsavedPositionChanges()}
+           onVersionLoaded={async () => {
+             console.log('Version loaded callback triggered - refreshing model data')
+             
+             // Prevent race conditions by setting loading state
+             setIsVersionLoading(true)
+             
+             try {
+               // First persist any pending position changes before loading version
+               await persistPendingPositions()
+               
+               // Clear any remaining pending position updates
+               pendingPositionUpdates.current.clear()
+               
+               // Add a small delay to ensure database operations complete
+               setTimeout(async () => {
+                 try {
+                   // Refresh the model data when a version is loaded
+                   // This will now load the restored nodes from function_model_nodes table
+                   if (loadNodes) {
+                     await loadNodes()
+                   }
+                   console.log('Version loading completed successfully')
+                   
+                   // Show success feedback to user
+                   showSuccess('Version loaded successfully!')
+                   announceToScreenReader('Model version loaded successfully')
+                 } catch (error) {
+                   console.error('Failed to load version data:', error)
+                   showError('Failed to load version data')
+                 } finally {
+                   setIsVersionLoading(false)
+                 }
+               }, 1000) // Increased delay to ensure version restoration completes
+             } catch (error) {
+               console.error('Failed to persist positions before version load:', error)
+               showError('Failed to save current changes before loading version')
+               setIsVersionLoading(false)
+             }
+           }}
+         />
 
         <ModalStack 
           modals={modalStack}

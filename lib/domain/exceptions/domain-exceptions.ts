@@ -76,4 +76,18 @@ export class RACIMatrixValidationError extends DomainError {
     super(message)
     this.name = 'RACIMatrixValidationError'
   }
+}
+
+export class NodeNotFoundError extends DomainError {
+  constructor(message: string, public readonly nodeId: string) {
+    super(message)
+    this.name = 'NodeNotFoundError'
+  }
+}
+
+export class InvalidOperationError extends DomainError {
+  constructor(message: string, public readonly operation: string) {
+    super(message)
+    this.name = 'InvalidOperationError'
+  }
 } 

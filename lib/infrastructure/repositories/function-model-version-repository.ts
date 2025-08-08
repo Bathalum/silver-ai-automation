@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import { VersionEntry, VersionMetadata } from '@/lib/application/use-cases/function-model-version-control'
+import { VersionEntry, VersionMetadata } from '@/lib/domain/entities/version-control-types'
 
 export class FunctionModelVersionRepository {
   private supabase = createClient()
@@ -51,6 +51,8 @@ export class FunctionModelVersionRepository {
   }
 
   async getVersions(modelId: string): Promise<VersionEntry[]> {
+    console.log(`Repository: Getting versions for modelId: ${modelId}`)
+    
     const { data, error } = await this.supabase
       .from('function_model_versions')
       .select('*')
@@ -58,10 +60,17 @@ export class FunctionModelVersionRepository {
       .order('created_at', { ascending: false })
 
     if (error) {
+      console.error(`Repository: Error getting versions:`, error)
       throw new Error(`Failed to get versions: ${error.message}`)
     }
 
-    return data.map(this.mapDbToVersionEntry)
+    console.log(`Repository: Raw data from database:`, data)
+    console.log(`Repository: Number of versions found:`, data?.length || 0)
+    
+    const mappedVersions = data.map(this.mapDbToVersionEntry)
+    console.log(`Repository: Mapped versions:`, mappedVersions)
+    
+    return mappedVersions
   }
 
   async getLatestVersion(modelId: string): Promise<VersionEntry | null> {
@@ -298,6 +307,8 @@ export class FunctionModelVersionRepository {
 
   // Helper method to bulk restore connections
   private async bulkRestoreConnections(modelId: string, edges: VersionEntry['edges']): Promise<void> {
+    console.log(`Restoring ${edges.length} connections for model ${modelId}`)
+    
     const connectionData = edges.map(edge => ({
       source_feature: 'function-model',
       source_entity_id: modelId,
@@ -305,19 +316,24 @@ export class FunctionModelVersionRepository {
       target_feature: 'function-model',
       target_entity_id: modelId,
       target_node_id: edge.data.target,
-      link_type: 'parent-child', // Default link type for function model connections
+      link_type: 'nested', // Use 'nested' as it's appropriate for function model node relationships
       link_strength: 1.0,
-      link_context: edge.data.data || {},
-      visual_properties: edge.data.style || {}
+      link_context: edge.data.data || {}
+      // Remove visual_properties as it might not exist in the database schema
     }))
+
+    console.log('Connection data to insert:', connectionData)
 
     const { error } = await this.supabase
       .from('node_links')
       .insert(connectionData)
 
     if (error) {
+      console.error('Failed to restore connections:', error)
       throw new Error(`Failed to restore connections: ${error.message}`)
     }
+    
+    console.log('Successfully restored connections')
   }
 
   // Helper method to update model metadata
@@ -429,8 +445,40 @@ export class FunctionModelVersionRepository {
     
     // Check if this is the new format (with nodes, edges, changeSummary)
     if (versionData.nodes !== undefined || versionData.edges !== undefined) {
-      nodes = Array.isArray(versionData.nodes) ? versionData.nodes : []
-      edges = Array.isArray(versionData.edges) ? versionData.edges : []
+      // Convert plain node objects to the expected format with nodeId and data
+      nodes = Array.isArray(versionData.nodes) ? versionData.nodes.map((node: any, index: number) => {
+        // If the node already has the expected format (nodeId and data), use it as is
+        if (node.nodeId && node.data) {
+          return node
+        }
+        
+        // If it's a plain node object, convert it to the expected format
+        // Generate a nodeId if it doesn't exist
+        const nodeId = node.nodeId || node.id || `node-${index}`
+        return {
+          nodeId,
+          data: node,
+          timestamp: new Date()
+        }
+      }) : []
+      
+      // Convert plain edge objects to the expected format with edgeId and data
+      edges = Array.isArray(versionData.edges) ? versionData.edges.map((edge: any, index: number) => {
+        // If the edge already has the expected format (edgeId and data), use it as is
+        if (edge.edgeId && edge.data) {
+          return edge
+        }
+        
+        // If it's a plain edge object, convert it to the expected format
+        // Generate an edgeId if it doesn't exist
+        const edgeId = edge.edgeId || edge.id || `edge-${index}`
+        return {
+          edgeId,
+          data: edge,
+          timestamp: new Date()
+        }
+      }) : []
+      
       changeSummary = versionData.changeSummary || ''
     } else {
       // Old format - create empty arrays and use description as change summary

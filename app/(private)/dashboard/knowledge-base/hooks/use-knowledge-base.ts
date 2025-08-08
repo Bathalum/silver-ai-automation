@@ -4,10 +4,21 @@ import { SOP, SOPCreateOptions, SOPUpdateOptions } from '@/lib/domain/entities/k
 
 const knowledgeBaseRepository = new KnowledgeBaseRepository()
 
+interface Filters {
+  search: string
+  category: string
+  status: string
+}
+
 export function useKnowledgeBase() {
   const [sops, setSOPs] = useState<SOP[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<Filters>({
+    search: '',
+    category: '',
+    status: ''
+  })
 
   useEffect(() => {
     loadSOPs()
@@ -63,15 +74,39 @@ export function useKnowledgeBase() {
     }
   }
 
+  // Filter management functions
+  const updateFilters = (newFilters: Partial<Filters>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }))
+  }
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      category: '',
+      status: ''
+    })
+  }
+
+  // Node operations (aliases for SOP operations)
+  const createSOPNode = createSOP
+  const updateSOPNode = updateSOP
+  const deleteSOPNode = deleteSOP
+
   return {
     sops,
     loading,
     error,
+    filters,
     createSOP,
     updateSOP,
     deleteSOP,
     getSOPById,
-    loadSOPs
+    loadSOPs,
+    updateFilters,
+    clearFilters,
+    createSOPNode,
+    updateSOPNode,
+    deleteSOPNode
   }
 }
 

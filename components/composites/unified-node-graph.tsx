@@ -37,26 +37,6 @@ import { ContentNode } from '@/components/composites/content/content-node'
 import { IntegrationNode } from '@/components/composites/integration/integration-node'
 import { DomainNode } from '@/components/composites/domain/domain-node'
 
-// Node type mapping
-const nodeTypes = {
-  // Function Model nodes
-  stageNode: StageNode,
-  actionTableNode: ActionTableNode,
-  ioNode: IONode,
-  
-  // Process nodes
-  processNode: ProcessNode,
-  
-  // Content nodes
-  contentNode: ContentNode,
-  
-  // Integration nodes
-  integrationNode: IntegrationNode,
-  
-  // Domain nodes
-  domainNode: DomainNode
-}
-
 interface UnifiedNodeGraphProps {
   nodes: BaseNode[]
   links: CrossFeatureLink[]
@@ -267,6 +247,26 @@ export function UnifiedNodeGraph({
   highlightNodeType = null,
   className
 }: UnifiedNodeGraphProps) {
+  // Node type mapping - memoized to prevent React Flow warnings
+  const nodeTypes = useMemo(() => ({
+    // Function Model nodes
+    stageNode: StageNode,
+    actionTableNode: ActionTableNode,
+    ioNode: IONode,
+    
+    // Process nodes
+    processNode: ProcessNode,
+    
+    // Content nodes
+    contentNode: ContentNode,
+    
+    // Integration nodes
+    integrationNode: IntegrationNode,
+    
+    // Domain nodes
+    domainNode: DomainNode
+  }), [])
+
   const [reactFlowNodes, setReactFlowNodes] = useState<Node[]>([])
   const [reactFlowEdges, setReactFlowEdges] = useState<Edge[]>([])
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>([

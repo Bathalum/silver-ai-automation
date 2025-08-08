@@ -9,8 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Save, Upload, Link, Search, Plus } from 'lucide-react'
-import { createFunctionModel, updateFunctionModel, getFunctionModelById } from '@/lib/application/use-cases/function-model-use-cases'
-import { createFunctionModelVersion, getFunctionModelVersions, loadFunctionModelVersion, restoreModelFromVersion } from '@/lib/application/use-cases/function-model-version-control'
+import { useFunctionModelSaveUseCases } from '@/lib/application/hooks/use-function-model-save-use-cases'
 import { createClient } from '@/lib/supabase/client'
 
 interface PersistenceModalProps {
@@ -20,6 +19,7 @@ interface PersistenceModalProps {
   onTabChange: (tab: 'save' | 'links') => void
   modelId: string
   onVersionLoaded?: () => void // Add callback for version loading
+  hasUnsavedChanges?: boolean // Add prop for unsaved changes state
 }
 
 interface VersionHistoryItem {
@@ -44,16 +44,33 @@ export function PersistenceModal({
   activeTab,
   onTabChange,
   modelId,
-  onVersionLoaded
+  onVersionLoaded,
+  hasUnsavedChanges
 }: PersistenceModalProps) {
+  // Initialize Application layer save use cases
+  const {
+    saveFunctionModel,
+    loadFunctionModel,
+    createVersion,
+    restoreFromVersion,
+    getFunctionModelVersions,
+    isSaving,
+    isLoading,
+    isCreatingVersion,
+    isRestoring,
+    isGettingVersions,
+    lastSaveResult,
+    lastLoadResult,
+    error: saveError
+  } = useFunctionModelSaveUseCases()
+
   const [saveName, setSaveName] = useState('')
   const [saveDescription, setSaveDescription] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedLinks, setSelectedLinks] = useState<string[]>([])
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveErrorLocal, setSaveErrorLocal] = useState<string | null>(null)
   const [savedVersions, setSavedVersions] = useState<VersionHistoryItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isLoadingVersions, setIsLoadingVersions] = useState(false)
   const [versionError, setVersionError] = useState<string | null>(null)
@@ -78,17 +95,22 @@ export function PersistenceModal({
       return
     }
     
-    setIsLoading(true)
     setLoadError(null)
     
     try {
-      const currentModel = await getFunctionModelById(modelId)
-      console.log('Current model result:', currentModel)
-      if (currentModel) {
-        setSaveName(currentModel.name || '')
-        setSaveDescription(currentModel.description || '')
-        console.log('Set save name to:', currentModel.name)
-        console.log('Set save description to:', currentModel.description)
+      // Use Application layer to load the model
+      const loadResult = await loadFunctionModel(modelId, undefined, {
+        validateData: false,
+        restoreFromVersion: false
+      })
+      
+      console.log('Load result:', loadResult)
+      
+      if (loadResult.success && loadResult.model) {
+        setSaveName(loadResult.model.name || '')
+        setSaveDescription(loadResult.model.description || '')
+        console.log('Set save name to:', loadResult.model.name)
+        console.log('Set save description to:', loadResult.model.description)
       } else {
         // Model doesn't exist, set default values
         setSaveName('New Function Model')
@@ -102,9 +124,6 @@ export function PersistenceModal({
       setSaveName('New Function Model')
       setSaveDescription('')
       setLoadError(error instanceof Error ? error.message : 'Failed to load model')
-      // Could show a toast notification here if needed
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -115,25 +134,30 @@ export function PersistenceModal({
     setVersionError(null)
     
     try {
-      const versions = await getFunctionModelVersions(modelId)
-      console.log('Loaded versions:', versions)
-      // Transform VersionEntry[] to VersionHistoryItem[]
-      const transformedVersions: VersionHistoryItem[] = versions.map(version => ({
-        version: version.version,
-        timestamp: version.createdAt,
-        author: version.createdBy || 'Unknown',
-        changes: [version.changeSummary],
-        snapshot: {
-          modelId: version.modelId,
+      const result = await getFunctionModelVersions(modelId)
+      console.log('Loaded versions result:', result)
+      
+      if (result.success) {
+        // Transform versions to VersionHistoryItem[]
+        const transformedVersions: VersionHistoryItem[] = result.versions.map(version => ({
           version: version.version,
-          name: 'Model Snapshot', // This would need to be extracted from the version data
-          description: version.changeSummary,
-          status: 'draft',
-          timestamp: version.createdAt
-        },
-        isPublished: false
-      }))
-      setSavedVersions(transformedVersions)
+          timestamp: version.createdAt,
+          author: version.createdBy || 'Unknown',
+          changes: [version.changeSummary],
+          snapshot: {
+            modelId: version.modelId,
+            version: version.version,
+            name: 'Model Snapshot', // This would need to be extracted from the version data
+            description: version.changeSummary,
+            status: 'draft',
+            timestamp: version.createdAt
+          },
+          isPublished: false
+        }))
+        setSavedVersions(transformedVersions)
+      } else {
+        throw new Error(result.error || 'Failed to load versions')
+      }
     } catch (error) {
       console.error('Failed to load version history:', error)
       setVersionError(error instanceof Error ? error.message : 'Failed to load versions')
@@ -145,68 +169,59 @@ export function PersistenceModal({
   const handleSave = async () => {
     try {
       setSaveStatus('saving')
-      setSaveError(null)
+      setSaveErrorLocal(null)
       
       // Get current user ID
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      const userId = user?.id
+      const userId = user?.id || 'unknown'
       
-      if (!userId) {
-        throw new Error('User not authenticated')
-      }
-      
-      // Get current model state for comprehensive snapshot
-      const currentModel = await getFunctionModelById(modelId)
-      
-      // Update the current model with new name and description
-      await updateFunctionModel(modelId, {
-        name: saveName || 'Unnamed Model',
-        description: saveDescription || ''
+      // Load current model data
+      const loadResult = await loadFunctionModel(modelId, undefined, {
+        validateData: false,
+        restoreFromVersion: false
       })
       
-      // Create a comprehensive version snapshot including node data
-      const versionData = {
-        version: `v${Date.now()}`, // Simple versioning for now
-        snapshot: {
-          name: saveName || 'Unnamed Model',
-          description: saveDescription || '',
-          status: 'draft',
-          timestamp: new Date().toISOString(),
-          // Include model metadata for better versioning
-          modelId: modelId,
-          version: currentModel?.version || '1.0.0',
-          lastSavedAt: new Date().toISOString(),
-          // Note: Node data is preserved separately in the nodes table
-          // This snapshot focuses on model-level metadata
-          // Node and connection counts are calculated dynamically
-        },
-        author: userId, // Use actual user ID instead of hardcoded string
-        isPublished: false,
-        // Add metadata about what this version contains
-        versionType: 'model-metadata', // Distinguish from node-only versions
-        includesNodes: false, // Node data is handled separately
-        includesConnections: false // Connection data is handled separately
+      if (!loadResult.success) {
+        throw new Error('Failed to load current model data')
       }
       
-      console.log('Saving comprehensive version with data:', versionData)
-      // Use the application layer use case for creating versions
-      await createFunctionModelVersion(modelId, [], [], 'Model metadata updated', userId)
+      // Use Application layer to save the model
+      const saveResult = await saveFunctionModel(
+        modelId,
+        loadResult.nodes,
+        loadResult.edges,
+        {
+          changeSummary: 'Model metadata updated',
+          author: userId,
+          isPublished: false
+        },
+        {
+          validateBeforeSave: true,
+          createBackup: false,
+          updateVersion: true,
+          createNewVersion: true
+        }
+      )
       
-      setSaveStatus('success')
-      // Refresh the saved versions list
-      await loadVersionHistory()
-      
-      // Clear success status after 2 seconds
-      setTimeout(() => setSaveStatus('idle'), 2000)
+      if (saveResult.success) {
+        setSaveStatus('success')
+        // Refresh the saved versions list
+        await loadVersionHistory()
+        
+        // Clear success status after 2 seconds
+        setTimeout(() => setSaveStatus('idle'), 2000)
+      } else {
+        throw new Error(saveResult.errors.join(', '))
+      }
     } catch (error) {
       console.error('Failed to save model:', error)
       setSaveStatus('error')
-      setSaveError(error instanceof Error ? error.message : 'Failed to save model')
+      setSaveErrorLocal(error instanceof Error ? error.message : 'Failed to save model')
       // Clear error status after 5 seconds
       setTimeout(() => {
         setSaveStatus('idle')
-        setSaveError(null)
+        setSaveErrorLocal(null)
       }, 5000)
     }
   }
@@ -227,13 +242,18 @@ export function PersistenceModal({
 
       console.log('Starting version restoration...')
       
-      // Use the new complete restoration functionality
-      const result = await restoreModelFromVersion(modelId, version)
+      // Get current user ID
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const userId = user?.id || 'unknown'
+      
+      // Use Application layer to restore from version
+      const result = await restoreFromVersion(modelId, version, userId)
       
       console.log('Version restoration result:', result)
       
       if (!result.success) {
-        throw new Error(`Version restoration failed: ${result.errors.join(', ')}`)
+        throw new Error(result.error || 'Version restoration failed')
       }
       
       console.log('Version restoration completed successfully')
@@ -337,10 +357,10 @@ export function PersistenceModal({
                   <Button 
                     onClick={handleSave} 
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    disabled={saveStatus === 'saving'}
+                    disabled={saveStatus === 'saving' || isSaving}
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    {saveStatus === 'saving' ? 'Saving...' : 'Save Model'}
+                    {saveStatus === 'saving' || isSaving ? 'Saving...' : 'Save Model'}
                   </Button>
                   {saveStatus === 'success' && (
                     <div className="p-3 bg-green-50 border border-green-200 rounded-md">
@@ -349,7 +369,7 @@ export function PersistenceModal({
                   )}
                   {saveStatus === 'error' && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                      <p className="text-sm text-red-700">{saveError}</p>
+                      <p className="text-sm text-red-700">{saveErrorLocal}</p>
                     </div>
                   )}
                 </CardContent>
@@ -367,7 +387,7 @@ export function PersistenceModal({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isLoadingVersions ? (
+                  {isLoadingVersions || isGettingVersions ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="text-gray-500">Loading versions...</div>
                     </div>

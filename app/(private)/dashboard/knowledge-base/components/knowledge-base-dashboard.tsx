@@ -11,7 +11,7 @@ import { SOPCard } from "@/components/composites/knowledge-base/sop-card"
 import { KnowledgeBaseSearch } from "@/components/composites/knowledge-base/knowledge-base-search"
 import { useRouter } from "next/navigation"
 import { useKnowledgeBase } from "../hooks/use-knowledge-base"
-import { useUnifiedNodeStore } from "@/lib/stores/unified-node-store"
+import { useNodeStore } from "@/lib/stores/node-store"
 import type { SOP } from "@/lib/domain/entities/knowledge-base-types"
 
 export function KnowledgeBaseDashboard() {
@@ -27,7 +27,7 @@ export function KnowledgeBaseDashboard() {
     deleteSOPNode
   } = useKnowledgeBase()
   
-  const { selectNode } = useUnifiedNodeStore()
+  const { selectNode } = useNodeStore()
 
   const handleSearch = (query: string) => {
     updateFilters({ search: query })

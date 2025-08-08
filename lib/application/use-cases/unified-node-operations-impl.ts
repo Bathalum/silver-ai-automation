@@ -9,7 +9,7 @@ import { FunctionModelNode } from '../../domain/entities/function-model-node-typ
 import { FunctionModelRepository } from '../../infrastructure/repositories/function-model-repository'
 import { SupabaseNodeRelationshipRepository } from '../../infrastructure/repositories/node-relationship-repository'
 import { 
-  ApplicationError, 
+  ApplicationException, 
   NodeExecutionError, 
   CrossNodeLinkError,
   FunctionModelNodeError 
@@ -49,9 +49,9 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
         return createdNode as unknown as T
       }
       
-      throw new ApplicationError(`Unsupported feature type: ${(node as any).featureType}`)
+      throw new ApplicationException(`Unsupported feature type: ${(node as any).featureType}`)
     } catch (error) {
-      if (error instanceof ApplicationError) throw error
+      if (error instanceof ApplicationException) throw error
       throw new FunctionModelNodeError(
         `Failed to create node: ${error instanceof Error ? error.message : 'Unknown error'}`,
         (node as any).nodeId || 'unknown',
@@ -82,9 +82,9 @@ export class UnifiedNodeOperationsImpl implements UnifiedNodeOperations {
         return node as unknown as T
       }
       
-      throw new ApplicationError(`Unsupported node type: ${nodeType}`)
+      throw new ApplicationException(`Unsupported node type: ${nodeType}`)
     } catch (error) {
-      if (error instanceof ApplicationError) throw error
+      if (error instanceof ApplicationException) throw error
       throw new FunctionModelNodeError(
         `Failed to get node: ${error instanceof Error ? error.message : 'Unknown error'}`,
         nodeId,

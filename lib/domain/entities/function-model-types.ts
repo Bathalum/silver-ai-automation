@@ -38,4 +38,22 @@ export interface FunctionModelUpdateOptions {
   aiAgentConfig?: Record<string, any>
   metadata?: Record<string, any>
   permissions?: Record<string, any>
+}
+
+// Edge-related interfaces for Domain layer
+export interface FunctionModelEdge {
+  id: string
+  sourceNodeId: string
+  targetNodeId: string
+  sourceHandle?: string
+  targetHandle?: string
+  type?: string
+  metadata?: Record<string, any>
+}
+
+export interface EdgeRepository {
+  getEdgesForModel(modelId: string): Promise<FunctionModelEdge[]>
+  saveEdgesForModel(modelId: string, edges: FunctionModelEdge[]): Promise<void>
+  deleteEdge(edgeId: string): Promise<void>
+  updateEdge(edgeId: string, updates: Partial<FunctionModelEdge>): Promise<void>
 } 

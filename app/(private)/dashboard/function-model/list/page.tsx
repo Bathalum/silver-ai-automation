@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { FunctionModelList } from '@/components/composites/function-model/function-model-list'
-import { getAllFunctionModelsWithNodeStats, createFunctionModel, deleteFunctionModelWithConfirmation, duplicateFunctionModelWithName } from '@/lib/application/use-cases/function-model-use-cases'
+import { getAllFunctionModelsWithNodeStats, createFunctionModel, deleteFunctionModelWithConfirmation, duplicateFunctionModelWithName } from '@/lib/application/use-cases/function-model-management-use-cases'
 import type { FunctionModel } from '@/lib/domain/entities/function-model-types'
 
 export default function FunctionModelListPage() {
@@ -44,6 +44,9 @@ export default function FunctionModelListPage() {
 
   const handleCreateNew = async () => {
     try {
+      // Show loading state
+      setLoading(true)
+      
       // Create a new function model using the correct approach
       const newModel = await createFunctionModel({
         name: 'New Function Model',
@@ -55,7 +58,10 @@ export default function FunctionModelListPage() {
       router.push(`/dashboard/function-model/${newModel.modelId}`)
     } catch (err) {
       console.error('Failed to create new model:', err)
+      setError(err instanceof Error ? err.message : 'Failed to create new model')
       // You might want to show a toast notification here
+    } finally {
+      setLoading(false)
     }
   }
   
@@ -96,10 +102,11 @@ export default function FunctionModelListPage() {
         <Button 
           size="lg" 
           onClick={handleCreateNew}
+          disabled={loading}
           className="rounded-full shadow-lg"
         >
           <Plus className="w-5 h-5 mr-2" />
-          New Model
+          {loading ? 'Creating...' : 'New Model'}
         </Button>
       </div>
 
