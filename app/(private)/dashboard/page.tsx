@@ -1,7 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header"
-import { StatsCard } from "@/components/ui/stats-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart3, Users, Zap, TrendingUp } from "lucide-react"
+import { BarChart3, Users, Zap, TrendingUp, Workflow } from "lucide-react"
 
 export default function DashboardPage() {
   return (
@@ -9,62 +8,74 @@ export default function DashboardPage() {
       <PageHeader title="Dashboard" description="Welcome to your AI automation command center" />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Active Automations"
-          value="24"
-          description="Running processes"
-          icon={<Zap className="h-4 w-4 text-blue-600" />}
-          trend={{ value: 12, isPositive: true }}
-        />
-        <StatsCard
-          title="Total Clients"
-          value="156"
-          description="Active clients"
-          icon={<Users className="h-4 w-4 text-green-600" />}
-          trend={{ value: 8, isPositive: true }}
-        />
-        <StatsCard
-          title="Efficiency Gain"
-          value="87%"
-          description="Average improvement"
-          icon={<TrendingUp className="h-4 w-4 text-purple-600" />}
-          trend={{ value: 5, isPositive: true }}
-        />
-        <StatsCard
-          title="Monthly Revenue"
-          value="$45,230"
-          description="This month"
-          icon={<BarChart3 className="h-4 w-4 text-orange-600" />}
-          trend={{ value: 15, isPositive: true }}
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Function Models</CardTitle>
+            <Workflow className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">12</div>
+            <p className="text-xs text-muted-foreground">Active models</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Process Nodes</CardTitle>
+            <Zap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">156</div>
+            <p className="text-xs text-muted-foreground">Total nodes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Efficiency Gain</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">87%</div>
+            <p className="text-xs text-muted-foreground">Average improvement</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Automation Time</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">45hrs</div>
+            <p className="text-xs text-muted-foreground">Saved this month</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest automation deployments and updates</CardDescription>
+            <CardDescription>Latest function model updates and deployments</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">New automation deployed for TechCorp</p>
+                  <p className="text-sm font-medium">New function model created</p>
                   <p className="text-xs text-gray-500">2 hours ago</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="w-2 h-2 bg-green-600 rounded-full"></div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">Client onboarding completed</p>
+                  <p className="text-sm font-medium">Process workflow updated</p>
                   <p className="text-xs text-gray-500">4 hours ago</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">Function model updated</p>
+                  <p className="text-sm font-medium">Node connection added</p>
                   <p className="text-xs text-gray-500">1 day ago</p>
                 </div>
               </div>
@@ -80,16 +91,16 @@ export default function DashboardPage() {
           <CardContent>
             <div className="grid gap-2">
               <button className="flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
-                <Zap className="h-4 w-4 text-blue-600" />
-                <span className="text-sm">Create New Automation</span>
+                <Workflow className="h-4 w-4 text-blue-600" />
+                <span className="text-sm">Create New Function Model</span>
               </button>
               <button className="flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
-                <Users className="h-4 w-4 text-green-600" />
-                <span className="text-sm">Add New Client</span>
+                <Zap className="h-4 w-4 text-green-600" />
+                <span className="text-sm">Add Process Node</span>
               </button>
               <button className="flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
                 <BarChart3 className="h-4 w-4 text-purple-600" />
-                <span className="text-sm">View Analytics</span>
+                <span className="text-sm">View Model Analytics</span>
               </button>
             </div>
           </CardContent>

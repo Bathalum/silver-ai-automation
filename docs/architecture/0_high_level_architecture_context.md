@@ -1,151 +1,590 @@
-# High-Level Architecture Design Context
+# Clean Architecture Design Document
 
-This document provides a high-level context for all your projects, serving as the foundational reference for architecture designs, component/feature patterns, and coding best practices. It ensures that every project begins with a consistent, maintainable, and extensible structure. Below, I outline the preferred approaches and principles, followed by specific guidance for frontend and backend implementations.
+This document establishes the foundational Clean Architecture principles for all projects, ensuring business logic independence, maintainability, and testability. Clean Architecture enforces strict separation of concerns through concentric layers where dependencies flow inward, protecting core business logic from external changes.
 
-## 1. Preferred Architecture Designs
+## Core Clean Architecture Principles
 
-All projects should adhere to **Clean Architecture**, a layered approach that separates concerns and keeps business logic independent of external systems. This applies to both frontend and backend, ensuring modularity and testability.
+### The Dependency Rule
+**Critical**: Dependencies can only point inward. Inner layers define interfaces; outer layers implement them. No inner layer can know about outer layers.
 
-### Clean Architecture Layers
-- **Domain Layer**  
-  - **Purpose**: Holds the core **business logic**, rules, and entities. This is the heart of your application, defining what it does at a fundamental level.
-  - **Key Principle**: Independent of frameworks, databases, or UI—no external dependencies.
-  - **Contains**: Entities (e.g., User, Order), business rules (e.g., validation logic), and pure functions/classes.
+### Layer Independence
+Each layer serves a distinct purpose and can be tested in isolation. Business logic remains independent of frameworks, databases, UI, or external services.
 
-- **Application Layer**  
-  - **Purpose**: Orchestrates **use cases** and coordinates data flow between the Domain and Infrastructure Layers. It does **not** contain business logic—that lives in the Domain Layer.
-  - **Key Principle**: Defines application-specific workflows (e.g., "Get User," "Process Order") without implementing the rules themselves.
-  - **Contains**: Use case definitions, service orchestrations, or hooks (frontend).
+## Clean Architecture Layers (Inside-Out)
 
-- **Infrastructure Layer**  
-  - **Purpose**: Handles interactions with the outside world—databases, APIs, file systems, etc.
-  - **Key Principle**: Acts as an adapter, keeping technical details separate from business concerns.
-  - **Contains**: Repositories, API clients, database connections.
+### 1. Entities (Innermost - Domain Core)
+**Purpose**: Contains enterprise-wide business rules and core business objects.
 
-- **Presentation Layer (Frontend Only)**  
-  - **Purpose**: Manages the user interface and interactions.
-  - **Key Principle**: Keeps UI logic minimal, relying on the Application Layer for data and workflows.
-  - **Contains**: Components, pages, and views.
+**What Belongs Here**:
+- **Enterprise Business Rules**: Rules that would exist even if the application didn't exist
+- **Core Business Objects**: User, Order, Product, etc. with their fundamental properties
+- **Business Invariants**: Rules that must always be true (e.g., account balance can't go negative)
+- **Business Calculations**: Core mathematical operations and formulas
 
-### How It Flows
-- Data and control flow **inward**: Presentation → Application → Domain, with Infrastructure providing external support.
-- The Domain Layer is the core, untouched by external changes (e.g., swapping a database or UI framework).
+**What Logic Stays Here**:
+- Data validation that reflects business rules (not input validation)
+- Business calculations and transformations
+- State transitions that follow business rules
+- Core domain behaviors that entities must enforce
 
-This structure ensures your business logic remains portable and testable, whether you're building a monolithic backend, a microservice, or a frontend app.
+**Dependencies**: None. Zero external dependencies.
 
-## 2. Component and Feature Patterns
-
-To avoid confusion in passing data and ensure modularity, components and features follow distinct patterns:
-
-### Frontend: Component Architecture
-- **Base Components**: Small, reusable UI building blocks (e.g., Button, Input).  
-  - Pass data via **props**, keep stateless where possible.
-- **Composite Components**: Combine Base Components into larger, reusable units (e.g., Form, CardGroup).  
-  - Manage internal state if needed, expose clear interfaces.
-- **Feature Components**: Tie to specific business features (e.g., UserProfile, OrderList).  
-  - Fetch data via Application Layer hooks or services, pass down to children.
-- **Page Components**: Assemble Feature Components into full pages.  
-  - Handle routing and page-level data flow.
-
-- **Data Flow**: Top-down (Page → Feature → Composite → Base), with events bubbling up via callbacks or state management.
-
-### Backend: Modular Design
-- **Modules**: Group related functionality (e.g., User, Payment).  
-  - Each module contains its own Domain, Application, and Infrastructure elements.
-- **Services**: Implement use cases from the Application Layer, calling Domain logic.  
-  - Pass data explicitly via parameters or DTOs (Data Transfer Objects).
-- **Repositories**: Abstract data access in the Infrastructure Layer.  
-  - Return Domain entities to services.
-
-- **Data Flow**: Controllers → Services → Domain → Repositories, with clear boundaries between layers.
-
-This ensures data flows predictably, reducing coupling and making components/features reusable across projects.
-
-## 3. Coding Best Practices
-
-All code should enhance **modularity**, **maintainability**, and **extensibility** by adhering to these principles:
-
-- **DRY (Don't Repeat Yourself)**: Reuse functions, components, and utilities instead of duplicating code.
-- **Separation of Concerns**: Each layer, module, or component has one clear responsibility.
-- **Single Responsibility Principle**: A function or class does one thing well.
-- **Encapsulation**: Hide implementation details, expose only what's necessary.
-- **Reusability**: Design for broad use across features or projects.
-- **Testability**: Write code that's easy to unit test (e.g., pure functions in Domain Layer).
-- **Consistency**: Follow naming conventions, file structures, and patterns outlined below.
-
-These practices ensure your codebase remains clean, scalable, and easy to extend as requirements evolve.
-
-## Frontend Specifics
-
-### File and Folder Structure
-```
-/app                           # Next.js App Router root
-├── (auth)/                    # Authentication routes (route group)
-├── (private)/                 # Protected routes (route group)
-│   └── dashboard/             # Dashboard area with features
-├── (public)/                  # Public routes (route group)
-├── api/                       # API routes
-├── lib
-│   ├── domain/                # Entities, business logic
-│   ├── use-cases/             # Application Layer use cases
-│   └── infrastructure/        # API clients, external services
-├── components
-│   ├── ui/                    # Base Components
-│   ├── composites/            # Composite Components
-│   └── features/              # Feature Components
-└── hooks/                     # Custom hooks (Application Layer)
+**Example**:
+```typescript
+// Good: Business rule enforcement
+class Order {
+  private items: OrderItem[]
+  private status: OrderStatus
+  
+  addItem(item: OrderItem): void {
+    if (this.status === OrderStatus.SHIPPED) {
+      throw new Error("Cannot modify shipped order") // Business rule
+    }
+    this.items.push(item)
+  }
+  
+  calculateTotal(): Money {
+    return this.items.reduce((sum, item) => sum.add(item.price), Money.zero())
+  }
+}
 ```
 
-### Tech Stack
-- **Framework**: Next.js (React) with App Router for routing and rendering.
-- **Language**: TypeScript for type safety.
-- **Styling**: Tailwind CSS or styled-components.
-- **State Management**: React Hooks (useState, useContext) or Redux.
-- **Form Handling**: React Hook Form with Zod for validation.
+### 2. Use Cases (Application Business Rules)
+**Purpose**: Contains application-specific business rules and orchestrates the flow of data between entities and external interfaces.
 
-### Key Architecture Components
-- **Route Groups**: Organize routes logically without affecting URL structure.
-- **Layouts**: Nested layouts for shared UI between routes while maintaining separation of concerns.
-- **Middleware**: Handle authentication and route protection at the infrastructure layer.
-- **Server Components**: Fetch data directly from the server, reducing client-side code.
-- **Client Components**: Handle interactive UI elements and state management.
+**What Belongs Here**:
+- **Application-specific workflows**: "Create User Account", "Process Payment"
+- **Use case orchestration**: Coordinating multiple entities and services
+- **Application business rules**: Rules specific to this application (not enterprise-wide)
+- **Data transformation**: Converting between domain models and DTOs
 
-### Guidelines
-- Place business logic in `/lib/domain/`.
-- Use hooks in `/hooks/` for Application Layer logic.
-- Implement middleware for cross-cutting concerns like authentication.
-- Keep components in `/components/` focused on UI, fetching data via hooks.
-- Use layouts to share UI between routes while maintaining Clean Architecture boundaries.
+**What Logic Stays Here**:
+- Workflow coordination between entities
+- Application-specific validation (e.g., duplicate email check)
+- Transaction boundaries
+- Authorization logic (who can do what)
+- Integration orchestration (calling multiple external services)
 
-## Backend Specifics
+**Dependencies**: Only Entities layer. Uses repository interfaces (not implementations).
 
-### File and Folder Structure
+**Example**:
+```typescript
+// Good: Use case orchestration
+class CreateUserUseCase {
+  constructor(
+    private userRepo: UserRepository, // Interface, not implementation
+    private emailService: EmailService // Interface
+  ) {}
+  
+  async execute(userData: CreateUserRequest): Promise<User> {
+    // Application validation
+    if (await this.userRepo.existsByEmail(userData.email)) {
+      throw new Error("Email already exists")
+    }
+    
+    // Create entity (business rules enforced)
+    const user = User.create(userData)
+    
+    // Persist and notify
+    await this.userRepo.save(user)
+    await this.emailService.sendWelcomeEmail(user.email)
+    
+    return user
+  }
+}
 ```
-/src
-├── domain
-│   ├── entities/        # Business entities
-│   └── rules/           # Business logic
-├── application
-│   ├── use-cases/       # Use case definitions
-│   └── services/        # Service implementations
-├── infrastructure
-│   ├── repositories/    # Data access
-│   └── external/        # APIs, databases
-└── modules
-    ├── user/            # Example module
-    │   ├── controllers/
-    │   └── routes/
-    └── payment/
+
+### 3. Interface Adapters
+**Purpose**: Converts data between use cases and external layers. Implements interfaces defined by inner layers.
+
+**What Belongs Here**:
+- **Controllers**: Handle HTTP requests, convert to use case inputs
+- **Presenters**: Format use case outputs for specific UI needs
+- **Repository Implementations**: Implement data access interfaces
+- **External Service Adapters**: Implement external service interfaces
+
+**What Logic Stays Here**:
+- Data format conversion (JSON ↔ Domain objects)
+- Input validation (format, type checking, not business rules)
+- HTTP status code mapping
+- Database query optimization
+- External API integration details
+
+**Dependencies**: Use Cases and Entities layers.
+
+**Example**:
+```typescript
+// Controller (Web Adapter)
+class UserController {
+  constructor(private createUser: CreateUserUseCase) {}
+  
+  async createUser(req: Request): Promise<Response> {
+    try {
+      // Convert HTTP input to use case input
+      const userData = this.validateAndMap(req.body)
+      
+      // Execute use case
+      const user = await this.createUser.execute(userData)
+      
+      // Convert domain result to HTTP response
+      return Response.created(this.mapToUserDTO(user))
+    } catch (error) {
+      return this.handleError(error) // HTTP-specific error handling
+    }
+  }
+}
+
+// Repository Implementation (Database Adapter)
+class SqlUserRepository implements UserRepository {
+  async save(user: User): Promise<void> {
+    // Convert domain entity to database format
+    const dbUser = this.mapToDbFormat(user)
+    await this.db.users.insert(dbUser)
+  }
+  
+  async findByEmail(email: string): Promise<User | null> {
+    const dbUser = await this.db.users.findByEmail(email)
+    return dbUser ? this.mapToDomain(dbUser) : null
+  }
+}
 ```
 
-### Tech Stack
-- **Framework**: NestJS, Express, or FastAPI (Python) for structured APIs.
-- **Language**: TypeScript or Python.
-- **Database**: Supabase, PostgreSQL, or MongoDB.
-- **ORM**: TypeORM, Prisma, or SQLAlchemy.
-- **Microservices**: Optional, using message queues (e.g., RabbitMQ).
+### 4. Frameworks & Drivers (Outermost)
+**Purpose**: Contains framework-specific code, external services, and infrastructure details.
 
-### Guidelines
-- Place business logic in `/src/domain/`.
-- Define use cases in `/src/application/use-cases/`, implement in services.
-- Use repositories in `/src/infrastructure/` for data access.
+**What Belongs Here**:
+- **Web Frameworks**: Express, FastAPI, Next.js routing
+- **Databases**: PostgreSQL, MongoDB connection details
+- **External Services**: Payment gateways, email providers
+- **UI Frameworks**: React components, view templates
+- **Configuration**: Environment variables, framework setup
+
+**Dependencies**: Interface Adapters layer only.
+
+## Critical Distinctions
+
+### Domain Logic vs Application Logic
+
+**Domain Logic (Entities)**:
+- "An order cannot be modified after shipping" ← Business invariant
+- "User age must be calculated from birth date" ← Business calculation
+- "Account balance = deposits - withdrawals" ← Business formula
+
+**Application Logic (Use Cases)**:
+- "Check if email exists before creating user" ← Application workflow
+- "Send welcome email after user creation" ← Application process
+- "Log user creation for audit" ← Application requirement
+
+### When to Create New Layers vs Extend Existing
+
+**Create New Entity When**:
+- Represents a core business concept with independent lifecycle
+- Has its own business rules and invariants
+- Other entities need to reference it
+
+**Extend Use Case When**:
+- Adding new application workflow
+- Orchestrating existing entities differently
+- Adding new external service integration
+
+**Create New Adapter When**:
+- Integrating with new external system
+- Supporting new presentation format (REST, GraphQL, CLI)
+- Different data persistence needs
+
+## Dependency Inversion Implementation
+
+### Interface Definition (Inner Layers)
+```typescript
+// Use Case Layer - Defines interfaces it needs
+interface UserRepository {
+  save(user: User): Promise<void>
+  findByEmail(email: string): Promise<User | null>
+}
+
+// Use Case Layer - Uses interface
+class CreateUserUseCase {
+  constructor(private userRepo: UserRepository) {} // Depends on interface
+}
+```
+
+### Interface Implementation (Outer Layers)
+```typescript
+// Infrastructure Layer - Implements interface
+class SqlUserRepository implements UserRepository {
+  async save(user: User): Promise<void> {
+    // Database-specific implementation
+  }
+}
+
+// Dependency Injection (Framework Layer)
+const userRepo = new SqlUserRepository(database)
+const createUser = new CreateUserUseCase(userRepo)
+```
+
+## Layer Communication Rules
+
+1. **Inward Dependencies Only**: Outer layers depend on inner layers, never reverse
+2. **Interface-Based**: Use cases depend on interfaces, not implementations
+3. **Data Transformation**: Each layer transforms data to/from its format
+4. **Error Handling**: Each layer handles its specific error types
+5. **Testing**: Inner layers can be tested without outer layer implementations
+
+## Implementation Checklist
+
+- [ ] Entities contain only business rules and core domain logic
+- [ ] Use cases orchestrate workflows without business rule implementation
+- [ ] Interfaces are defined in inner layers, implemented in outer layers
+- [ ] No entity or use case imports framework-specific code
+- [ ] Database/external service details stay in infrastructure layer
+- [ ] Controllers handle only HTTP concerns, not business logic
+- [ ] Data flows inward as domain objects, outward as DTOs
+- [ ] Each layer can be unit tested in isolation
+
+## Project Implementation Guidelines
+
+### Coding Standards
+All code must adhere to Clean Architecture principles while maintaining:
+
+- **Single Responsibility**: Each class/function has one reason to change
+- **Open/Closed Principle**: Open for extension, closed for modification
+- **Dependency Inversion**: Depend on abstractions, not concretions
+- **Interface Segregation**: No client should depend on unused methods
+- **DRY Principle**: Don't repeat yourself, extract common functionality
+- **SOLID Principles**: Foundation for maintainable object-oriented design
+
+### File Organization
+```
+/lib                           # Clean Architecture Implementation
+├── domain/                    # Domain Layer (Entities - Core Business Logic)
+│   ├── entities/              # Business entities with enterprise rules
+│   └── rules/                 # Business rule validators and calculations
+├── use-cases/                 # Application Layer (Use Cases)
+│   ├── [feature]/             # Feature-specific use case implementations
+│   └── interfaces/            # Repository and service interfaces (defined by use cases)
+├── infrastructure/            # Infrastructure Layer (External Concerns)
+│   ├── repositories/          # Data access implementations
+│   ├── external/              # External service clients
+│   └── adapters/              # Framework-specific adapters
+├── supabase/                  # Database layer (Infrastructure)
+│   ├── client.ts              # Database client configuration
+│   ├── server.ts              # Server-side database access
+│   └── middleware.ts          # Database middleware
+└── utils.ts                   # Shared utilities (framework-agnostic)
+```
+
+### Testing Strategy
+Each layer must be independently testable:
+
+**Domain Layer Testing**:
+- Unit tests for entities and business rules
+- No external dependencies (mocks/stubs)
+- Focus on business logic correctness
+
+**Use Case Testing**:
+- Integration tests with mocked repositories
+- Test application workflows end-to-end
+- Verify correct domain coordination
+
+**Infrastructure Testing**:
+- Test database mapping and external service integration
+- Use test databases and service stubs
+- Verify interface contract compliance
+
+**Presentation Testing**:
+- Test component rendering and user interactions
+- Mock use case dependencies
+- Focus on UI behavior and data display
+
+### Error Handling Strategy
+Each layer handles specific error types:
+
+**Domain Layer**: Business rule violations, domain constraint errors
+**Use Case Layer**: Application workflow errors, authorization failures
+**Infrastructure Layer**: Data access errors, external service failures
+**Presentation Layer**: Input validation errors, HTTP status mapping
+
+### Data Flow Patterns
+1. **Inbound**: Request → Controller → Use Case → Entity → Repository
+2. **Outbound**: Repository → Entity → Use Case → Presenter → Response
+3. **Cross-Cutting**: Use Case → Multiple External Services (via interfaces)
+4. **Validation**: Input Validation (Adapter) → Business Validation (Entity)
+
+## Presentation Layer Architecture (Frontend)
+
+The Presentation Layer in Clean Architecture is responsible for user interface concerns and should remain isolated from business logic. It communicates with the Application Layer (Use Cases) through well-defined interfaces.
+
+### Presentation Layer Structure
+```
+/app                          # Next.js App Router (Framework Layer)
+├── (auth)/                   # Authentication route group
+│   ├── login/                # Login page
+│   ├── signup/               # Registration page
+│   ├── callback/             # OAuth callback
+│   └── layout.tsx            # Auth-specific layout
+├── (private)/                # Protected route group (requires authentication)
+│   ├── dashboard/            # Main dashboard
+│   ├── function-model/       # Function model management
+│   ├── profile/              # User profile management
+│   ├── settings/             # Application settings
+│   └── layout.tsx            # Private layout with navigation
+├── (public)/                 # Public route group (no authentication required)
+│   ├── page.tsx              # Landing/home page
+│   ├── about/                # About page
+│   ├── contact/              # Contact page
+│   └── layout.tsx            # Public layout
+├── api/                      # API routes (Framework Layer)
+│   ├── contact/              # Contact form handler
+│   └── auth/                 # Authentication endpoints
+├── components/               # Reusable UI components (Presentation Layer)
+│   ├── ui/                   # Base UI components (Button, Input, Card)
+│   ├── forms/                # Form-specific components
+│   ├── features/             # Feature-specific components
+│   └── layout/               # Layout components (Header, Sidebar)
+├── hooks/                    # UI logic hooks (Presentation Layer)
+│   ├── use-form-state.ts     # Form state management
+│   ├── use-ui-state.ts       # UI-specific state (modals, themes)
+│   └── use-data-fetching.ts  # Data fetching patterns
+├── use-cases/                # Presentation-specific use cases
+│   ├── ui-workflows/         # UI-only workflows
+│   │   ├── toggle-theme.ts   # Theme switching logic
+│   │   ├── show-notification.ts # Notification management
+│   │   └── form-validation.ts # Client-side form validation
+│   └── data-access/          # Application layer bridges
+│       ├── user-operations.ts # User-related use case calls
+│       └── content-operations.ts # Content management calls
+├── styles/                   # Styling concerns
+│   ├── globals.css           # Global styles
+│   └── components.css        # Component-specific styles
+├── layout.tsx                # Root layout
+└── globals.css               # Global styles
+```
+
+### Presentation Layer Principles
+
+#### 1. **UI Components (Pure Presentation)**
+Components should be focused on rendering and user interaction, with minimal logic.
+
+**What Belongs Here**:
+- Rendering logic and visual presentation
+- User input handling (click, type, scroll)
+- Local UI state (form inputs, modals, dropdowns)
+- Accessibility and responsive behavior
+
+**What Should NOT Be Here**:
+- Business logic or business rules
+- Direct API calls or data fetching
+- Complex data transformations
+- Domain entity manipulation
+
+**Example**:
+```typescript
+// Good: Pure presentation component
+interface UserCardProps {
+  user: UserDisplayModel // DTO from use case
+  onEdit: (userId: string) => void // Callback to parent
+  onDelete: (userId: string) => void
+}
+
+export function UserCard({ user, onEdit, onDelete }: UserCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false) // UI state only
+  
+  return (
+    <Card>
+      <CardHeader onClick={() => setIsExpanded(!isExpanded)}>
+        <h3>{user.name}</h3>
+        <p>{user.email}</p>
+      </CardHeader>
+      
+      {isExpanded && (
+        <CardContent>
+          <p>{user.bio}</p>
+          <Button onClick={() => onEdit(user.id)}>Edit</Button>
+          <Button onClick={() => onDelete(user.id)}>Delete</Button>
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+```
+
+#### 2. **UI Hooks (Presentation Logic)**
+Hooks manage UI-specific state and effects, bridging components to use cases.
+
+**What Belongs Here**:
+- Form state management and validation
+- UI state coordination (modals, themes, notifications)
+- Component lifecycle effects
+- Local storage for UI preferences
+
+**Example**:
+```typescript
+// Good: UI-focused hook
+export function useUserForm(initialUser?: User) {
+  const [formData, setFormData] = useState(initialUser || emptyUser)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const validateForm = () => {
+    // UI validation only (format, required fields)
+    const newErrors: FormErrors = {}
+    if (!formData.email.includes('@')) {
+      newErrors.email = 'Invalid email format'
+    }
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+  
+  const handleSubmit = async (onSubmit: (data: UserFormData) => Promise<void>) => {
+    if (!validateForm()) return
+    
+    setIsSubmitting(true)
+    try {
+      await onSubmit(formData) // Delegate to use case
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+  
+  return {
+    formData,
+    setFormData,
+    errors,
+    isSubmitting,
+    handleSubmit
+  }
+}
+```
+
+#### 3. **Presentation Use Cases (UI Workflows)**
+Handle UI-specific workflows that don't involve business logic.
+
+**What Belongs Here**:
+- Theme switching and UI preferences
+- Notification management
+- Modal state coordination
+- Form validation (format/type checking)
+- Client-side routing logic
+
+**Example**:
+```typescript
+// Good: UI-only use case
+export class ToggleThemeUseCase {
+  constructor(
+    private themeStorage: ThemeStorage, // Interface for persistence
+    private notificationService: NotificationService
+  ) {}
+  
+  execute(currentTheme: Theme): Theme {
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light'
+    
+    // Persist UI preference
+    this.themeStorage.save(newTheme)
+    
+    // Show UI feedback
+    this.notificationService.show(`Switched to ${newTheme} theme`)
+    
+    return newTheme
+  }
+}
+
+// Good: Form validation use case
+export class FormValidationUseCase {
+  validateEmail(email: string): ValidationResult {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return {
+      isValid: emailRegex.test(email),
+      error: emailRegex.test(email) ? null : 'Invalid email format'
+    }
+  }
+  
+  validateRequired(value: string, fieldName: string): ValidationResult {
+    return {
+      isValid: value.trim().length > 0,
+      error: value.trim().length > 0 ? null : `${fieldName} is required`
+    }
+  }
+}
+```
+
+#### 4. **Data Access Bridges (Application Integration)**
+Connect presentation layer to application use cases through clean interfaces.
+
+**What Belongs Here**:
+- Orchestrating application layer use cases
+- Data transformation between domain models and UI models
+- Error handling and user feedback
+- Loading state management
+
+**Example**:
+```typescript
+// Good: Bridge to application layer
+export class UserOperationsPresenter {
+  constructor(
+    private createUserUseCase: CreateUserUseCase, // Application layer
+    private getUserUseCase: GetUserUseCase,
+    private notificationService: NotificationService // UI service
+  ) {}
+  
+  async createUser(formData: UserFormData): Promise<UserDisplayModel> {
+    try {
+      // Convert UI model to domain model
+      const userData: CreateUserRequest = {
+        email: formData.email,
+        name: formData.name,
+        // ... other mappings
+      }
+      
+      // Call application use case
+      const user = await this.createUserUseCase.execute(userData)
+      
+      // Show UI feedback
+      this.notificationService.showSuccess('User created successfully')
+      
+      // Convert domain model to UI model
+      return this.mapToDisplayModel(user)
+    } catch (error) {
+      // Handle errors with user-friendly messages
+      this.notificationService.showError('Failed to create user')
+      throw error
+    }
+  }
+  
+  private mapToDisplayModel(user: User): UserDisplayModel {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      displayName: `${user.name} (${user.email})`, // UI-specific formatting
+      // ... other UI-specific properties
+    }
+  }
+}
+```
+
+### Presentation Layer Communication Rules
+
+1. **No Direct Business Logic**: Components and hooks should not contain business rules
+2. **Interface-Based Integration**: Use interfaces to communicate with application layer
+3. **Data Transformation**: Convert between domain models and UI-specific display models
+4. **Error Boundaries**: Handle and display errors appropriately for users
+5. **State Isolation**: UI state should be separate from business state
+6. **Event-Driven**: Use callbacks and events for component communication
+
+### Testing Presentation Layer
+
+**Component Testing**:
+- Test rendering with different props
+- Test user interactions (clicks, form inputs)
+- Mock use case dependencies
+- Focus on UI behavior, not business logic
+
+**Hook Testing**:
+- Test state management and effects
+- Mock external dependencies
+- Test UI workflows and validation
+
+**Integration Testing**:
+- Test component and use case integration
+- Test data flow through the presentation layer
+- Mock application layer dependencies

@@ -14,13 +14,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Handle auth redirects
-  if (user && (pathname === "/login" || pathname === "/signup")) {
+  // Handle auth redirects - redirect authenticated users away from auth pages
+  if (user && (pathname === "/login" || pathname === "/signup" || pathname === "/callback")) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  // Protect private routes
-  if (!user && pathname.startsWith("/dashboard")) {
+  // Protect private routes - redirect unauthenticated users to login
+  // Since route groups don't affect URLs, we protect specific paths that map to (private) routes
+  if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/function-model") || pathname.startsWith("/profile") || pathname.startsWith("/settings"))) {
     return NextResponse.redirect(new URL("/login", request.url))
   }
 

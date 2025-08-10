@@ -18,7 +18,7 @@ Begin by slowing down to gather **complete context**:
 
 * What is the exact feature, problem, or requested change?
 * What is the desired outcome or behavior?
-* What system components will this affect (frontend, backend, DB, services)?
+* What Clean Architecture layers will this affect (Entities, Use Cases, Interface Adapters, Frameworks & Drivers)?
 * What triggers or user actions are involved?
 * Are there existing flows this will integrate with or disrupt?
 * What assumptions are being made — and which ones need verification?
@@ -75,22 +75,26 @@ Now write:
     "What is the real feature, bug, or request?",
     "What triggers it and what is the expected outcome?",
     "What files/modules handle this currently?",
-    "What parts of the system are affected (FE/BE/DB)?",
+    "What Clean Architecture layers are affected (Entities, Use Cases, Interface Adapters, Frameworks & Drivers)?",
     "What assumptions are we making?",
     "What dependencies or constraints should be noted?",
     "What could be the side effects or integration conflicts?",
     "Are there recent changes to this area?",
     "What are the risks to performance, integrity, or users?",
-    "Is this the minimal safe change, or are we overcomplicating?"
+    "Is this the minimal safe change, or are we overcomplicating?",
+    "Which layer should contain the core business logic for this feature?",
+    "Are we maintaining the inward dependency rule?",
+    "Will entities remain framework-independent?",
+    "Are we defining interfaces in inner layers and implementing in outer layers?"
   ],
   "currentFlowAnalysis": "step-by-step trace of the existing system behavior, integration points, and data/state flow",
   "implementationSummary": "a clear single-line description of the proposed change",
   "implementationPlan": {
-    "step1": "define scope and what code to update",
-    "step2": "map dependencies and related logic",
-    "step3": "outline code changes, schema updates, or service interactions",
-    "step4": "implement in the smallest testable pieces",
-    "step5": "run validation tests across affected areas"
+    "step1": "define scope and identify which Clean Architecture layers need updates",
+    "step2": "map dependencies ensuring inward-only flow and interface compliance",
+    "step3": "design entities and business rules first, then use cases, then adapters",
+    "step4": "implement layer by layer, starting with innermost (entities) working outward",
+    "step5": "run validation tests for each layer independently and integration flows"
   },
   "compatibilityAssurance": "explanation of how the change avoids regressions, breaks, or unintended consequences",
   "implementationConsiderations": "notes on risks, long-term impacts, maintainability, scalability, or UX"
@@ -108,7 +112,7 @@ Now write:
 1. What is the new feature? (Rollback to previous model versions)
 2. What triggers it? (User selects version from UI history)
 3. What is the current data model for versions?
-4. Which backend and frontend components are involved?
+4. Which Clean Architecture layers and components are involved?
 5. Are we using a state manager or client cache?
 6. Is there a field that marks the "active" version?
 7. What's the expected rollback behavior — overwrite? duplicate?
@@ -118,40 +122,46 @@ Now write:
 
 **Current Flow Analysis:**
 
-* Frontend: `ModelHistoryModal.tsx` shows available versions.
-* Backend: `POST /models/{id}/versions` calls `createVersionSnapshot()`.
-* DB: `function_model_versions` table stores `model_id`, `version_number`, `data`, etc.
-* Active version is inferred as latest, not explicitly tracked.
+* **Frameworks & Drivers Layer**: `ModelHistoryModal.tsx` (React component) shows available versions; Next.js API routes handle HTTP requests.
+* **Interface Adapters Layer**: `POST /models/{id}/versions` controller calls `createVersionSnapshot()` use case; repository implementations handle database operations.
+* **Use Cases Layer**: `CreateVersionSnapshotUseCase` orchestrates version creation workflow.
+* **Entities Layer**: Version business rules (currently minimal - needs enhancement for rollback).
+* **Infrastructure**: `function_model_versions` table stores `model_id`, `version_number`, `data`, etc.
+* Active version is inferred as latest, not explicitly tracked in entities.
 * No current rollback logic; only append-only model history.
-* Dependencies: Supabase DB, Redux store, and API gateway layer.
-* Side effects: rollbacks could overwrite active version if not handled carefully.
-* Logging is minimal — audit trails needed for traceability.
+* Dependencies: Supabase DB, React state management, following Clean Architecture dependency flow.
+* Side effects: rollbacks could violate business rules if not handled in entities layer.
+* Logging is minimal — audit trails needed for traceability and compliance.
 
 **Implementation Summary:**
 Enable rollback of model versions by marking older versions as active while preserving the full version history.
 
 **Implementation Plan:**
 
-* **Step 1:** Add `is_active` column to `function_model_versions` table.
-* **Step 2:** Update `createVersionSnapshot()` to manage active flag consistently.
-* **Step 3:** Create `/models/{id}/rollback/{version}` endpoint with safety checks.
-* **Step 4:** Update frontend to support rollback UI and confirmation.
-* **Step 5:** Log rollback actions in `audit_log`.
-* **Step 6:** Write tests for version switching, race conditions, and audit logging.
+* **Step 1 (Entities Layer):** Define `ModelVersion` entity with business rules for version activation and rollback constraints.
+* **Step 2 (Interface Adapters Layer):** Add `is_active` column to `function_model_versions` table; update repository implementation.
+* **Step 3 (Use Cases Layer):** Create `RollbackModelVersionUseCase` with proper business rule enforcement and safety checks.
+* **Step 4 (Interface Adapters Layer):** Create controller for `/models/{id}/rollback/{version}` endpoint that delegates to use case.
+* **Step 5 (Frameworks & Drivers Layer):** Update React UI to support rollback actions and confirmation dialogs.
+* **Step 6 (Interface Adapters Layer):** Implement audit logging repository for rollback actions.
+* **Step 7 (Testing):** Write tests for each layer - entity business rules, use case workflows, and UI interactions.
 
 **Compatibility Assurance:**
 
-* Existing endpoints continue to return latest version unless `is_active` is specified.
-* Rollbacks are additive, preserving all data.
-* DB migrations handle backfill of active version data.
+* Existing use cases continue to return latest version unless `is_active` entity property is specified.
+* Rollbacks are additive, preserving all version history in accordance with entity business rules.
+* Database migrations handle backfill of active version data without affecting existing entity behavior.
+* Interface contracts remain stable - changes are internal to layer implementations.
 
 **Implementation Considerations:**
 
-* **Scalability:** Index `is_active` to speed up queries.
-* **Security:** Limit rollback to admin or creator roles.
-* **Auditability:** Ensure rollback actions are logged with timestamps and user IDs.
-* **Maintainability:** Decouple rollback logic from version creation for clarity.
-* **User Clarity:** UI must clearly distinguish between rollback and save-new-version actions.
+* **Clean Architecture Compliance:** Business rules must be enforced in entities layer, not in UI or database constraints.
+* **Scalability:** Index `is_active` to speed up repository queries; ensure use case performance.
+* **Security:** Implement authorization in use cases layer, limit rollback to admin or creator roles through entity validation.
+* **Auditability:** Ensure rollback actions are logged through audit repository, maintaining full traceability.
+* **Maintainability:** Decouple rollback logic from version creation for clarity; separate use cases for different responsibilities.
+* **User Experience:** UI layer must clearly distinguish between rollback and save-new-version actions without containing business logic.
+* **Dependency Inversion:** Use cases depend on repository interfaces, not concrete implementations.
 
 ---
 

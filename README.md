@@ -1,30 +1,54 @@
-# Silver AI Automation App
+# Silver AI Automation Platform
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+A comprehensive AI automation platform focused on function model design and process workflow management.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/tony-apostols-projects/v0-silver-ai-automation-app)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/BHNZuYq5G5M)
+## Current Status
 
-## Overview
+This project has been reset to a clean state with:
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+- ✅ **Basic UI Scaffolding**: Dashboard layout with sidebar navigation
+- ✅ **Function Model Feature**: Process workflow design (placeholder)
+- ✅ **Authentication**: Supabase auth integration preserved
+- ✅ **Documentation**: All architecture and feature documentation preserved
+- ✅ **Database**: Supabase database schema and data preserved
 
-## Deployment
+## Features
 
-Your project is live at:
+- **Dashboard**: Overview with function model statistics and quick actions
+- **Function Model**: Process workflow design and management (placeholder)
 
-**[https://vercel.com/tony-apostols-projects/v0-silver-ai-automation-app](https://vercel.com/tony-apostols-projects/v0-silver-ai-automation-app)**
+## Getting Started
 
-## Build your app
+1. Install dependencies:
+   ```bash
+   pnpm install
+   ```
 
-Continue building your app on:
+2. Set up environment variables:
+   ```bash
+   cp .env.example .env.local
+   ```
 
-**[https://v0.dev/chat/projects/BHNZuYq5G5M](https://v0.dev/chat/projects/BHNZuYq5G5M)**
+3. Run the development server:
+   ```bash
+   pnpm dev
+   ```
 
-## How It Works
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+## Architecture
+
+The project follows Clean Architecture principles with:
+
+- **Presentation Layer**: React components and pages
+- **Application Layer**: Use cases and business logic
+- **Domain Layer**: Entities and business rules
+- **Infrastructure Layer**: External services and data access
+
+## Documentation
+
+See the `docs/` directory for detailed architecture and feature documentation.
+
+## Development
+
+This is a clean slate focused on the Function Model feature. The placeholder page is ready for implementation.

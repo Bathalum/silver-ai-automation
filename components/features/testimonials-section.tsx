@@ -1,7 +1,7 @@
 "use client"
 
 import { Section } from "@/components/ui/section"
-import { TestimonialCard } from "@/components/composites/testimonial-card"
+import { TestimonialCard } from "@/components/features/testimonial-card"
 import { getTestimonials } from "@/lib/use-cases/get-testimonials"
 
 export function TestimonialsSection() {
