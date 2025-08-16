@@ -58,7 +58,7 @@ export class NodeFactory {
     id: string,
     position: { x: number; y: number },
     data: Partial<IONodeData> = {}
-  ): Node<IONodeData> {
+  ): Node {
     const defaultData: IONodeData = {
       id,
       type: NODE_TYPES.IO,
@@ -95,12 +95,12 @@ export class NodeFactory {
     id: string,
     position: { x: number; y: number },
     data: Partial<StageNodeData> = {}
-  ): Node<StageNodeData> {
+  ): Node {
     const defaultData: StageNodeData = {
       id,
       type: NODE_TYPES.STAGE,
       name: 'Stage Node',
-      description: 'Execution stage node',
+      description: 'Processing stage node',
       status: 'idle',
       priority: 'medium',
       raci: {
@@ -110,12 +110,10 @@ export class NodeFactory {
         informed: ''
       },
       executionMode: 'sequential',
-      dependencies: [],
       actionCount: 0,
-      estimatedDuration: '5m',
       retryPolicy: {
         maxRetries: 3,
-        retryDelay: '1m'
+        retryDelay: '5s'
       },
       position,
       ...data
@@ -134,7 +132,7 @@ export class NodeFactory {
     id: string,
     position: { x: number; y: number },
     data: Partial<TetherNodeData> = {}
-  ): Node<TetherNodeData> {
+  ): Node {
     const defaultData: TetherNodeData = {
       id,
       type: NODE_TYPES.TETHER,
@@ -148,10 +146,18 @@ export class NodeFactory {
         consulted: '',
         informed: ''
       },
+      // New unified properties
+      targetNode: '',
+      executionTime: 0,
+      progress: 0,
+      isExecuting: false,
+      // Legacy properties for backward compatibility
       executionStatus: 'pending',
-      estimatedDuration: '2m',
+      estimatedDuration: '30s',
       retryCount: 0,
       maxRetries: 3,
+      lastExecutionTime: '',
+      nextExecutionTime: '',
       position,
       ...data
     }
@@ -169,13 +175,13 @@ export class NodeFactory {
     id: string,
     position: { x: number; y: number },
     data: Partial<KBNodeData> = {}
-  ): Node<KBNodeData> {
+  ): Node {
     const defaultData: KBNodeData = {
       id,
       type: NODE_TYPES.KB,
       name: 'KB Node',
       description: 'Knowledge base node',
-      status: 'idle',
+      status: 'ready',
       priority: 'medium',
       raci: {
         responsible: 'User',
@@ -183,15 +189,13 @@ export class NodeFactory {
         consulted: '',
         informed: ''
       },
-      kbReference: 'KB-001',
-      raci: {
-        responsible: 'User',
-        accountable: 'User',
-        consulted: '',
-        informed: ''
-      },
-      knowledgeDomain: 'General',
-      version: '1.0',
+      // New unified properties
+      sources: [],
+      lastUpdated: new Date().toISOString(),
+      author: 'User',
+      documentCount: 0,
+      isIndexing: false,
+      indexingProgress: 0,
       position,
       ...data
     }
@@ -209,12 +213,12 @@ export class NodeFactory {
     id: string,
     position: { x: number; y: number },
     data: Partial<FunctionModelContainerNodeData> = {}
-  ): Node<FunctionModelContainerNodeData> {
+  ): Node {
     const defaultData: FunctionModelContainerNodeData = {
       id,
       type: NODE_TYPES.CONTAINER,
-      name: 'Container Node',
-      description: 'Function model container',
+      name: 'Function Model Container',
+      description: 'Container for function models',
       status: 'idle',
       priority: 'medium',
       raci: {
@@ -223,11 +227,19 @@ export class NodeFactory {
         consulted: '',
         informed: ''
       },
-      nestedModelId: 'model-001',
-      nestedModelName: 'Nested Model',
-      contextMapping: {},
-      executionPolicy: 'inherit',
-      nestingLevel: 1,
+      // New unified properties
+      containerType: 'Standard',
+      lastUpdated: new Date().toISOString(),
+      owner: 'User',
+      isExpanded: false,
+      executionProgress: 0,
+      isExecuting: false,
+      models: [],
+      // Legacy properties for backward compatibility
+      executionStatus: 'pending',
+      estimatedDuration: '60s',
+      retryCount: 0,
+      maxRetries: 3,
       position,
       ...data
     }
@@ -272,8 +284,8 @@ export class NodeFactory {
       ...node,
       data: {
         ...node.data,
-        ...updates,
-      },
+        ...updates
+      }
     }
   }
 
@@ -283,40 +295,41 @@ export class NodeFactory {
     newId: string,
     newPosition: { x: number; y: number }
   ): T {
-    return {
-      ...node,
+    const clonedData = {
+      ...node.data,
       id: newId,
-      position: newPosition,
-      data: {
-        ...node.data,
-        id: newId,
-        position: newPosition,
-      },
+      position: newPosition
     }
+
+    return this.createNode(
+      node.type as NodeType,
+      newId,
+      newPosition,
+      clonedData
+    ) as T
   }
 
   // Validate node data
   validateNodeData<T extends Node>(node: T): boolean {
-    // Basic validation - ensure required fields exist
-    if (!node.data.name || !node.data.type) {
+    if (!node.data || !node.data.id || !node.data.type) {
       return false
     }
     return true
   }
 }
 
-// Hook for using the node factory
+// React hook for using the node factory
 export function useNodeFactory(config: NodeFactoryConfig = {}) {
   const factory = React.useMemo(() => new NodeFactory(config), [config])
-  
+
   return {
     factory,
-    createNode: factory.createNode.bind(factory),
     createIONode: factory.createIONode.bind(factory),
     createStageNode: factory.createStageNode.bind(factory),
     createTetherNode: factory.createTetherNode.bind(factory),
     createKBNode: factory.createKBNode.bind(factory),
     createContainerNode: factory.createContainerNode.bind(factory),
+    createNode: factory.createNode.bind(factory),
     updateNodeData: factory.updateNodeData.bind(factory),
     cloneNode: factory.cloneNode.bind(factory),
     validateNodeData: factory.validateNodeData.bind(factory),

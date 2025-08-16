@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-export interface BaseNodeData {
+export interface BaseNodeData extends Record<string, unknown> {
   id: string
   type: string
   name: string

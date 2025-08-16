@@ -1,9 +1,10 @@
 'use client'
 
 import React from 'react'
-import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Node, Edge, Connection, addEdge, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react'
+import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Node, Edge, Connection, addEdge, useNodesState, useEdgesState, useReactFlow, NodeTypes } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Card } from '@/components/ui/card'
+import { nodeTypes } from '@/app/(private)/dashboard/function-model/components/nodes/node-factory'
 
 interface WorkflowCanvasProps {
   nodes: Node[]
@@ -52,6 +53,7 @@ export function WorkflowCanvas({
         fitView
         attributionPosition="bottom-left"
         className="bg-gray-50"
+        nodeTypes={nodeTypes}
       >
         <Background
           gap={20}

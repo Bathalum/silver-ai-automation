@@ -21,6 +21,7 @@ interface WorkflowSidebarProps {
   onToggleCollapse?: () => void
   selectedNodeId?: string
   onNodeSelect?: (nodeId: string) => void
+  onAddNode?: (nodeType: string, position: { x: number; y: number }) => void
   className?: string
 }
 
@@ -83,12 +84,16 @@ export function WorkflowSidebar({
   onToggleCollapse,
   selectedNodeId,
   onNodeSelect,
+  onAddNode,
   className = ''
 }: WorkflowSidebarProps) {
   const [activeTab, setActiveTab] = useState<'tools' | 'properties'>('tools')
 
   const handleNodeToolClick = (tool: NodeTool) => {
-    // This would typically trigger a drag operation or node creation
+    if (onAddNode) {
+      const position = { x: 250, y: 200 } // Default position for now
+      onAddNode(tool.id, position)
+    }
     console.log('Node tool selected:', tool)
   }
 

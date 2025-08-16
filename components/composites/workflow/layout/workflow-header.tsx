@@ -34,7 +34,7 @@ const statusConfig = {
   running: { label: 'Running', variant: 'default' as const, color: 'bg-blue-100 text-blue-800' },
   completed: { label: 'Completed', variant: 'default' as const, color: 'bg-green-100 text-green-800' },
   error: { label: 'Error', variant: 'destructive' as const, color: 'bg-red-100 text-red-800' }
-}
+} as const
 
 export function WorkflowHeader({
   modelName,

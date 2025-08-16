@@ -111,6 +111,30 @@ export function WorkflowContainer({
     setIsSidebarCollapsed(!isSidebarCollapsed)
   }
 
+  const handleAddNode = (nodeType: string, position: { x: number; y: number }) => {
+    const nodeTypeMap: Record<string, string> = {
+      'io': 'ioNode',
+      'stage': 'stageNode',
+      'tether': 'tetherNode',
+      'kb': 'kbNode',
+      'function-model-container': 'functionModelContainerNode',
+    }
+    
+    const actualNodeType = nodeTypeMap[nodeType] || nodeType
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: actualNodeType,
+      position,
+      data: {
+        label: nodeType.charAt(0).toUpperCase() + nodeType.slice(1).replace('-', ' '),
+        type: actualNodeType
+      }
+    }
+    
+    setNodes((nds) => [...nds, newNode])
+    setIsDirty(true)
+  }
+
   return (
     <div className={`flex flex-col h-screen bg-gray-50 ${className}`}>
       {/* Header */}
@@ -145,6 +169,7 @@ export function WorkflowContainer({
           onToggleCollapse={toggleSidebar}
           selectedNodeId={selectedNodeId}
           onNodeSelect={setSelectedNodeId}
+          onAddNode={handleAddNode}
         />
 
         {/* Canvas Area */}

@@ -19,7 +19,7 @@ const mockModel = {
   id: '1',
   name: 'Customer Onboarding Process',
   description: 'Complete workflow for new customer account setup and verification',
-  status: 'active',
+  status: 'draft' as const,
   version: '1.2.0',
   category: 'Customer Service',
   lastModified: '2025-01-15',
@@ -80,21 +80,21 @@ export default function WorkflowDesignerPage() {
 
       {/* Workflow Designer */}
       <div className="flex-1 overflow-hidden">
-        <WorkflowContainer>
-          <WorkflowToolbar 
-            modelName={mockModel.name}
-            version={mockModel.version}
-            status={mockModel.status}
-            executionMode={mockModel.executionMode}
-            contextAccess={mockModel.contextAccess}
-          />
-          <div className="flex flex-1 overflow-hidden">
-            <WorkflowSidebar />
-            <div className="flex-1">
-              <WorkflowCanvas />
-            </div>
-          </div>
-        </WorkflowContainer>
+        <WorkflowContainer
+          modelName={mockModel.name}
+          version={mockModel.version}
+          status={mockModel.status}
+          initialNodes={[]}
+          initialEdges={[]}
+          onSave={() => console.log('Save workflow')}
+          onPublish={() => console.log('Publish workflow')}
+          onArchive={() => console.log('Archive workflow')}
+          onSettings={() => console.log('Open settings')}
+          onShare={() => console.log('Share workflow')}
+          onHistory={() => console.log('View history')}
+          onPreview={() => console.log('Preview workflow')}
+          onRun={() => console.log('Run workflow')}
+        />
       </div>
     </div>
   )
