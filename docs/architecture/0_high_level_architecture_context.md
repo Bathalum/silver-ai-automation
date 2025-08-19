@@ -31,20 +31,70 @@ Each layer serves a distinct purpose and can be tested in isolation. Business lo
 
 **Example**:
 ```typescript
-// Good: Business rule enforcement
+// Good: Business rule enforcement with value objects
+class Email {
+  constructor(private readonly value: string) {
+    if (!this.isValid(value)) {
+      throw new Error('Invalid email format')
+    }
+  }
+  
+  toString(): string { return this.value }
+  equals(other: Email): boolean { return this.value === other.value }
+  
+  private isValid(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+}
+
+class Money {
+  constructor(
+    private readonly amount: number,
+    private readonly currency: string
+  ) {
+    if (amount < 0) throw new Error("Money cannot be negative")
+  }
+  
+  add(other: Money): Money {
+    if (this.currency !== other.currency) {
+      throw new Error("Cannot add different currencies")
+    }
+    return new Money(this.amount + other.amount, this.currency)
+  }
+  
+  static zero(currency = 'USD'): Money {
+    return new Money(0, currency)
+  }
+}
+
 class Order {
   private items: OrderItem[]
   private status: OrderStatus
+  private events: DomainEvent[] = []
   
   addItem(item: OrderItem): void {
     if (this.status === OrderStatus.SHIPPED) {
       throw new Error("Cannot modify shipped order") // Business rule
     }
     this.items.push(item)
+    this.addEvent(new OrderItemAdded(this.id, item))
   }
   
   calculateTotal(): Money {
     return this.items.reduce((sum, item) => sum.add(item.price), Money.zero())
+  }
+  
+  private addEvent(event: DomainEvent): void {
+    this.events.push(event)
+  }
+  
+  getEvents(): DomainEvent[] {
+    return [...this.events]
+  }
+  
+  clearEvents(): void {
+    this.events = []
   }
 }
 ```
@@ -69,28 +119,169 @@ class Order {
 
 **Example**:
 ```typescript
-// Good: Use case orchestration
+// Good: Use case orchestration with Result pattern
 class CreateUserUseCase {
   constructor(
     private userRepo: UserRepository, // Interface, not implementation
-    private emailService: EmailService // Interface
+    private emailService: EmailService, // Interface
+    private eventBus: EventBus // Interface
   ) {}
   
-  async execute(userData: CreateUserRequest): Promise<User> {
-    // Application validation
-    if (await this.userRepo.existsByEmail(userData.email)) {
-      throw new Error("Email already exists")
+  async execute(userData: CreateUserRequest): Promise<Result<User>> {
+    try {
+      // Application validation
+      const existingUser = await this.userRepo.findByEmail(userData.email)
+      if (existingUser.isSuccess && existingUser.value) {
+        return Result.fail<User>("Email already exists")
+      }
+      
+      // Create entity (business rules enforced)
+      const userResult = User.create(userData)
+      if (userResult.isFailure) {
+        return Result.fail<User>(userResult.error)
+      }
+      
+      const user = userResult.value
+      
+      // Persist
+      const saveResult = await this.userRepo.save(user)
+      if (saveResult.isFailure) {
+        return Result.fail<User>("Failed to save user")
+      }
+      
+      // Publish domain events
+      const events = user.getEvents()
+      for (const event of events) {
+        await this.eventBus.publish(event)
+      }
+      user.clearEvents()
+      
+      // Send notification (fire and forget)
+      this.emailService.sendWelcomeEmail(user.email.toString())
+        .catch(error => console.error('Failed to send welcome email:', error))
+      
+      return Result.ok(user)
+    } catch (error) {
+      return Result.fail<User>(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+}
+```
+
+### Result Pattern for Functional Error Handling
+
+**Purpose**: Provides explicit error handling without exceptions, making error cases part of the type system.
+
+**What It Solves**:
+- **Explicit Error Handling**: Forces developers to handle both success and failure cases
+- **Type Safety**: Errors become part of the return type, caught at compile time
+- **Functional Composition**: Allows chaining operations with automatic error propagation
+- **No Hidden Exceptions**: All possible errors are visible in the method signature
+
+**Implementation**:
+```typescript
+// Core Result pattern implementation
+export class Result<T> {
+  private constructor(
+    private readonly _value?: T,
+    private readonly _error?: string,
+    private readonly _isSuccess: boolean = false
+  ) {}
+  
+  static ok<T>(value: T): Result<T> {
+    return new Result<T>(value, undefined, true)
+  }
+  
+  static fail<T>(error: string): Result<T> {
+    return new Result<T>(undefined, error, false)
+  }
+  
+  get isSuccess(): boolean {
+    return this._isSuccess
+  }
+  
+  get isFailure(): boolean {
+    return !this._isSuccess
+  }
+  
+  get value(): T {
+    if (!this._isSuccess) {
+      throw new Error("Cannot get value from failed result")
+    }
+    return this._value!
+  }
+  
+  get error(): string {
+    if (this._isSuccess) {
+      throw new Error("Cannot get error from successful result")
+    }
+    return this._error!
+  }
+  
+  // Functional combinators
+  map<U>(fn: (value: T) => U): Result<U> {
+    if (this.isFailure) {
+      return Result.fail<U>(this._error!)
+    }
+    try {
+      return Result.ok(fn(this._value!))
+    } catch (error) {
+      return Result.fail<U>(error instanceof Error ? error.message : String(error))
+    }
+  }
+  
+  flatMap<U>(fn: (value: T) => Result<U>): Result<U> {
+    if (this.isFailure) {
+      return Result.fail<U>(this._error!)
+    }
+    return fn(this._value!)
+  }
+  
+  onSuccess(fn: (value: T) => void): Result<T> {
+    if (this.isSuccess) {
+      fn(this._value!)
+    }
+    return this
+  }
+  
+  onFailure(fn: (error: string) => void): Result<T> {
+    if (this.isFailure) {
+      fn(this._error!)
+    }
+    return this
+  }
+}
+
+// Usage in domain entities
+class User {
+  static create(userData: CreateUserRequest): Result<User> {
+    // Validate email
+    const emailResult = Email.create(userData.email)
+    if (emailResult.isFailure) {
+      return Result.fail<User>(`Invalid email: ${emailResult.error}`)
     }
     
-    // Create entity (business rules enforced)
-    const user = User.create(userData)
+    // Validate other fields...
+    if (!userData.name || userData.name.trim().length === 0) {
+      return Result.fail<User>("Name is required")
+    }
     
-    // Persist and notify
-    await this.userRepo.save(user)
-    await this.emailService.sendWelcomeEmail(user.email)
+    // Create user if all validations pass
+    const user = new User(
+      generateId(),
+      emailResult.value,
+      userData.name.trim()
+    )
     
-    return user
+    return Result.ok(user)
   }
+}
+
+// Repository interface with Result pattern
+interface UserRepository {
+  save(user: User): Promise<Result<void>>
+  findByEmail(email: string): Promise<Result<User | null>>
+  findById(id: string): Promise<Result<User | null>>
 }
 ```
 
@@ -145,6 +336,171 @@ class SqlUserRepository implements UserRepository {
   async findByEmail(email: string): Promise<User | null> {
     const dbUser = await this.db.users.findByEmail(email)
     return dbUser ? this.mapToDomain(dbUser) : null
+  }
+}
+```
+
+### Domain Events for Loose Coupling
+
+**Purpose**: Enable loose coupling between aggregates and bounded contexts through event-driven communication.
+
+**What It Solves**:
+- **Aggregate Independence**: Aggregates don't need direct references to each other
+- **Cross-Cutting Concerns**: Handle side effects (emails, notifications, integrations) without coupling
+- **Temporal Decoupling**: Events can be processed immediately or later (eventual consistency)
+- **Audit Trail**: Natural event sourcing and audit logging capabilities
+
+**Implementation**:
+```typescript
+// Base domain event interface
+interface DomainEvent {
+  eventId: string
+  occurredOn: Date
+  aggregateId: string
+  aggregateType: string
+  eventType: string
+}
+
+// Concrete domain events
+class UserCreated implements DomainEvent {
+  readonly eventId = generateId()
+  readonly occurredOn = new Date()
+  readonly aggregateType = 'User'
+  readonly eventType = 'UserCreated'
+  
+  constructor(
+    public readonly aggregateId: string,
+    public readonly user: {
+      id: string
+      email: string
+      name: string
+    }
+  ) {}
+}
+
+class OrderItemAdded implements DomainEvent {
+  readonly eventId = generateId()
+  readonly occurredOn = new Date()
+  readonly aggregateType = 'Order'
+  readonly eventType = 'OrderItemAdded'
+  
+  constructor(
+    public readonly aggregateId: string,
+    public readonly item: {
+      productId: string
+      quantity: number
+      price: number
+    }
+  ) {}
+}
+
+// Entity with domain events
+abstract class AggregateRoot {
+  private _events: DomainEvent[] = []
+  
+  protected addEvent(event: DomainEvent): void {
+    this._events.push(event)
+  }
+  
+  getEvents(): DomainEvent[] {
+    return [...this._events]
+  }
+  
+  clearEvents(): void {
+    this._events = []
+  }
+}
+
+class User extends AggregateRoot {
+  constructor(
+    public readonly id: string,
+    public readonly email: Email,
+    public readonly name: string
+  ) {
+    super()
+  }
+  
+  static create(userData: CreateUserRequest): Result<User> {
+    const emailResult = Email.create(userData.email)
+    if (emailResult.isFailure) {
+      return Result.fail<User>(`Invalid email: ${emailResult.error}`)
+    }
+    
+    const user = new User(
+      generateId(),
+      emailResult.value,
+      userData.name
+    )
+    
+    // Domain event for user creation
+    user.addEvent(new UserCreated(user.id, {
+      id: user.id,
+      email: user.email.toString(),
+      name: user.name
+    }))
+    
+    return Result.ok(user)
+  }
+}
+
+// Event bus interface (defined in use case layer)
+interface EventBus {
+  publish(event: DomainEvent): Promise<void>
+  subscribe<T extends DomainEvent>(
+    eventType: string,
+    handler: (event: T) => Promise<void>
+  ): void
+}
+
+// Event handlers (application layer)
+class SendWelcomeEmailHandler {
+  constructor(private emailService: EmailService) {}
+  
+  async handle(event: UserCreated): Promise<void> {
+    await this.emailService.sendWelcomeEmail(
+      event.user.email,
+      event.user.name
+    )
+  }
+}
+
+class UpdateUserStatisticsHandler {
+  constructor(private statisticsRepo: StatisticsRepository) {}
+  
+  async handle(event: UserCreated): Promise<void> {
+    await this.statisticsRepo.incrementUserCount()
+  }
+}
+
+// Use case with event publishing
+class CreateUserUseCase {
+  constructor(
+    private userRepo: UserRepository,
+    private eventBus: EventBus
+  ) {}
+  
+  async execute(userData: CreateUserRequest): Promise<Result<User>> {
+    const userResult = User.create(userData)
+    if (userResult.isFailure) {
+      return userResult
+    }
+    
+    const user = userResult.value
+    
+    // Save user
+    const saveResult = await this.userRepo.save(user)
+    if (saveResult.isFailure) {
+      return Result.fail<User>("Failed to save user")
+    }
+    
+    // Publish domain events
+    const events = user.getEvents()
+    for (const event of events) {
+      await this.eventBus.publish(event)
+    }
+    user.clearEvents()
+    
+    return Result.ok(user)
   }
 }
 ```
@@ -232,6 +588,7 @@ const createUser = new CreateUserUseCase(userRepo)
 
 ## Implementation Checklist
 
+### Core Architecture Compliance
 - [ ] Entities contain only business rules and core domain logic
 - [ ] Use cases orchestrate workflows without business rule implementation
 - [ ] Interfaces are defined in inner layers, implemented in outer layers
@@ -240,6 +597,16 @@ const createUser = new CreateUserUseCase(userRepo)
 - [ ] Controllers handle only HTTP concerns, not business logic
 - [ ] Data flows inward as domain objects, outward as DTOs
 - [ ] Each layer can be unit tested in isolation
+
+### Advanced Patterns Implementation
+- [ ] **Value Objects**: Used for primitive obsession prevention (Email, Money, etc.)
+- [ ] **Result Pattern**: Functional error handling without exceptions
+- [ ] **Domain Events**: Loose coupling between aggregates and bounded contexts
+- [ ] **Aggregate Root**: Entities inherit from AggregateRoot for event management
+- [ ] **Event-Driven Architecture**: Cross-cutting concerns handled via events
+- [ ] **Functional Combinators**: Result.map(), flatMap() for operation chaining
+- [ ] **Explicit Error Handling**: All methods return Result<T> for type-safe errors
+- [ ] **Event Sourcing Ready**: Domain events provide natural audit trail
 
 ## Project Implementation Guidelines
 
@@ -297,12 +664,46 @@ Each layer must be independently testable:
 - Focus on UI behavior and data display
 
 ### Error Handling Strategy
-Each layer handles specific error types:
+Each layer handles specific error types using the Result<T> pattern for explicit error handling:
 
-**Domain Layer**: Business rule violations, domain constraint errors
-**Use Case Layer**: Application workflow errors, authorization failures
-**Infrastructure Layer**: Data access errors, external service failures
-**Presentation Layer**: Input validation errors, HTTP status mapping
+**Domain Layer**: 
+- Business rule violations, domain constraint errors
+- Returns: `Result<Entity>` from factory methods, `Result<void>` from operations
+- Example: `User.create()` returns `Result<User>` with validation errors
+
+**Use Case Layer**: 
+- Application workflow errors, authorization failures, coordination errors
+- Returns: `Result<T>` from all use case executions
+- Example: `CreateUserUseCase.execute()` returns `Result<User>`
+
+**Infrastructure Layer**: 
+- Data access errors, external service failures, network timeouts
+- Returns: `Result<T>` from repository and service operations
+- Example: `UserRepository.save()` returns `Result<void>`
+
+**Presentation Layer**: 
+- Input validation errors, HTTP status mapping, format conversion errors
+- Converts `Result<T>` to HTTP responses with appropriate status codes
+- Example: Success → 200/201, Failure → 400/500 with error details
+
+**Advanced Error Handling Patterns**:
+```typescript
+// Functional error composition
+const result = await userRepository.findByEmail(email)
+  .flatMap(user => user ? Result.ok(user) : Result.fail("User not found"))
+  .flatMap(user => user.updateProfile(profileData))
+  .flatMap(user => userRepository.save(user))
+
+// Error handling with context
+result
+  .onSuccess(user => logger.info(`User ${user.id} updated successfully`))
+  .onFailure(error => logger.error(`Failed to update user: ${error}`))
+
+// HTTP response mapping
+return result.isSuccess
+  ? Response.ok(result.value)
+  : Response.badRequest({ error: result.error })
+```
 
 ### Data Flow Patterns
 1. **Inbound**: Request → Controller → Use Case → Entity → Repository
