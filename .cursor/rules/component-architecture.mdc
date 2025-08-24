@@ -1,9 +1,6 @@
 ---
 description: When creating features, build modular UI components for presentation
 globs:
-  - "components/**/*.tsx"
-  - "app/**/*.tsx"
-  - "lib/application/hooks/**/*.ts"
 alwaysApply: false
 ---
 # Component Architecture
@@ -53,25 +50,29 @@ Component-Based Design (CBD) is a software engineering approach that emphasizes 
 
 Clean Architecture serves as the foundational architectural pattern for the entire application. It provides a clear separation of concerns across four distinct layers:
 
-1. **Domain Layer**: Contains core business entities and types
-   - Located in `/lib/types/`
+1. **Domain Layer** (Innermost): Contains enterprise-wide business rules and core business objects
+   - Located in `/lib/domain/`
+   - Contains business entities with enterprise rules and business rule validators
    - Defines the fundamental data structures and interfaces used throughout the application
-   - Example: Data type definitions for core business entities
+   - Example: Business entities with core business logic and calculations
 
-2. **Application Layer**: Implements business logic and use cases
-   - Located in `/lib/utils/` and `/lib/hooks/`
-   - Contains business logic, calculations, and transformations
-   - Example: Calculation utilities for business metrics
+2. **Use Cases Layer** (Application Business Rules): Contains application-specific business rules and orchestrates workflows
+   - Located in `/lib/use-cases/`
+   - Implements application-specific workflows and business logic orchestration
+   - Defines repository and service interfaces that it needs
+   - Example: "Create User Account", "Process Payment" workflows
 
-3. **Infrastructure Layer**: Handles external interfaces and technical concerns
-   - Located in `/lib/services/` and `/lib/repositories/`
-   - Manages communication with external systems (Supabase, APIs)
-   - Example: Repository modules that handle data access for specific features
+3. **Interface Adapters Layer**: Converts data between use cases and external layers
+   - Located in `/lib/infrastructure/`
+   - Implements repository interfaces and external service adapters
+   - Handles data format conversion and external system integration
+   - Example: Database repositories, external API clients
 
-4. **Presentation Layer**: Manages UI components and user interaction
-   - Located in `/components/` and `/app/`
-   - Renders the user interface and handles user interactions
-   - Example: Feature-specific UI components in their respective directories
+4. **Frameworks & Drivers Layer** (Outermost): Contains framework-specific code and infrastructure details
+   - Located in `/app/` and `/components/`
+   - Manages UI components, routing, and framework configuration
+   - Handles user interface concerns and user interactions
+   - Example: React components, Next.js routing, UI state management
 
 The key benefit of Clean Architecture is that it creates a system where business rules and application logic are independent of external frameworks, databases, and UI components. This makes the system more testable, maintainable, and adaptable to change.
 
@@ -86,6 +87,7 @@ Base components are the fundamental building blocks of our UI. They are:
 - Highly reusable across the entire application
 - Generally stateless, receiving data via props
 - Styled using Tailwind CSS with consistent design patterns
+- **Pure presentation components with no business logic**
 
 **Location**: `/components/ui/`
 
@@ -103,6 +105,7 @@ Composite components combine multiple base components to create more complex UI 
 - Encapsulate related UI logic and interactions
 - Still relatively generic and reusable across different features
 - May maintain their own internal state
+- **UI-focused functionality, no business rules**
 
 **Location**: `/components/composites/`
 
@@ -116,24 +119,26 @@ Composite components combine multiple base components to create more complex UI 
 
 Feature components are specialized for specific business features:
 - Built using base and composite components
-- Implement specific business logic for a particular feature
-- Closely tied to the domain model and application logic
-- May interact with hooks and services to fetch and manipulate data
+- **Do NOT implement business logic** - they delegate to use cases
+- Closely tied to the domain model through use case interfaces
+- Interact with presentation layer hooks to fetch and manipulate data
+- **Pure presentation with business logic delegated to application layer**
 
 **Location**: `/app/(private)/dashboard/[feature]/components/`
 
 **Examples**:
-- FeatureSummary (in feature-specific component directories)
-- DataListingTable (in data listing feature directories)
-- FeatureKpiCards (in feature dashboard component directories)
+- FeatureSummary (displays data from use cases)
+- DataListingTable (renders data with UI interactions)
+- FeatureKpiCards (displays metrics from business calculations)
 
 ### Page Components
 
 Page components represent entire pages or major sections of the application:
 - Compose feature components to create complete pages
-- Handle page-level state and data fetching
+- Handle page-level state and data fetching coordination
 - Manage routing and navigation concerns
 - Implement layout and page structure
+- **Orchestrate use cases through presentation layer bridges**
 
 **Location**: `/app/(private)/dashboard/[feature]/page.tsx`
 
@@ -150,13 +155,15 @@ Our component architecture follows a clear flow of data and composition:
    - Page Components → Feature Components → Composite Components → Base Components
 
 2. **Data Flow**:
-   - Data typically flows down from page components to feature components to composite components to base components
+   - Data flows down from page components to feature components to composite components to base components
    - Events and user interactions flow up in the opposite direction
+   - **Business data flows from use cases through presentation layer bridges to components**
 
 3. **Clean Architecture Integration**:
-   - Page and Feature components interact with the Application Layer through custom hooks
-   - Custom hooks interact with the Infrastructure Layer through services and repositories
-   - Services and repositories interact with external systems (Supabase, APIs)
+   - **Page and Feature components interact with Use Cases through presentation layer bridges**
+   - **Presentation layer bridges orchestrate use cases and transform data for UI consumption**
+   - **Use cases interact with domain entities and external systems through interfaces**
+   - **No business logic in components - only UI logic and data display**
 
 This approach ensures a clear separation of concerns while maintaining a modular, reusable component structure.
 
@@ -173,8 +180,9 @@ Our component architecture is implemented using the following technologies:
 - **Radix UI**: Provides accessible, unstyled UI primitives
 
 ### State Management
-- **React Hooks**: useState, useContext, and custom hooks for state management
+- **React Hooks**: useState, useContext, and custom hooks for **UI state management only**
 - **URL Parameters**: For shareable, bookmarkable states
+- **Custom Hooks**: For UI-specific logic and state coordination
 
 ### Form Handling
 - **React Hook Form**: For form state management and validation
@@ -195,12 +203,14 @@ To maintain the integrity of our component architecture, we follow these best pr
 2. **Proper Naming**: Use clear, descriptive names that indicate the component's purpose
 3. **Consistent Props API**: Design consistent, intuitive props interfaces
 4. **Documentation**: Document component props, usage, and examples
+5. **No Business Logic**: Components should contain only UI logic and presentation concerns
 
 ### State Management
 1. **Minimize State**: Keep state as close as possible to where it's needed
 2. **URL Parameters**: Use URL parameters for shareable filter state
-3. **Custom Hooks**: Extract complex state logic into custom hooks
+3. **Custom Hooks**: Extract complex UI state logic into custom hooks
 4. **Avoid Prop Drilling**: Use context or custom hooks for deeply nested state needs
+5. **UI State Only**: Hooks should manage UI state, not business state
 
 ### Performance
 1. **Memoization**: Use React.memo, useMemo, and useCallback appropriately
@@ -213,6 +223,7 @@ To maintain the integrity of our component architecture, we follow these best pr
 2. **Hook Testing**: Test custom hooks independently
 3. **Integration Testing**: Test component compositions and interactions
 4. **Accessibility Testing**: Ensure components meet accessibility standards
+5. **Mock Use Cases**: Test components with mocked use case dependencies
 
 ## Examples from Our Codebase
 
@@ -224,9 +235,10 @@ The DataTable component is an excellent example of our component architecture in
 2. **Composite Component**: DataTable in `/components/composites/data-table/`
    - Combines search, filtering, pagination, and sorting
    - Provides a consistent interface for all tables in the application
+   - **Contains only UI logic, no business rules**
 3. **Feature Component**: FeatureDataTable in `/app/(private)/dashboard/feature/data-view/`
    - Uses DataTable with specific columns and data for the feature
-   - Implements feature-specific functionality
+   - **Delegates data fetching to use cases through presentation layer bridges**
 4. **Page Component**: Feature view page that incorporates the FeatureDataTable
 
 This hierarchy demonstrates how our component architecture enables code reuse while maintaining separation of concerns.
@@ -235,10 +247,11 @@ This hierarchy demonstrates how our component architecture enables code reuse wh
 
 The Feature Dashboard showcases Clean Architecture principles:
 
-1. **Domain Layer**: Types in `/lib/types/feature-types.ts`
-2. **Application Layer**: Calculations in `/lib/utils/feature/calculations.ts`
-3. **Infrastructure Layer**: Data fetching in `/lib/hooks/use-feature-data.ts`
+1. **Domain Layer**: Business entities and rules in `/lib/domain/`
+2. **Use Cases Layer**: Business workflows in `/lib/use-cases/`
+3. **Infrastructure Layer**: Data access implementations in `/lib/infrastructure/`
 4. **Presentation Layer**: Components in `/app/(private)/dashboard/feature/components/`
+5. **Presentation Layer Bridges**: Data access bridges in `/app/use-cases/data-access/`
 
 This separation allows each layer to evolve independently while maintaining clear boundaries between concerns.
 
@@ -250,5 +263,6 @@ As the application continues to evolve, our component architecture provides a so
 2. **Design System**: Our base and composite components could evolve into a formal design system
 3. **Component Library**: We could extract reusable components into a shared library for use across multiple projects
 4. **Server Components**: Next.js server components could be further leveraged to optimize performance
+5. **Clean Architecture Compliance**: Maintain strict separation between business logic and presentation concerns
 
-By maintaining our modified Component-Based Design approach within the Clean Architecture framework, we ensure that the application remains maintainable, scalable, and adaptable to changing requirements.
+By maintaining our modified Component-Based Design approach within the Clean Architecture framework, we ensure that the application remains maintainable, scalable, and adaptable to changing requirements while preserving the integrity of business logic separation.
