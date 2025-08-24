@@ -127,7 +127,7 @@ class MockKBNode extends KBNode {
         shortDescription: 'Test knowledge base reference',
         documentationContext: { section: 'api', subsection: 'authentication' },
         searchKeywords: ['auth', 'api', 'security'],
-        accessPermissions: { read: true, write: false, execute: false }
+        accessPermissions: { view: ['user1', 'user2'], edit: ['user1'] }
       },
       createdAt: new Date(),
       updatedAt: new Date()
@@ -619,7 +619,7 @@ describe('NodeContextAccessService', () => {
       expect(context.kbReferenceId).toBe('test-kb-ref');
       expect(context.shortDescription).toBe('Test knowledge base reference');
       expect(context.searchKeywords).toEqual(['auth', 'api', 'security']);
-      expect(context.accessPermissions).toEqual({ read: true, write: false, execute: false });
+      expect(context.accessPermissions).toEqual({ view: ['user1', 'user2'], edit: ['user1'] });
     });
 
     it('should extract function model container node context', () => {

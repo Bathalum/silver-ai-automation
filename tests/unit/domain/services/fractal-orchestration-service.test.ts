@@ -31,12 +31,30 @@ class MockFunctionModel extends FunctionModel {
     nodes: any[] = [],
     containerNodes: FunctionModelContainerNode[] = []
   ): MockFunctionModel {
+    // Create nodes Map
+    const nodesMap = new Map<string, Node>();
+    const allNodes = [...nodes, ...containerNodes];
+    allNodes.forEach(node => {
+      if (node && node.nodeId && node.nodeId.value) {
+        nodesMap.set(node.nodeId.value, node);
+      }
+    });
+
+    // Create actionNodes Map
+    const actionNodesMap = new Map<string, ActionNode>();
+    allNodes
+      .filter(node => node.constructor.name.includes('Action'))
+      .forEach(node => {
+        actionNodesMap.set(node.nodeId.value, node as ActionNode);
+      });
+
     const model = new MockFunctionModel({
       modelId,
       name: `Mock Model ${modelId}`,
       description: 'Test function model',
       version: 1,
-      nodes: [...nodes, ...containerNodes],
+      nodes: nodesMap,
+      actionNodes: actionNodesMap,
       edges: [],
       metadata: {},
       featureType: 'FUNCTION_MODEL' as any,

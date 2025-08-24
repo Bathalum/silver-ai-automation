@@ -111,7 +111,6 @@ describe('Domain Event Behavior and Integration - Clean Architecture Compliance'
 
       // Act - Simulate event raising (in real implementation, this would be automatic)
       const event = new ModelCreated({
-        aggregateId: model.modelId,
         modelId: model.modelId,
         modelName: model.name.toString(),
         version: model.version.toString(),
@@ -157,7 +156,6 @@ describe('Domain Event Behavior and Integration - Clean Architecture Compliance'
       expect(publishResult.isSuccess).toBe(true);
 
       const event = new ModelPublished({
-        aggregateId: model.modelId,
         modelId: model.modelId,
         modelName: model.name.toString(),
         version: model.version.toString(),
@@ -194,7 +192,6 @@ describe('Domain Event Behavior and Integration - Clean Architecture Compliance'
       expect(archiveResult.isSuccess).toBe(true);
 
       const event = new ModelArchived({
-        aggregateId: model.modelId,
         modelId: model.modelId,
         modelName: model.name.toString(),
         version: model.version.toString(),
@@ -659,7 +656,6 @@ describe('Domain Event Behavior and Integration - Clean Architecture Compliance'
 
       // Act - Start AI agent execution and raise event
       const event = new AIAgentExecutionStarted({
-        aggregateId: agentId,
         agentId,
         executionId,
         agentName: 'Workflow Orchestrator',

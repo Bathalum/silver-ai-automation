@@ -404,7 +404,7 @@ describe('ExecutionRules', () => {
       // Arrange
       const resourceLimits = {
         maxCpu: 16,
-        maxMemory: 32768,
+        maxMemory: 536870912, // 512 MB in bytes
         maxExecutionTime: 3600
       };
       
@@ -598,7 +598,7 @@ describe('ExecutionRules', () => {
       
       const resourceLimits = {
         maxCpu: 16,
-        maxMemory: 32768,
+        maxMemory: 536870912, // 512 MB in bytes
         maxExecutionTime: 3600
       };
       

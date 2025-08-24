@@ -46,7 +46,6 @@ export interface CrossFeatureLinkBrokenData {
 }
 
 export class NodeLinkCreated extends DomainEvent {
-  public readonly eventType = 'NodeLinkCreated';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: NodeLinkCreatedData) {
@@ -55,7 +54,7 @@ export class NodeLinkCreated extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'NodeLinkCreated';
   }
 
   public getEventData(): Record<string, any> {
@@ -154,7 +153,6 @@ export class CrossFeatureLinkRemoved extends DomainEvent {
 }
 
 export class CrossFeatureLinkEstablished extends DomainEvent {
-  public readonly eventType = 'CrossFeatureLinkEstablished';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: CrossFeatureLinkEstablishedData) {
@@ -163,7 +161,7 @@ export class CrossFeatureLinkEstablished extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'CrossFeatureLinkEstablished';
   }
 
   public getEventData(): Record<string, any> {
@@ -183,7 +181,6 @@ export class CrossFeatureLinkEstablished extends DomainEvent {
 }
 
 export class CrossFeatureLinkBroken extends DomainEvent {
-  public readonly eventType = 'CrossFeatureLinkBroken';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: CrossFeatureLinkBrokenData) {
@@ -192,7 +189,7 @@ export class CrossFeatureLinkBroken extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'CrossFeatureLinkBroken';
   }
 
   public getEventData(): Record<string, any> {

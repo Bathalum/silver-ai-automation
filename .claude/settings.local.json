@@ -12,9 +12,14 @@
       "Bash(rm:*)",
       "Bash(rg:*)",
       "Bash(grep:*)",
-      "Bash(pntml test:*)"
+      "Bash(pntml test:*)",
+      "Bash(timeout 30 pnpm test:*)",
+      "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects/**)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects"
+    ]
   }
 }

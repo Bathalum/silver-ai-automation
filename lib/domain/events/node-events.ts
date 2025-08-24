@@ -63,7 +63,6 @@ export interface ActionNodeUpdatedData {
 }
 
 export class ContainerNodeAdded extends DomainEvent {
-  public readonly eventType = 'ContainerNodeAdded';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ContainerNodeAddedData) {
@@ -72,7 +71,7 @@ export class ContainerNodeAdded extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ContainerNodeAdded';
   }
 
   public getEventData(): Record<string, any> {
@@ -92,7 +91,6 @@ export class ContainerNodeAdded extends DomainEvent {
 }
 
 export class ContainerNodeRemoved extends DomainEvent {
-  public readonly eventType = 'ContainerNodeRemoved';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ContainerNodeRemovedData) {
@@ -101,7 +99,7 @@ export class ContainerNodeRemoved extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ContainerNodeRemoved';
   }
 
   public getEventData(): Record<string, any> {
@@ -121,7 +119,6 @@ export class ContainerNodeRemoved extends DomainEvent {
 }
 
 export class ContainerNodeUpdated extends DomainEvent {
-  public readonly eventType = 'ContainerNodeUpdated';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ContainerNodeUpdatedData) {
@@ -130,7 +127,7 @@ export class ContainerNodeUpdated extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ContainerNodeUpdated';
   }
 
   public getEventData(): Record<string, any> {
@@ -150,7 +147,6 @@ export class ContainerNodeUpdated extends DomainEvent {
 }
 
 export class ActionNodeAdded extends DomainEvent {
-  public readonly eventType = 'ActionNodeAdded';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeAddedData) {
@@ -159,7 +155,7 @@ export class ActionNodeAdded extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeAdded';
   }
 
   public getEventData(): Record<string, any> {
@@ -180,7 +176,6 @@ export class ActionNodeAdded extends DomainEvent {
 }
 
 export class ActionNodeRemoved extends DomainEvent {
-  public readonly eventType = 'ActionNodeRemoved';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeRemovedData) {
@@ -189,7 +184,7 @@ export class ActionNodeRemoved extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeRemoved';
   }
 
   public getEventData(): Record<string, any> {
@@ -210,7 +205,6 @@ export class ActionNodeRemoved extends DomainEvent {
 }
 
 export class ActionNodeUpdated extends DomainEvent {
-  public readonly eventType = 'ActionNodeUpdated';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeUpdatedData) {
@@ -219,7 +213,7 @@ export class ActionNodeUpdated extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeUpdated';
   }
 
   public getEventData(): Record<string, any> {

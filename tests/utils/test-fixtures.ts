@@ -412,6 +412,7 @@ export class TetherNodeBuilder {
   private retryPolicy?: RetryPolicy;
   private configuration?: any = {
     tetherReference: 'test-tether-ref',
+    tetherReferenceId: 'test-tether-ref-id-123',
     executionParameters: {},
     outputMapping: {},
     executionTriggers: [],
@@ -468,6 +469,14 @@ export class TetherNodeBuilder {
     return this;
   }
 
+  withResourceRequirements(requirements: Record<string, any>): TetherNodeBuilder {
+    if (!this.configuration) {
+      this.configuration = {};
+    }
+    this.configuration.resourceRequirements = { ...this.configuration.resourceRequirements, ...requirements };
+    return this;
+  }
+
   withPriority(priority: number): TetherNodeBuilder {
     this.priority = priority;
     return this;
@@ -502,7 +511,7 @@ export class TetherNodeBuilder {
       priority: this.priority,
       estimatedDuration: this.estimatedDuration,
       retryPolicy: this.retryPolicy,
-      configuration: this.configuration
+      tetherData: this.configuration
     };
 
     const result = TetherNode.create(tetherNodeProps);
@@ -533,8 +542,8 @@ export class KBNodeBuilder {
     shortDescription: 'Test KB description',
     searchKeywords: ['test', 'knowledge'],
     accessPermissions: {
-      readers: ['developer-team', 'tech-lead'], // editors must also be readers
-      editors: ['tech-lead']
+      view: ['developer-team', 'tech-lead'], // edit users must also be view users
+      edit: ['tech-lead']
     }
   };
 
@@ -594,32 +603,27 @@ export class KBNodeBuilder {
   }
 
   build(): KBNode {
-    const actionIdResult = NodeId.create(this.actionId);
-    const parentNodeIdResult = NodeId.create(this.parentNodeId);
-    
-    if (actionIdResult.isFailure || parentNodeIdResult.isFailure) {
-      const errors = [];
-      if (actionIdResult.isFailure) errors.push(`ActionId: ${actionIdResult.error}`);
-      if (parentNodeIdResult.isFailure) errors.push(`ParentNodeId: ${parentNodeIdResult.error}`);
-      throw new Error(`Invalid action creation parameters: ${errors.join(', ')}`);
-    }
+    const retryPolicy = this.retryPolicy || RetryPolicy.createDefault().value;
+    const raci = RACI.create(['system']).value;
 
-    const kbNodeProps = {
-      actionId: actionIdResult.value,
-      parentNodeId: parentNodeIdResult.value,
+    const kbNodeCreateProps = {
+      actionId: this.actionId,
+      parentNodeId: this.parentNodeId,
       modelId: this.modelId,
       name: this.name,
       description: this.description,
-      actionType: ActionNodeType.KB_NODE,
       executionMode: this.executionMode,
       executionOrder: this.executionOrder,
       status: this.status,
       priority: this.priority,
       estimatedDuration: this.estimatedDuration,
-      configuration: this.configuration
+      retryPolicy: retryPolicy.toObject(),
+      raci: raci.toObject(),
+      metadata: {},
+      kbData: this.configuration!
     };
 
-    const result = KBNode.create(kbNodeProps);
+    const result = KBNode.create(kbNodeCreateProps);
     if (result.isFailure) {
       throw new Error('Failed to create KBNode: ' + result.error);
     }

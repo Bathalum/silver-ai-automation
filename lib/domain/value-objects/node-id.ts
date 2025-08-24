@@ -15,11 +15,19 @@ export class NodeId {
   }
 
   public static create(id: string): Result<NodeId> {
-    if (!id || id.trim().length === 0) {
+    // Handle non-string inputs
+    if (id === null || id === undefined) {
+      return Result.fail<NodeId>('Node ID cannot be empty');
+    }
+    
+    // Convert to string if needed (handles objects with toString())
+    const idString = typeof id === 'string' ? id : String(id);
+    
+    if (!idString || idString.trim().length === 0) {
       return Result.fail<NodeId>('Node ID cannot be empty');
     }
 
-    const trimmedId = id.trim();
+    const trimmedId = idString.trim();
     if (!NodeId.UUID_PATTERN.test(trimmedId)) {
       return Result.fail<NodeId>('Node ID must be a valid UUID');
     }

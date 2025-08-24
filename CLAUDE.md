@@ -2,8 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Here’s a tightened-up version of your implementation rule prompt, preserving the **1–2 punch** rhythm while making it super clear that **Clean Architecture + TDD are non-negotiable**:
-
 ---
 
 # 🚨 IMPLEMENTATION RULE — STRICT, NO EXCEPTIONS 🚨
@@ -38,8 +36,6 @@ Repeat steps **1 → 2 → 1 → 2** until all behaviors are covered and tests p
 * Every implementation must serve a passing test.
 
 ---
-
-Would you like me to also **reformat this into a Cursor-style rule** (like the one you asked me to make before for implementation planning), so it’s directly enforceable when you’re working inside Cursor?
 
 
 ## Development Commands

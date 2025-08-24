@@ -112,8 +112,13 @@ export class NodeDependencyService {
       const sortedNodes = sortedNodeIds.map(nodeId => graph.nodes.get(nodeId)!);
       return Result.ok<Node[]>(sortedNodes);
     } else {
-      // Return node IDs
-      return Result.ok<string[]>(sortResult.value);
+      // Return node names (not IDs) for DependencyGraph input
+      const sortedNodeIds = sortResult.value;
+      const sortedNames = sortedNodeIds.map(nodeId => {
+        const node = graph.nodes.get(nodeId);
+        return node ? node.name : nodeId;
+      });
+      return Result.ok<string[]>(sortedNames);
     }
   }
 
@@ -246,10 +251,15 @@ export class NodeDependencyService {
     }
   }
 
-  public findReachableNodes(graph: DependencyGraph, startNodeId: string): string[] {
+  public findReachableNodes(graph: DependencyGraph, startNodeId: string): Result<string[]> {
     // Handle malformed input gracefully
     if (!graph || typeof graph !== 'object' || !graph.adjacencyList || !graph.nodes) {
-      return [];
+      return Result.fail<string[]>('Invalid graph structure provided');
+    }
+
+    // Check if start node exists in the graph
+    if (!graph.nodes.has(startNodeId)) {
+      return Result.fail<string[]>(`Start node "${startNodeId}" not found in graph`);
     }
 
     const reachable = new Set<string>();
@@ -268,7 +278,7 @@ export class NodeDependencyService {
       });
     }
 
-    return Array.from(reachable);
+    return Result.ok<string[]>(Array.from(reachable));
   }
 
   public getDependencyDepth(graph: DependencyGraph, nodeId: string): number {
@@ -338,9 +348,17 @@ export class NodeDependencyService {
     const recursionStack = new Set<string>();
     const cycles: string[][] = [];
 
+    // First pass: detect self-references
+    Array.from(graph.nodes.keys()).forEach(nodeId => {
+      const dependencies = graph.reverseDependencies.get(nodeId) || [];
+      if (dependencies.includes(nodeId)) {
+        cycles.push([nodeId, nodeId]);
+      }
+    });
+
     const dfs = (nodeId: string, path: string[]): void => {
+      // If already visited in this path, we found a cycle
       if (recursionStack.has(nodeId)) {
-        // Found a cycle - extract the cycle from current path
         const cycleStart = path.indexOf(nodeId);
         if (cycleStart >= 0) {
           const cycle = path.slice(cycleStart);
@@ -350,23 +368,33 @@ export class NodeDependencyService {
         return;
       }
 
+      // If already fully processed, skip
       if (visited.has(nodeId)) {
         return;
       }
 
+      // Mark as being processed
       visited.add(nodeId);
       recursionStack.add(nodeId);
-      const newPath = [...path, nodeId];
 
-      // Follow the adjacency list (dependents) to find cycles in dependency chain
-      const dependents = graph.adjacencyList.get(nodeId) || [];
-      dependents.forEach(dependent => {
-        dfs(dependent, newPath);
-      });
+      const currentPath = [...path, nodeId];
 
+      // Follow dependencies: if node A depends on B, follow A -> B
+      // Dependencies are stored in reverseDependencies: A -> [B]
+      const dependencies = graph.reverseDependencies.get(nodeId) || [];
+      for (const dependency of dependencies) {
+        // Skip self-references as they're already handled
+        if (dependency === nodeId) {
+          continue;
+        }
+        dfs(dependency, currentPath);
+      }
+
+      // Remove from recursion stack when done processing
       recursionStack.delete(nodeId);
     };
 
+    // Start DFS from each unvisited node for multi-node cycles
     Array.from(graph.nodes.keys()).forEach(nodeId => {
       if (!visited.has(nodeId)) {
         dfs(nodeId, []);

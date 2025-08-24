@@ -718,11 +718,11 @@ export class ExecutionRules {
       
       if (requirements) {
         if (requirements.cpu !== undefined) {
-          const cpuValue = this.parseResourceValue(requirements.cpu);
+          const cpuValue = ExecutionRules.parseResourceValue(requirements.cpu);
           totalCpu += cpuValue;
         }
         if (requirements.memory !== undefined) {
-          const memoryValue = this.parseResourceValue(requirements.memory);
+          const memoryValue = ExecutionRules.parseResourceValue(requirements.memory);
           totalMemory += memoryValue;
         }
       }
@@ -730,14 +730,14 @@ export class ExecutionRules {
 
     // Check against limits
     if (resourceLimits.maxCpu) {
-      const cpuLimit = this.parseResourceValue(resourceLimits.maxCpu);
+      const cpuLimit = ExecutionRules.parseResourceValue(resourceLimits.maxCpu);
       if (totalCpu > cpuLimit) {
         errors.push(`CPU requirement exceeds limit: ${totalCpu} > ${cpuLimit}`);
       }
     }
 
     if (resourceLimits.maxMemory) {
-      const memoryLimit = this.parseResourceValue(resourceLimits.maxMemory);
+      const memoryLimit = ExecutionRules.parseResourceValue(resourceLimits.maxMemory);
       if (totalMemory > memoryLimit) {
         errors.push(`Memory requirement exceeds limit: ${totalMemory} > ${memoryLimit}`);
       }

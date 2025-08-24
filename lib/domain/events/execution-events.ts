@@ -131,7 +131,6 @@ export interface ActionNodePriorityChangedData {
 }
 
 export class ActionNodeExecutionStarted extends DomainEvent {
-  public readonly eventType = 'ActionNodeExecutionStarted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeExecutionStartedData) {
@@ -140,7 +139,7 @@ export class ActionNodeExecutionStarted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeExecutionStarted';
   }
 
   public getEventData(): Record<string, any> {
@@ -162,7 +161,6 @@ export class ActionNodeExecutionStarted extends DomainEvent {
 }
 
 export class ActionNodeExecutionCompleted extends DomainEvent {
-  public readonly eventType = 'ActionNodeExecutionCompleted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeExecutionCompletedData) {
@@ -171,7 +169,7 @@ export class ActionNodeExecutionCompleted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeExecutionCompleted';
   }
 
   public getEventData(): Record<string, any> {
@@ -192,7 +190,6 @@ export class ActionNodeExecutionCompleted extends DomainEvent {
 }
 
 export class ActionNodeExecutionFailed extends DomainEvent {
-  public readonly eventType = 'ActionNodeExecutionFailed';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeExecutionFailedData) {
@@ -201,7 +198,7 @@ export class ActionNodeExecutionFailed extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeExecutionFailed';
   }
 
   public getEventData(): Record<string, any> {
@@ -233,7 +230,7 @@ export class ActionNodeExecutionRetried extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeExecutionOrderChanged';
   }
 
   public getEventData(): Record<string, any> {
@@ -264,7 +261,7 @@ export class ActionNodeStatusChanged extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeExecutionOrderChanged';
   }
 
   public getEventData(): Record<string, any> {
@@ -285,64 +282,137 @@ export class ActionNodeStatusChanged extends DomainEvent {
 }
 
 export class ExecutionStarted extends DomainEvent {
-  public readonly eventType = 'ExecutionStarted';
-  public readonly occurredAt: Date;
+  public readonly modelId: string;
+  public readonly executionId: string;
+  public readonly startedBy: string;
+  public readonly context: Record<string, any>;
+  public readonly startedAt: Date;
 
-  constructor(public readonly data: ExecutionStartedData) {
-    super(data.modelId);
-    this.occurredAt = new Date();
+  // Support both constructor patterns: data object OR individual parameters
+  constructor(
+    aggregateIdOrData: string | ExecutionStartedData,
+    modelId?: string,
+    executionId?: string,
+    startedBy?: string,
+    context?: Record<string, any>,
+    eventVersion = 1
+  ) {
+    if (typeof aggregateIdOrData === 'object') {
+      // Data object pattern
+      const data = aggregateIdOrData;
+      super(data.modelId, eventVersion);
+      this.modelId = data.modelId;
+      this.executionId = data.executionId;
+      this.startedBy = data.startedBy;
+      this.context = data.context;
+      this.startedAt = data.startedAt;
+    } else {
+      // Individual parameters pattern
+      if (!modelId || !executionId || !startedBy || !context) {
+        throw new Error('Individual parameters constructor requires aggregateId, modelId, executionId, startedBy, and context');
+      }
+      super(aggregateIdOrData, eventVersion);
+      this.modelId = modelId;
+      this.executionId = executionId;
+      this.startedBy = startedBy;
+      this.context = context;
+      this.startedAt = new Date();
+    }
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ExecutionStarted';
   }
 
   public getEventData(): Record<string, any> {
     return {
-      ...this.data,
-      startedAt: this.data.startedAt.toISOString()
+      modelId: this.modelId,
+      executionId: this.executionId,
+      startedBy: this.startedBy,
+      context: JSON.parse(JSON.stringify(this.context)),
+      startedAt: this.startedAt.toISOString()
     };
   }
-
-  public get modelId(): string { return this.data.modelId; }
-  public get executionId(): string { return this.data.executionId; }
-  public get startedBy(): string { return this.data.startedBy; }
-  public get context(): Record<string, any> { return JSON.parse(JSON.stringify(this.data.context)); }
-  public get startedAt(): Date { return this.data.startedAt; }
 }
 
 export class NodeExecuted extends DomainEvent {
-  public readonly eventType = 'NodeExecuted';
-  public readonly occurredAt: Date;
+  public readonly executionId: string;
+  public readonly nodeId: string;
+  public readonly nodeName: string;
+  public readonly success: boolean;
+  public readonly executionTime: number;
+  public readonly executedAt: Date;
+  public readonly output?: Record<string, any>;
+  public readonly error?: string;
 
-  constructor(public readonly data: NodeExecutedData) {
-    super(data.executionId); // Use executionId as aggregateId for node executions
-    this.occurredAt = new Date();
+  // Support both constructor patterns: data object OR individual parameters
+  constructor(
+    aggregateIdOrData: string | NodeExecutedData,
+    executionId?: string,
+    nodeId?: string,
+    nodeName?: string,
+    success?: boolean,
+    executionTime?: number,
+    output?: Record<string, any>,
+    error?: string,
+    eventVersion = 1
+  ) {
+    if (typeof aggregateIdOrData === 'object') {
+      // Data object pattern
+      const data = aggregateIdOrData;
+      super(data.executionId, eventVersion); // Use executionId as aggregateId for node executions
+      this.executionId = data.executionId;
+      this.nodeId = data.nodeId;
+      this.nodeName = data.nodeName;
+      this.success = data.success;
+      this.executionTime = data.executionTime;
+      this.executedAt = data.executedAt;
+      this.output = data.output;
+      this.error = data.error;
+    } else {
+      // Individual parameters pattern
+      if (!executionId || !nodeId || !nodeName || success === undefined || executionTime === undefined) {
+        throw new Error('Individual parameters constructor requires aggregateId, executionId, nodeId, nodeName, success, and executionTime');
+      }
+      super(aggregateIdOrData, eventVersion);
+      this.executionId = executionId;
+      this.nodeId = nodeId;
+      this.nodeName = nodeName;
+      this.success = success;
+      this.executionTime = executionTime;
+      this.output = output;
+      this.error = error;
+      this.executedAt = new Date();
+    }
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'NodeExecuted';
   }
 
   public getEventData(): Record<string, any> {
-    return {
-      ...this.data,
-      executedAt: this.data.executedAt.toISOString()
+    const data: Record<string, any> = {
+      executionId: this.executionId,
+      nodeId: this.nodeId,
+      nodeName: this.nodeName,
+      success: this.success,
+      executionTime: this.executionTime,
+      executedAt: this.executedAt.toISOString()
     };
+    
+    if (this.output !== undefined) {
+      data.output = JSON.parse(JSON.stringify(this.output));
+    }
+    
+    if (this.error !== undefined) {
+      data.error = this.error;
+    }
+    
+    return data;
   }
-
-  public get executionId(): string { return this.data.executionId; }
-  public get nodeId(): string { return this.data.nodeId; }
-  public get nodeName(): string { return this.data.nodeName; }
-  public get success(): boolean { return this.data.success; }
-  public get executionTime(): number { return this.data.executionTime; }
-  public get executedAt(): Date { return this.data.executedAt; }
-  public get output(): Record<string, any> | undefined { return this.data.output ? { ...this.data.output } : undefined; }
-  public get error(): string | undefined { return this.data.error; }
 }
 
 export class ActionNodeExecutionOrderChanged extends DomainEvent {
-  public readonly eventType = 'ActionNodeExecutionOrderChanged';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeExecutionOrderChangedData) {
@@ -351,7 +421,7 @@ export class ActionNodeExecutionOrderChanged extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeExecutionOrderChanged';
   }
 
   public getEventData(): Record<string, any> {
@@ -370,7 +440,6 @@ export class ActionNodeExecutionOrderChanged extends DomainEvent {
 }
 
 export class ActionNodeExecutionModeChanged extends DomainEvent {
-  public readonly eventType = 'ActionNodeExecutionModeChanged';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeExecutionModeChangedData) {
@@ -379,7 +448,7 @@ export class ActionNodeExecutionModeChanged extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodeExecutionModeChanged';
   }
 
   public getEventData(): Record<string, any> {
@@ -398,7 +467,6 @@ export class ActionNodeExecutionModeChanged extends DomainEvent {
 }
 
 export class ActionNodePriorityChanged extends DomainEvent {
-  public readonly eventType = 'ActionNodePriorityChanged';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodePriorityChangedData) {
@@ -407,7 +475,7 @@ export class ActionNodePriorityChanged extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ActionNodePriorityChanged';
   }
 
   public getEventData(): Record<string, any> {
