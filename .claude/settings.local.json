@@ -4,7 +4,15 @@
       "Bash(pnpm test:*)",
       "Bash(pnpm build:*)",
       "Bash(npx tsc:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm test:*)",
+      "Bash(rm:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(pntml test:*)"
     ],
     "deny": [],
     "ask": []

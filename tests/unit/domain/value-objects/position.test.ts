@@ -583,15 +583,21 @@ describe('Position', () => {
     it('should be immutable after creation', () => {
       // Arrange
       const position = Position.create(100, 200).value;
+      const originalX = position.x;
+      const originalY = position.y;
       
-      // Act & Assert
+      // Act & Assert - Object.freeze prevents modification of properties
       expect(() => {
         (position as any)._x = 999;
-      }).toThrow();
+      }).toThrow(TypeError);
       
       expect(() => {
         (position as any)._y = 888;
-      }).toThrow();
+      }).toThrow(TypeError);
+      
+      // Public interface should remain unchanged
+      expect(position.x).toBe(originalX);
+      expect(position.y).toBe(originalY);
     });
 
     it('should not allow modification of coordinate properties', () => {

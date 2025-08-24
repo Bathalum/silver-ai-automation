@@ -3,11 +3,18 @@ import { RACIRole } from '../enums';
 
 export class RACI {
   private constructor(
-    private readonly _responsible: string[],
-    private readonly _accountable: string[],
-    private readonly _consulted: string[],
-    private readonly _informed: string[]
-  ) {}
+    private readonly _responsible: readonly string[],
+    private readonly _accountable: readonly string[],
+    private readonly _consulted: readonly string[],
+    private readonly _informed: readonly string[]
+  ) {
+    // Freeze all arrays for true immutability
+    Object.freeze(this._responsible);
+    Object.freeze(this._accountable);
+    Object.freeze(this._consulted);
+    Object.freeze(this._informed);
+    Object.freeze(this);
+  }
 
   public get responsible(): readonly string[] {
     return this._responsible;
@@ -25,18 +32,74 @@ export class RACI {
     return this._informed;
   }
 
+  // Overloaded create method to support both parameter styles
   public static create(
-    responsible: string[] = [],
-    accountable: string[] = [],
-    consulted: string[] = [],
-    informed: string[] = []
+    responsible: string[],
+    accountable?: string[],
+    consulted?: string[],
+    informed?: string[]
+  ): Result<RACI>;
+  public static create(params: {
+    responsible?: string[],
+    accountable?: string[],
+    consulted?: string[],
+    informed?: string[]
+  }): Result<RACI>;
+  public static create(
+    paramsOrResponsible: {
+      responsible?: string[],
+      accountable?: string[],
+      consulted?: string[],
+      informed?: string[]
+    } | string[],
+    accountable?: string[],
+    consulted?: string[],
+    informed?: string[]
   ): Result<RACI> {
-    if (responsible.length === 0) {
+    let respArray: string[];
+    let accArray: string[];
+    let consArray: string[];
+    let infArray: string[];
+
+    // Handle different call signatures
+    if (Array.isArray(paramsOrResponsible)) {
+      // Called with individual array parameters
+      respArray = paramsOrResponsible || [];
+      accArray = accountable || [];
+      consArray = consulted || [];
+      infArray = informed || [];
+    } else {
+      // Called with object parameter
+      const { responsible, accountable: acc, consulted: cons, informed: inf } = paramsOrResponsible;
+      respArray = responsible || [];
+      accArray = acc || [];
+      consArray = cons || [];
+      infArray = inf || [];
+    }
+
+    // Business rule: At least one responsible party is required
+    if (respArray.length === 0) {
       return Result.fail<RACI>('RACI must have at least one responsible party');
     }
 
+    // Validate no duplicates within same role
+    const checkDuplicatesInArray = (arr: string[], role: string) => {
+      const uniqueItems = new Set(arr);
+      if (arr.length !== uniqueItems.size) {
+        return true;
+      }
+      return false;
+    };
+
+    if (checkDuplicatesInArray(respArray, 'responsible') ||
+        checkDuplicatesInArray(accArray, 'accountable') ||
+        checkDuplicatesInArray(consArray, 'consulted') ||
+        checkDuplicatesInArray(infArray, 'informed')) {
+      return Result.fail<RACI>('The same party cannot have multiple roles in RACI matrix');
+    }
+
     // Validate no duplicates across roles
-    const allParties = [...responsible, ...accountable, ...consulted, ...informed];
+    const allParties = [...respArray, ...accArray, ...consArray, ...infArray];
     const uniqueParties = new Set(allParties);
     if (allParties.length !== uniqueParties.size) {
       return Result.fail<RACI>('The same party cannot have multiple roles in RACI matrix');
@@ -49,15 +112,34 @@ export class RACI {
     }
 
     return Result.ok<RACI>(new RACI(
-      [...responsible],
-      [...accountable], 
-      [...consulted],
-      [...informed]
+      Object.freeze([...respArray]),
+      Object.freeze([...accArray]), 
+      Object.freeze([...consArray]),
+      Object.freeze([...infArray])
     ));
   }
 
+  public static createLegacy(
+    responsible?: string[],
+    accountable?: string[],
+    consulted?: string[],
+    informed?: string[]
+  ): Result<RACI> {
+    return RACI.create({
+      responsible,
+      accountable, 
+      consulted,
+      informed
+    });
+  }
+
   public static empty(): RACI {
-    return new RACI(['System'], [], [], []);
+    return new RACI(
+      Object.freeze(['System']), 
+      Object.freeze([]), 
+      Object.freeze([]), 
+      Object.freeze([])
+    );
   }
 
   public hasRole(party: string, role: RACIRole): boolean {
@@ -86,7 +168,7 @@ export class RACI {
       case RACIRole.INFORMED:
         return this._informed;
       default:
-        return [];
+        return Object.freeze([]);
     }
   }
 
@@ -126,7 +208,12 @@ export class RACI {
         break;
     }
 
-    return Result.ok<RACI>(new RACI(newResponsible, newAccountable, newConsulted, newInformed));
+    return Result.ok<RACI>(new RACI(
+      Object.freeze(newResponsible), 
+      Object.freeze(newAccountable), 
+      Object.freeze(newConsulted), 
+      Object.freeze(newInformed)
+    ));
   }
 
   public equals(other: RACI): boolean {

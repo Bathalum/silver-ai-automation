@@ -12,6 +12,7 @@ export interface NodeProps {
   dependencies: NodeId[];
   executionType: ExecutionMode;
   status: NodeStatus;
+  timeout?: number;
   metadata: Record<string, any>;
   visualProperties: Record<string, any>;
   createdAt: Date;
@@ -61,6 +62,10 @@ export abstract class Node {
     return this.props.visualProperties;
   }
 
+  public get timeout(): number | undefined {
+    return this.props.timeout;
+  }
+
   public get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -93,28 +98,96 @@ export abstract class Node {
     return Result.ok<void>(undefined);
   }
 
-  public updatePosition(position: Position): Result<void> {
-    this.props.position = position;
+  public updatePosition(position: Position): Result<void>;
+  public updatePosition(x: number, y: number): Result<void>;
+  public updatePosition(positionOrX: Position | number, y?: number): Result<void> {
+    let newPosition: Position;
+    
+    if (typeof positionOrX === 'number' && typeof y === 'number') {
+      // Handle x, y coordinates
+      if (positionOrX < 0 || y < 0) {
+        return Result.fail<void>('Position coordinates must be non-negative');
+      }
+      
+      // Check maximum canvas boundaries
+      const MAX_CANVAS_SIZE = 50000;
+      if (positionOrX > MAX_CANVAS_SIZE || y > MAX_CANVAS_SIZE) {
+        return Result.fail<void>('Position exceeds maximum canvas boundaries');
+      }
+      
+      const positionResult = Position.create(positionOrX, y);
+      if (positionResult.isFailure) {
+        return Result.fail<void>(positionResult.error);
+      }
+      newPosition = positionResult.value;
+    } else if (positionOrX instanceof Position) {
+      // Handle Position object
+      newPosition = positionOrX;
+    } else {
+      return Result.fail<void>('Invalid position parameters');
+    }
+
+    this.props.position = newPosition;
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
-  public addDependency(nodeId: NodeId): Result<void> {
-    if (this.props.dependencies.some(dep => dep.equals(nodeId))) {
+  public updateTimeout(timeout: number): Result<void> {
+    if (timeout < 0) {
+      return Result.fail<void>('Timeout must be a positive value');
+    }
+
+    // Set reasonable maximum limit (24 hours in milliseconds)
+    const MAX_TIMEOUT = 24 * 60 * 60 * 1000;
+    if (timeout > MAX_TIMEOUT) {
+      return Result.fail<void>('Timeout value exceeds maximum allowed limit');
+    }
+
+    this.props.timeout = timeout;
+    this.props.updatedAt = new Date();
+    return Result.ok<void>(undefined);
+  }
+
+  public addDependency(nodeId: NodeId | string): Result<void> {
+    // Convert string to NodeId if needed
+    let nodeIdObj: NodeId;
+    if (typeof nodeId === 'string') {
+      const nodeIdResult = NodeId.create(nodeId);
+      if (nodeIdResult.isFailure) {
+        return Result.fail<void>(nodeIdResult.error);
+      }
+      nodeIdObj = nodeIdResult.value;
+    } else {
+      nodeIdObj = nodeId;
+    }
+
+    if (this.props.dependencies.some(dep => dep.equals(nodeIdObj))) {
       return Result.fail<void>('Dependency already exists');
     }
 
-    if (nodeId.equals(this.nodeId)) {
+    if (nodeIdObj.equals(this.nodeId)) {
       return Result.fail<void>('Node cannot depend on itself');
     }
 
-    this.props.dependencies.push(nodeId);
+    this.props.dependencies.push(nodeIdObj);
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
-  public removeDependency(nodeId: NodeId): Result<void> {
-    const index = this.props.dependencies.findIndex(dep => dep.equals(nodeId));
+  public removeDependency(nodeId: NodeId | string): Result<void> {
+    // Convert string to NodeId if needed
+    let nodeIdObj: NodeId;
+    if (typeof nodeId === 'string') {
+      const nodeIdResult = NodeId.create(nodeId);
+      if (nodeIdResult.isFailure) {
+        return Result.fail<void>(nodeIdResult.error);
+      }
+      nodeIdObj = nodeIdResult.value;
+    } else {
+      nodeIdObj = nodeId;
+    }
+
+    const index = this.props.dependencies.findIndex(dep => dep.equals(nodeIdObj));
     if (index === -1) {
       return Result.fail<void>('Dependency does not exist');
     }

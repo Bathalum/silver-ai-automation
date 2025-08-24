@@ -3,7 +3,12 @@ import { Result } from '../shared/result';
 export class NodeId {
   private static readonly UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  private constructor(private readonly _value: string) {}
+  private readonly _value: string;
+
+  private constructor(value: string) {
+    this._value = value;
+    Object.freeze(this);
+  }
 
   public get value(): string {
     return this._value;

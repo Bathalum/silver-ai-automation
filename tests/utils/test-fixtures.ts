@@ -2,6 +2,55 @@
  * Test fixtures and data builders for consistent test data creation
  */
 
+// Helper function to generate deterministic UUIDs for test identifiers
+export function getTestUUID(identifier: string): string {
+  // If already a valid UUID, return as-is
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier)) {
+    return identifier;
+  }
+  
+  // Create deterministic UUID from identifier using a better hash function
+  const str = identifier + '-salt'; // Add salt to prevent collisions
+  let hash1 = 0xdeadbeef;
+  let hash2 = 0x41c6ce57;
+  
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash1 = Math.imul(hash1 ^ char, 2654435761);
+    hash2 = Math.imul(hash2 ^ char, 1597334677);
+  }
+  
+  hash1 = Math.imul(hash1 ^ (hash1 >>> 16), 2246822507);
+  hash1 = Math.imul(hash1 ^ (hash1 >>> 13), 3266489909);
+  hash1 = (hash1 ^ (hash1 >>> 16)) >>> 0;
+  
+  hash2 = Math.imul(hash2 ^ (hash2 >>> 16), 2246822507);
+  hash2 = Math.imul(hash2 ^ (hash2 >>> 13), 3266489909);
+  hash2 = (hash2 ^ (hash2 >>> 16)) >>> 0;
+  
+  const hex1 = hash1.toString(16).padStart(8, '0');
+  const hex2 = hash2.toString(16).padStart(8, '0');
+  const hex3 = (hash1 ^ hash2).toString(16).padStart(8, '0');
+  const hex4 = ((hash1 + hash2) >>> 0).toString(16).padStart(8, '0');
+  
+  const fullHex = (hex1 + hex2 + hex3 + hex4).substring(0, 32);
+  
+  // Construct UUID with proper version (4) and variant (8,9,A,B) bits
+  const segment1 = fullHex.substring(0, 8);
+  const segment2 = fullHex.substring(8, 12);
+  const segment3 = '4' + fullHex.substring(13, 16); // Version 4
+  let segment4 = fullHex.substring(16, 20); // 4 characters
+  const segment5 = fullHex.substring(20, 32); // 12 characters
+  
+  // Ensure first character of segment4 is 8, 9, A, or B for proper variant
+  const firstChar = segment4.charAt(0);
+  if (!/[89ab]/i.test(firstChar)) {
+    segment4 = '8' + segment4.substring(1);
+  }
+  
+  return `${segment1}-${segment2}-${segment3}-${segment4}-${segment5}`;
+}
+
 import { 
   FunctionModel, 
   IONode, 
@@ -33,7 +82,7 @@ import { CreateModelCommand } from '@/lib/use-cases/commands';
  * Builder pattern for creating test FunctionModel instances
  */
 export class FunctionModelBuilder {
-  private modelId = 'test-model-' + Math.random().toString(36).substring(7);
+  private modelId = crypto.randomUUID();
   private name = 'Test Function Model';
   private description = 'A test function model for unit testing';
   private version = '1.0.0';
@@ -92,15 +141,24 @@ export class FunctionModelBuilder {
       throw new Error(`Invalid version: ${modelVersion.error}`);
     }
 
-    return new FunctionModel(
-      this.modelId,
-      modelName.value,
-      this.description,
-      modelVersion.value,
-      this.status,
-      this.metadata,
-      this.permissions
-    );
+    const result = FunctionModel.create({
+      modelId: this.modelId,
+      name: modelName.value,
+      description: this.description,
+      version: modelVersion.value,
+      status: this.status,
+      currentVersion: modelVersion.value,
+      nodes: new Map<string, Node>(),
+      actionNodes: new Map<string, ActionNode>(),
+      metadata: this.metadata,
+      permissions: this.permissions
+    });
+
+    if (result.isFailure) {
+      throw new Error(`Failed to create FunctionModel: ${result.error}`);
+    }
+
+    return result.value;
   }
 }
 
@@ -108,17 +166,29 @@ export class FunctionModelBuilder {
  * Builder for creating test IONode instances
  */
 export class IONodeBuilder {
-  private nodeId = 'test-io-node-' + Math.random().toString(36).substring(7);
-  private modelId = 'test-model-id';
+  private nodeId = crypto.randomUUID();
+  private modelId = crypto.randomUUID();
   private name = 'Test IO Node';
   private description = 'A test IO node';
   private position = { x: 100, y: 200 };
   private nodeType = ContainerNodeType.IO_NODE;
   private ioType: 'input' | 'output' = 'input';
+  private metadata: Record<string, any> = {};
 
   withId(nodeId: string): IONodeBuilder {
-    this.nodeId = nodeId;
+    // If the provided ID is not a valid UUID, create a deterministic UUID from it
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(nodeId)) {
+      // Create a deterministic UUID based on the simple identifier
+      const hash = this.simpleHash(nodeId);
+      this.nodeId = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-8${hash.substring(16, 19)}-${hash.substring(19, 31)}`;
+    } else {
+      this.nodeId = nodeId;
+    }
     return this;
+  }
+
+  private simpleHash(str: string): string {
+    return getTestUUID(str).replace(/-/g, '');
   }
 
   withModelId(modelId: string): IONodeBuilder {
@@ -131,8 +201,23 @@ export class IONodeBuilder {
     return this;
   }
 
+  withDescription(description: string): IONodeBuilder {
+    this.description = description;
+    return this;
+  }
+
+  withoutDescription(): IONodeBuilder {
+    this.description = '';
+    return this;
+  }
+
   withPosition(x: number, y: number): IONodeBuilder {
     this.position = { x, y };
+    return this;
+  }
+
+  withMetadata(metadata: Record<string, any>): IONodeBuilder {
+    this.metadata = metadata;
     return this;
   }
 
@@ -158,25 +243,32 @@ export class IONodeBuilder {
       throw new Error(`Invalid position: ${positionResult.error}`);
     }
 
-    return new IONode(
-      nodeIdResult.value,
-      this.modelId,
-      this.name,
-      this.description,
-      positionResult.value,
-      [],
-      NodeStatus.CONFIGURED,
-      {},
-      {},
-      {
-        ioType: this.ioType,
-        dataContract: {
-          inputs: [],
-          outputs: [],
-          validation: {}
-        }
+    const result = IONode.create({
+      nodeId: nodeIdResult.value,
+      modelId: this.modelId,
+      name: this.name,
+      description: this.description,
+      position: positionResult.value,
+      dependencies: [],
+      executionType: ExecutionMode.SEQUENTIAL,
+      status: NodeStatus.CONFIGURED,
+      timeout: undefined,
+      metadata: this.metadata,
+      visualProperties: {},
+      configuration: {},
+      ioData: {
+        inputDataContract: this.ioType === 'input' ? {} : undefined,
+        outputDataContract: this.ioType === 'output' ? {} : undefined,
+        dataValidationRules: {},
+        boundaryType: this.ioType as 'input' | 'output'
       }
-    );
+    });
+
+    if (result.isFailure) {
+      throw new Error(`Failed to create IONode: ${result.error}`);
+    }
+
+    return result.value;
   }
 }
 
@@ -184,15 +276,29 @@ export class IONodeBuilder {
  * Builder for creating test StageNode instances
  */
 export class StageNodeBuilder {
-  private nodeId = 'test-stage-node-' + Math.random().toString(36).substring(7);
-  private modelId = 'test-model-id';
+  private nodeId = crypto.randomUUID();
+  private modelId = crypto.randomUUID();
   private name = 'Test Stage Node';
   private description = 'A test stage node';
   private position = { x: 300, y: 200 };
+  private timeout?: number;
+  private parallelExecution = false;
+  private retryPolicy?: any;
 
   withId(nodeId: string): StageNodeBuilder {
-    this.nodeId = nodeId;
+    // If the provided ID is not a valid UUID, create a deterministic UUID from it
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(nodeId)) {
+      // Create a deterministic UUID based on the simple identifier
+      const hash = this.simpleHash(nodeId);
+      this.nodeId = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-8${hash.substring(16, 19)}-${hash.substring(19, 31)}`;
+    } else {
+      this.nodeId = nodeId;
+    }
     return this;
+  }
+
+  private simpleHash(str: string): string {
+    return getTestUUID(str).replace(/-/g, '');
   }
 
   withModelId(modelId: string): StageNodeBuilder {
@@ -205,8 +311,28 @@ export class StageNodeBuilder {
     return this;
   }
 
+  withDescription(description: string): StageNodeBuilder {
+    this.description = description;
+    return this;
+  }
+
   withPosition(x: number, y: number): StageNodeBuilder {
     this.position = { x, y };
+    return this;
+  }
+
+  withTimeout(timeout: number): StageNodeBuilder {
+    this.timeout = timeout;
+    return this;
+  }
+
+  withParallelExecution(parallel: boolean): StageNodeBuilder {
+    this.parallelExecution = parallel;
+    return this;
+  }
+
+  withRetryPolicy(retryPolicy: any): StageNodeBuilder {
+    this.retryPolicy = retryPolicy;
     return this;
   }
 
@@ -218,22 +344,54 @@ export class StageNodeBuilder {
       throw new Error('Invalid node creation parameters');
     }
 
-    return new StageNode(
-      nodeIdResult.value,
-      this.modelId,
-      this.name,
-      this.description,
-      positionResult.value,
-      [],
-      NodeStatus.CONFIGURED,
-      {},
-      {},
-      {
-        goals: ['Test goal'],
-        parallelismConfig: { enabled: false, maxConcurrency: 1 },
-        resourceRequirements: { cpu: '100m', memory: '128Mi' }
+    // Convert retry policy object to RetryPolicy value object if provided
+    let retryPolicyValue: RetryPolicy | undefined;
+    let metadata: Record<string, any> = {};
+    
+    if (this.retryPolicy) {
+      const retryPolicyResult = RetryPolicy.create(this.retryPolicy);
+      if (retryPolicyResult.isFailure) {
+        // Store invalid retry policy in metadata for validation testing
+        metadata.invalidRetryPolicy = this.retryPolicy;
+        retryPolicyValue = undefined;
+      } else {
+        retryPolicyValue = retryPolicyResult.value;
       }
-    );
+    }
+
+    const result = StageNode.create({
+      nodeId: nodeIdResult.value,
+      modelId: this.modelId,
+      name: this.name,
+      description: this.description,
+      position: positionResult.value,
+      dependencies: [],
+      executionType: this.parallelExecution ? ExecutionMode.PARALLEL : ExecutionMode.SEQUENTIAL,
+      status: NodeStatus.CONFIGURED,
+      timeout: this.timeout,
+      metadata: metadata,
+      visualProperties: {},
+      stageData: {
+        stageType: 'process',
+        completionCriteria: {},
+        stageGoals: ['Test goal'],
+        resourceRequirements: { cpu: '100m', memory: '128Mi' },
+        parallelismConfig: { 
+          maxConcurrency: 1,
+          loadBalancing: 'round-robin'
+        }
+      },
+      parallelExecution: this.parallelExecution,
+      retryPolicy: retryPolicyValue,
+      actionNodes: [],
+      configuration: {}
+    });
+
+    if (result.isFailure) {
+      throw new Error(`Failed to create StageNode: ${result.error}`);
+    }
+
+    return result.value;
   }
 }
 
@@ -241,14 +399,29 @@ export class StageNodeBuilder {
  * Builder for creating test TetherNode instances
  */
 export class TetherNodeBuilder {
-  private actionId = 'test-tether-' + Math.random().toString(36).substring(7);
-  private parentNodeId = 'test-parent-node-id';
-  private modelId = 'test-model-id';
+  private actionId = crypto.randomUUID();
+  private parentNodeId = crypto.randomUUID();
+  private modelId = crypto.randomUUID();
   private name = 'Test Tether Action';
   private description = 'A test tether action';
   private executionMode = ExecutionMode.SEQUENTIAL;
+  private executionOrder = 1;
   private priority = 5;
   private estimatedDuration = 30;
+  private status = ActionStatus.ACTIVE;
+  private retryPolicy?: RetryPolicy;
+  private configuration?: any = {
+    tetherReference: 'test-tether-ref',
+    executionParameters: {},
+    outputMapping: {},
+    executionTriggers: [],
+    resourceRequirements: { cpu: '200m', memory: '256Mi', timeout: 300 },
+    integrationConfig: {
+      endpoint: 'https://api.example.com',
+      authentication: {},
+      headers: {}
+    }
+  };
 
   withId(actionId: string): TetherNodeBuilder {
     this.actionId = actionId;
@@ -260,8 +433,38 @@ export class TetherNodeBuilder {
     return this;
   }
 
+  withModelId(modelId: string): TetherNodeBuilder {
+    this.modelId = modelId;
+    return this;
+  }
+
   withName(name: string): TetherNodeBuilder {
     this.name = name;
+    return this;
+  }
+
+  withExecutionOrder(order: number): TetherNodeBuilder {
+    this.executionOrder = order;
+    return this;
+  }
+
+  withStatus(status: ActionStatus): TetherNodeBuilder {
+    this.status = status;
+    return this;
+  }
+
+  withExecutionMode(mode: ExecutionMode): TetherNodeBuilder {
+    this.executionMode = mode;
+    return this;
+  }
+
+  withRetryPolicy(retryPolicy: RetryPolicy): TetherNodeBuilder {
+    this.retryPolicy = retryPolicy;
+    return this;
+  }
+
+  withConfiguration(config: any): TetherNodeBuilder {
+    this.configuration = { ...this.configuration, ...config };
     return this;
   }
 
@@ -270,40 +473,289 @@ export class TetherNodeBuilder {
     return this;
   }
 
+  withEstimatedDuration(duration: number): TetherNodeBuilder {
+    this.estimatedDuration = duration;
+    return this;
+  }
+
   build(): TetherNode {
     const actionIdResult = NodeId.create(this.actionId);
     const parentNodeIdResult = NodeId.create(this.parentNodeId);
-    const retryPolicyResult = RetryPolicy.createDefault();
-    const raciResult = RACI.create();
     
-    if (actionIdResult.isFailure || parentNodeIdResult.isFailure || 
-        retryPolicyResult.isFailure || raciResult.isFailure) {
-      throw new Error('Invalid action creation parameters');
+    if (actionIdResult.isFailure || parentNodeIdResult.isFailure) {
+      const errors = [];
+      if (actionIdResult.isFailure) errors.push(`ActionId: ${actionIdResult.error}`);
+      if (parentNodeIdResult.isFailure) errors.push(`ParentNodeId: ${parentNodeIdResult.error}`);
+      throw new Error(`Invalid action creation parameters: ${errors.join(', ')}`);
     }
 
-    return new TetherNode(
-      actionIdResult.value,
-      parentNodeIdResult.value,
-      this.modelId,
-      this.name,
-      this.description,
-      this.executionMode,
-      1, // executionOrder
-      ActionStatus.CONFIGURED,
-      this.priority,
-      this.estimatedDuration,
-      retryPolicyResult.value,
-      raciResult.value,
-      {},
-      {
-        spindleIntegration: {
-          spindleId: 'test-spindle-id',
-          executionParameters: {},
-          resourceRequirements: { cpu: '100m', memory: '128Mi' },
-          triggers: []
-        }
-      }
-    );
+    const tetherNodeProps = {
+      actionId: actionIdResult.value,
+      parentNodeId: parentNodeIdResult.value,
+      modelId: this.modelId,
+      name: this.name,
+      description: this.description,
+      actionType: ActionNodeType.TETHER_NODE,
+      executionMode: this.executionMode,
+      executionOrder: this.executionOrder,
+      status: this.status,
+      priority: this.priority,
+      estimatedDuration: this.estimatedDuration,
+      retryPolicy: this.retryPolicy,
+      configuration: this.configuration
+    };
+
+    const result = TetherNode.create(tetherNodeProps);
+    if (result.isFailure) {
+      throw new Error('Failed to create TetherNode: ' + result.error);
+    }
+    return result.value;
+  }
+}
+
+/**
+ * Builder for creating test KBNode instances
+ */
+export class KBNodeBuilder {
+  private actionId = crypto.randomUUID();
+  private parentNodeId = crypto.randomUUID();
+  private modelId = crypto.randomUUID();
+  private name = 'Test KB Action';
+  private description = 'A test knowledge base action';
+  private executionMode = ExecutionMode.SEQUENTIAL;
+  private executionOrder = 1;
+  private priority = 5;
+  private estimatedDuration = 0;
+  private status = ActionStatus.ACTIVE;
+  private retryPolicy?: RetryPolicy;
+  private configuration?: any = {
+    kbReferenceId: 'kb-test-ref',
+    shortDescription: 'Test KB description',
+    searchKeywords: ['test', 'knowledge'],
+    accessPermissions: {
+      readers: ['developer-team', 'tech-lead'], // editors must also be readers
+      editors: ['tech-lead']
+    }
+  };
+
+  withId(actionId: string): KBNodeBuilder {
+    this.actionId = actionId;
+    return this;
+  }
+
+  withParentNode(parentNodeId: string): KBNodeBuilder {
+    this.parentNodeId = parentNodeId;
+    return this;
+  }
+
+  withModelId(modelId: string): KBNodeBuilder {
+    this.modelId = modelId;
+    return this;
+  }
+
+  withName(name: string): KBNodeBuilder {
+    this.name = name;
+    return this;
+  }
+
+  withExecutionOrder(order: number): KBNodeBuilder {
+    this.executionOrder = order;
+    return this;
+  }
+
+  withPriority(priority: number): KBNodeBuilder {
+    this.priority = priority;
+    return this;
+  }
+
+  withStatus(status: ActionStatus): KBNodeBuilder {
+    this.status = status;
+    return this;
+  }
+
+  withExecutionMode(mode: ExecutionMode): KBNodeBuilder {
+    this.executionMode = mode;
+    return this;
+  }
+
+  withRetryPolicy(retryPolicy: RetryPolicy): KBNodeBuilder {
+    this.retryPolicy = retryPolicy;
+    return this;
+  }
+
+  withConfiguration(config: any): KBNodeBuilder {
+    this.configuration = { ...this.configuration, ...config };
+    return this;
+  }
+
+  withEstimatedDuration(duration: number): KBNodeBuilder {
+    this.estimatedDuration = duration;
+    return this;
+  }
+
+  build(): KBNode {
+    const actionIdResult = NodeId.create(this.actionId);
+    const parentNodeIdResult = NodeId.create(this.parentNodeId);
+    
+    if (actionIdResult.isFailure || parentNodeIdResult.isFailure) {
+      const errors = [];
+      if (actionIdResult.isFailure) errors.push(`ActionId: ${actionIdResult.error}`);
+      if (parentNodeIdResult.isFailure) errors.push(`ParentNodeId: ${parentNodeIdResult.error}`);
+      throw new Error(`Invalid action creation parameters: ${errors.join(', ')}`);
+    }
+
+    const kbNodeProps = {
+      actionId: actionIdResult.value,
+      parentNodeId: parentNodeIdResult.value,
+      modelId: this.modelId,
+      name: this.name,
+      description: this.description,
+      actionType: ActionNodeType.KB_NODE,
+      executionMode: this.executionMode,
+      executionOrder: this.executionOrder,
+      status: this.status,
+      priority: this.priority,
+      estimatedDuration: this.estimatedDuration,
+      configuration: this.configuration
+    };
+
+    const result = KBNode.create(kbNodeProps);
+    if (result.isFailure) {
+      throw new Error('Failed to create KBNode: ' + result.error);
+    }
+    return result.value;
+  }
+}
+
+/**
+ * Builder for creating test FunctionModelContainerNode instances
+ */
+export class FunctionModelContainerNodeBuilder {
+  private actionId = crypto.randomUUID();
+  private parentNodeId = crypto.randomUUID();
+  private modelId = crypto.randomUUID();
+  private name = 'Test Function Model Container Action';
+  private description = 'A test function model container action';
+  private executionMode = ExecutionMode.SEQUENTIAL;
+  private executionOrder = 1;
+  private priority = 5;
+  private estimatedDuration = 600;
+  private status = ActionStatus.ACTIVE;
+  private retryPolicy?: RetryPolicy;
+  private nestedModelId = crypto.randomUUID();
+  private configuration?: any = {
+    nestedModelId: this.nestedModelId,
+    contextMapping: {
+      'input': 'parent.input',
+      'config': 'parent.config'
+    },
+    outputExtraction: {
+      'result': 'nested.output',
+      'status': 'nested.executionStatus'
+    }
+  };
+
+  withId(actionId: string): FunctionModelContainerNodeBuilder {
+    this.actionId = actionId;
+    return this;
+  }
+
+  withParentNode(parentNodeId: string): FunctionModelContainerNodeBuilder {
+    this.parentNodeId = parentNodeId;
+    return this;
+  }
+
+  withParentNodeId(parentNodeId: string): FunctionModelContainerNodeBuilder {
+    this.parentNodeId = parentNodeId;
+    return this;
+  }
+
+  withModelId(modelId: string): FunctionModelContainerNodeBuilder {
+    this.modelId = modelId;
+    return this;
+  }
+
+  withName(name: string): FunctionModelContainerNodeBuilder {
+    this.name = name;
+    return this;
+  }
+
+  withNestedModelId(nestedModelId: string): FunctionModelContainerNodeBuilder {
+    this.nestedModelId = nestedModelId;
+    return this;
+  }
+
+  withExecutionOrder(order: number): FunctionModelContainerNodeBuilder {
+    this.executionOrder = order;
+    return this;
+  }
+
+  withPriority(priority: number): FunctionModelContainerNodeBuilder {
+    this.priority = priority;
+    return this;
+  }
+
+  withStatus(status: ActionStatus): FunctionModelContainerNodeBuilder {
+    this.status = status;
+    return this;
+  }
+
+  withExecutionMode(mode: ExecutionMode): FunctionModelContainerNodeBuilder {
+    this.executionMode = mode;
+    return this;
+  }
+
+  withRetryPolicy(retryPolicy: RetryPolicy): FunctionModelContainerNodeBuilder {
+    this.retryPolicy = retryPolicy;
+    return this;
+  }
+
+  withConfiguration(config: any): FunctionModelContainerNodeBuilder {
+    this.configuration = { ...this.configuration, ...config };
+    // Update nested model ID if provided in configuration
+    if (config.nestedModelId) {
+      this.nestedModelId = config.nestedModelId;
+    }
+    return this;
+  }
+
+  withEstimatedDuration(duration: number): FunctionModelContainerNodeBuilder {
+    this.estimatedDuration = duration;
+    return this;
+  }
+
+  build(): FunctionModelContainerNode {
+    const actionIdResult = NodeId.create(this.actionId);
+    const parentNodeIdResult = NodeId.create(this.parentNodeId);
+    
+    if (actionIdResult.isFailure || parentNodeIdResult.isFailure) {
+      const errors = [];
+      if (actionIdResult.isFailure) errors.push(`ActionId: ${actionIdResult.error}`);
+      if (parentNodeIdResult.isFailure) errors.push(`ParentNodeId: ${parentNodeIdResult.error}`);
+      throw new Error(`Invalid action creation parameters: ${errors.join(', ')}`);
+    }
+
+    const containerNodeProps = {
+      actionId: actionIdResult.value,
+      parentNodeId: parentNodeIdResult.value,
+      modelId: this.modelId,
+      name: this.name,
+      description: this.description,
+      actionType: ActionNodeType.FUNCTION_MODEL_CONTAINER,
+      executionMode: this.executionMode,
+      executionOrder: this.executionOrder,
+      status: this.status,
+      priority: this.priority,
+      estimatedDuration: this.estimatedDuration,
+      retryPolicy: this.retryPolicy,
+      configuration: this.configuration
+    };
+
+    const result = FunctionModelContainerNode.create(containerNodeProps);
+    if (result.isFailure) {
+      throw new Error('Failed to create FunctionModelContainerNode: ' + result.error);
+    }
+    return result.value;
   }
 }
 
@@ -314,8 +766,9 @@ export const TestData = {
   // Valid test values
   VALID_MODEL_NAME: 'Valid Test Model',
   VALID_VERSION: '1.0.0',
-  VALID_UUID: '123e4567-e89b-12d3-a456-426614174000',
+  VALID_UUID: '123e4567-e89b-42d3-a456-426614174000',
   VALID_USER_ID: 'user-123',
+  NON_EXISTENT_UUID: '999e9999-e99b-49d9-a999-999999999999',
   
   // Invalid test values
   INVALID_MODEL_NAME: '', // Too short
@@ -358,7 +811,47 @@ export const TestFactories = {
   },
 
   /**
-   * Create a complete workflow with IO and Stage nodes
+   * Create a basic workflow with IO and Stage nodes (no actions)
+   */
+  createBasicWorkflow(): FunctionModel {
+    const model = TestFactories.createValidModel();
+    
+    // Add input node
+    const inputNode = new IONodeBuilder()
+      .withModelId(model.modelId)
+      .withName('Input')
+      .withPosition(100, 200)
+      .asInput()
+      .build();
+    
+    // Add stage node with dependencies
+    const stageNode = new StageNodeBuilder()
+      .withModelId(model.modelId)
+      .withName('Process')
+      .withPosition(300, 200)
+      .build();
+    
+    // Add output node with dependencies
+    const outputNode = new IONodeBuilder()
+      .withModelId(model.modelId)
+      .withName('Output')
+      .withPosition(500, 200)
+      .asOutput()
+      .build();
+
+    model.addNode(inputNode);
+    model.addNode(stageNode);
+    model.addNode(outputNode);
+    
+    // Create connections by setting dependencies (but no actions)
+    stageNode.addDependency(inputNode.nodeId);
+    outputNode.addDependency(stageNode.nodeId);
+    
+    return model;
+  },
+
+  /**
+   * Create a complete workflow with IO and Stage nodes and actions
    */
   createCompleteWorkflow(): FunctionModel {
     const model = TestFactories.createValidModel();
@@ -371,14 +864,14 @@ export const TestFactories = {
       .asInput()
       .build();
     
-    // Add stage node
+    // Add stage node with dependencies
     const stageNode = new StageNodeBuilder()
       .withModelId(model.modelId)
       .withName('Process')
       .withPosition(300, 200)
       .build();
     
-    // Add output node
+    // Add output node with dependencies
     const outputNode = new IONodeBuilder()
       .withModelId(model.modelId)
       .withName('Output')
@@ -386,9 +879,22 @@ export const TestFactories = {
       .asOutput()
       .build();
 
-    model.addContainerNode(inputNode);
-    model.addContainerNode(stageNode);
-    model.addContainerNode(outputNode);
+    model.addNode(inputNode);
+    model.addNode(stageNode);
+    model.addNode(outputNode);
+    
+    // Create connections by setting dependencies
+    stageNode.addDependency(inputNode.nodeId);
+    outputNode.addDependency(stageNode.nodeId);
+    
+    // Add an action to the stage node to avoid warnings
+    const tetherAction = new TetherNodeBuilder()
+      .withParentNode(stageNode.nodeId.toString())
+      .withModelId(model.modelId)
+      .withName('Process Action')
+      .build();
+    
+    model.addActionNode(tetherAction);
     
     return model;
   },

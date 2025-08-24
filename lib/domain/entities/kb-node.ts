@@ -1,6 +1,9 @@
 import { ActionNode, ActionNodeProps } from './action-node';
-import { ActionNodeType } from '../enums';
+import { ActionNodeType, ExecutionMode, ActionStatus } from '../enums';
 import { Result } from '../shared/result';
+import { NodeId } from '../value-objects/node-id';
+import { RetryPolicy } from '../value-objects/retry-policy';
+import { RACI } from '../value-objects/raci';
 
 export interface KBNodeData {
   kbReferenceId: string;
@@ -14,6 +17,24 @@ export interface KBNodeData {
 }
 
 export interface KBNodeProps extends ActionNodeProps {
+  actionType: string;
+  configuration?: KBNodeData;
+}
+
+export interface KBNodeCreateProps {
+  actionId: string;
+  parentNodeId: string;
+  modelId: string;
+  name: string;
+  description?: string;
+  executionMode: ExecutionMode;
+  executionOrder: number;
+  status: ActionStatus;
+  priority: number;
+  estimatedDuration?: number;
+  retryPolicy: any;
+  raci: any;
+  metadata: any;
   kbData: KBNodeData;
 }
 
@@ -24,209 +45,233 @@ export class KBNode extends ActionNode {
     super(props);
   }
 
-  public static create(props: Omit<KBNodeProps, 'createdAt' | 'updatedAt'>): Result<KBNode> {
+  public static create(createProps: KBNodeCreateProps): Result<KBNode> {
     const now = new Date();
-    const nodeProps: KBNodeProps = {
-      ...props,
+
+    // Validate KB data
+    const validationResult = KBNode.validateKBData(createProps.kbData);
+    if (validationResult.isFailure) {
+      return Result.fail<KBNode>(validationResult.error);
+    }
+
+    const actionNodeProps: ActionNodeProps = {
+      actionId: NodeId.create(createProps.actionId).value,
+      parentNodeId: NodeId.create(createProps.parentNodeId).value,
+      modelId: createProps.modelId,
+      name: createProps.name,
+      description: createProps.description,
+      executionMode: createProps.executionMode,
+      executionOrder: createProps.executionOrder,
+      status: createProps.status,
+      priority: createProps.priority,
+      estimatedDuration: createProps.estimatedDuration || 0,
+      retryPolicy: createProps.retryPolicy,
+      raci: createProps.raci,
+      metadata: createProps.metadata,
       createdAt: now,
       updatedAt: now,
     };
 
-    // Validate KB-specific business rules
-    const validationResult = KBNode.validateKBData(props.kbData);
-    if (validationResult.isFailure) {
-      return Result.fail<KBNode>(validationResult.error);
-    }
+    const nodeProps: KBNodeProps = {
+      ...actionNodeProps,
+      actionType: ActionNodeType.KB_NODE,
+      configuration: createProps.kbData,
+    };
 
     return Result.ok<KBNode>(new KBNode(nodeProps));
   }
 
   public get kbData(): Readonly<KBNodeData> {
-    return this.props.kbData;
+    return this.props.configuration!;
+  }
+
+  public get actionType(): string {
+    return this.props.actionType;
   }
 
   public getActionType(): string {
-    return ActionNodeType.KB_NODE;
+    return this.props.actionType;
   }
 
   public updateKBReferenceId(referenceId: string): Result<void> {
-    if (!referenceId || referenceId.trim().length === 0) {
+    const trimmed = referenceId.trim();
+    if (!trimmed) {
       return Result.fail<void>('KB reference ID cannot be empty');
     }
 
-    this.props.kbData.kbReferenceId = referenceId.trim();
+    this.props.configuration!.kbReferenceId = trimmed;
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   public updateShortDescription(description: string): Result<void> {
-    if (!description || description.trim().length === 0) {
+    const trimmed = description.trim();
+    if (!trimmed) {
       return Result.fail<void>('Short description cannot be empty');
     }
-
-    if (description.trim().length > 500) {
+    if (trimmed.length > 500) {
       return Result.fail<void>('Short description cannot exceed 500 characters');
     }
 
-    this.props.kbData.shortDescription = description.trim();
+    this.props.configuration!.shortDescription = trimmed;
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   public updateDocumentationContext(context?: string): Result<void> {
-    if (context && context.length > 2000) {
-      return Result.fail<void>('Documentation context cannot exceed 2000 characters');
+    if (context !== undefined) {
+      const trimmed = context.trim();
+      if (trimmed.length > 2000) {
+        return Result.fail<void>('Documentation context cannot exceed 2000 characters');
+      }
+      this.props.configuration!.documentationContext = trimmed || '';
+    } else {
+      this.props.configuration!.documentationContext = undefined;
     }
-
-    this.props.kbData.documentationContext = context?.trim();
+    
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   public addSearchKeyword(keyword: string): Result<void> {
-    if (!keyword || keyword.trim().length === 0) {
+    const trimmed = keyword.trim().toLowerCase();
+    if (!trimmed) {
       return Result.fail<void>('Search keyword cannot be empty');
     }
 
-    const trimmedKeyword = keyword.trim().toLowerCase();
-    if (this.props.kbData.searchKeywords.includes(trimmedKeyword)) {
+    const keywords = this.props.configuration!.searchKeywords;
+    if (keywords.includes(trimmed)) {
       return Result.fail<void>('Search keyword already exists');
     }
-
-    if (this.props.kbData.searchKeywords.length >= 20) {
+    if (keywords.length >= 20) {
       return Result.fail<void>('Cannot have more than 20 search keywords');
     }
 
-    this.props.kbData.searchKeywords.push(trimmedKeyword);
+    keywords.push(trimmed);
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   public removeSearchKeyword(keyword: string): Result<void> {
-    const index = this.props.kbData.searchKeywords.indexOf(keyword.trim().toLowerCase());
+    const trimmed = keyword.trim().toLowerCase();
+    const keywords = this.props.configuration!.searchKeywords;
+    const index = keywords.indexOf(trimmed);
+    
     if (index === -1) {
       return Result.fail<void>('Search keyword does not exist');
     }
 
-    this.props.kbData.searchKeywords.splice(index, 1);
+    keywords.splice(index, 1);
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
-  public updateAccessPermissions(permissions: {
-    view: string[];
-    edit: string[];
-  }): Result<void> {
-    // Validate that all users in edit permissions are also in view permissions
-    const missingViewPermissions = permissions.edit.filter(user => 
-      !permissions.view.includes(user)
-    );
+  public updateAccessPermissions(permissions: { view: string[]; edit: string[] }): Result<void> {
+    // Clean up permissions
+    const cleanView = [...new Set(permissions.view.filter(u => u.trim()))];
+    const cleanEdit = [...new Set(permissions.edit.filter(u => u.trim()))];
 
+    // Validate that edit users have view permissions
+    const missingViewPermissions = cleanEdit.filter(user => !cleanView.includes(user));
     if (missingViewPermissions.length > 0) {
       return Result.fail<void>('Users with edit permissions must also have view permissions');
     }
 
-    // Remove duplicates and empty strings
-    const cleanViewPermissions = Array.from(new Set(permissions.view.filter(user => user && user.trim().length > 0)));
-    const cleanEditPermissions = Array.from(new Set(permissions.edit.filter(user => user && user.trim().length > 0)));
-
-    this.props.kbData.accessPermissions = {
-      view: cleanViewPermissions,
-      edit: cleanEditPermissions,
+    this.props.configuration!.accessPermissions = {
+      view: cleanView,
+      edit: cleanEdit
     };
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   public grantViewAccess(userId: string): Result<void> {
-    if (!userId || userId.trim().length === 0) {
+    const trimmed = userId.trim();
+    if (!trimmed) {
       return Result.fail<void>('User ID cannot be empty');
     }
 
-    const trimmedUserId = userId.trim();
-    if (this.props.kbData.accessPermissions.view.includes(trimmedUserId)) {
+    const permissions = this.props.configuration!.accessPermissions;
+    if (permissions.view.includes(trimmed)) {
       return Result.fail<void>('User already has view access');
     }
 
-    this.props.kbData.accessPermissions.view.push(trimmedUserId);
+    permissions.view.push(trimmed);
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   public grantEditAccess(userId: string): Result<void> {
-    if (!userId || userId.trim().length === 0) {
+    const trimmed = userId.trim();
+    if (!trimmed) {
       return Result.fail<void>('User ID cannot be empty');
     }
 
-    const trimmedUserId = userId.trim();
-    
-    // Ensure user has view access first
-    if (!this.props.kbData.accessPermissions.view.includes(trimmedUserId)) {
-      this.props.kbData.accessPermissions.view.push(trimmedUserId);
-    }
-
-    if (this.props.kbData.accessPermissions.edit.includes(trimmedUserId)) {
+    const permissions = this.props.configuration!.accessPermissions;
+    if (permissions.edit.includes(trimmed)) {
       return Result.fail<void>('User already has edit access');
     }
 
-    this.props.kbData.accessPermissions.edit.push(trimmedUserId);
+    // Auto-grant view access if needed
+    if (!permissions.view.includes(trimmed)) {
+      permissions.view.push(trimmed);
+    }
+
+    permissions.edit.push(trimmed);
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   public revokeAccess(userId: string): Result<void> {
-    if (!userId || userId.trim().length === 0) {
+    const trimmed = userId.trim();
+    if (!trimmed) {
       return Result.fail<void>('User ID cannot be empty');
     }
 
-    const trimmedUserId = userId.trim();
-    
-    // Remove from both view and edit permissions
-    const viewIndex = this.props.kbData.accessPermissions.view.indexOf(trimmedUserId);
-    if (viewIndex !== -1) {
-      this.props.kbData.accessPermissions.view.splice(viewIndex, 1);
-    }
+    const permissions = this.props.configuration!.accessPermissions;
+    const hasViewAccess = permissions.view.includes(trimmed);
+    const hasEditAccess = permissions.edit.includes(trimmed);
 
-    const editIndex = this.props.kbData.accessPermissions.edit.indexOf(trimmedUserId);
-    if (editIndex !== -1) {
-      this.props.kbData.accessPermissions.edit.splice(editIndex, 1);
-    }
-
-    if (viewIndex === -1 && editIndex === -1) {
+    if (!hasViewAccess && !hasEditAccess) {
       return Result.fail<void>('User does not have access');
     }
 
+    // Remove from both arrays
+    permissions.view = permissions.view.filter(u => u !== trimmed);
+    permissions.edit = permissions.edit.filter(u => u !== trimmed);
+    
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
 
   private static validateKBData(kbData: KBNodeData): Result<void> {
+    // Validate KB reference ID
     if (!kbData.kbReferenceId || kbData.kbReferenceId.trim().length === 0) {
       return Result.fail<void>('KB reference ID is required');
     }
 
+    // Validate short description
     if (!kbData.shortDescription || kbData.shortDescription.trim().length === 0) {
       return Result.fail<void>('Short description is required');
     }
-
     if (kbData.shortDescription.length > 500) {
       return Result.fail<void>('Short description cannot exceed 500 characters');
     }
 
+    // Validate documentation context if provided
     if (kbData.documentationContext && kbData.documentationContext.length > 2000) {
       return Result.fail<void>('Documentation context cannot exceed 2000 characters');
     }
 
+    // Validate search keywords
     if (kbData.searchKeywords.length > 20) {
       return Result.fail<void>('Cannot have more than 20 search keywords');
     }
 
     // Validate access permissions
-    const { accessPermissions } = kbData;
-    const missingViewPermissions = accessPermissions.edit.filter(user => 
-      !accessPermissions.view.includes(user)
+    const missingViewPermissions = kbData.accessPermissions.edit.filter(user => 
+      !kbData.accessPermissions.view.includes(user)
     );
-
     if (missingViewPermissions.length > 0) {
       return Result.fail<void>('Users with edit permissions must also have view permissions');
     }

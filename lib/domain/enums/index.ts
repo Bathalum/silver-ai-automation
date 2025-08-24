@@ -10,6 +10,12 @@ export enum ContainerNodeType {
   STAGE_NODE = 'stageNode'
 }
 
+export enum IOType {
+  INPUT = 'input',
+  OUTPUT = 'output',
+  INPUT_OUTPUT = 'input-output'
+}
+
 export enum ActionNodeType {
   TETHER_NODE = 'tetherNode',
   KB_NODE = 'kbNode',
@@ -24,6 +30,7 @@ export enum ExecutionMode {
 
 export enum ActionStatus {
   DRAFT = 'draft',
+  CONFIGURED = 'configured',
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   EXECUTING = 'executing',

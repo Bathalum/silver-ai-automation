@@ -94,6 +94,14 @@ export class Version {
     return this.compare(other) === 0;
   }
 
+  public isGreaterThan(other: Version): boolean {
+    return this.compare(other) > 0;
+  }
+
+  public isLessThan(other: Version): boolean {
+    return this.compare(other) < 0;
+  }
+
   public toString(): string {
     return this.value;
   }

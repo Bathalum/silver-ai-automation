@@ -1,0 +1,25 @@
+
+> silver-ai-automation-app@0.1.0 test C:\Users\alant\OneDrive\Desktop\Projects\silver-ai-automation
+> jest "--verbose"
+
+  console.log
+    Executing Tether Node: Test Tether Action (test-tether-ref)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+  console.log
+    Agent 00000020-0000-4000-8000-000000200000 failed: Test failure
+
+      at AIAgentOrchestrationService.log [as handleAgentFailure] (lib/domain/services/ai-agent-orchestration-service.ts:277:13)
+
+  console.log
+    Agent 00000021-0000-4000-8000-000000210000 failed: Test failure
+
+      at AIAgentOrchestrationService.log [as handleAgentFailure] (lib/domain/services/ai-agent-orchestration-service.ts:277:13)
+
+  console.log
+    Agent 00000022-0000-4000-8000-000000220000 failed: Test failure
+
+      at AIAgentOrchestrationService.log [as handleAgentFailure] (lib/domain/services/ai-agent-orchestration-service.ts:277:13)
+
+ ELIFECYCLE  Test failed. See above for more details.

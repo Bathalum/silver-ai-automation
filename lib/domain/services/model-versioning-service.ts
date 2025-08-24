@@ -32,15 +32,22 @@ export interface IModelVersioningService {
 export class ModelVersioningService implements IModelVersioningService {
   async createVersion(model: FunctionModel, versionType: 'major' | 'minor' | 'patch'): Promise<Result<Version>> {
     try {
-      // Validate model can have a new version created
-      const validationResult = model.validateWorkflow();
-      if (validationResult.isFailure) {
-        return Result.fail<Version>(`Cannot create version for invalid model: ${validationResult.error}`);
+      // Validate version type first
+      if (!['major', 'minor', 'patch'].includes(versionType)) {
+        return Result.fail<Version>('Invalid version type. Must be major, minor, or patch');
       }
 
-      const validation = validationResult.value;
-      if (!validation.isValid) {
-        return Result.fail<Version>(`Cannot create version with validation errors: ${validation.errors.join(', ')}`);
+      // Only validate workflow for published models - drafts can have new versions
+      if (model.status === 'published') {
+        const validationResult = model.validateWorkflow();
+        if (validationResult.isFailure) {
+          return Result.fail<Version>(`Cannot create version for invalid model: ${validationResult.error}`);
+        }
+
+        const validation = validationResult.value;
+        if (!validation.isValid) {
+          return Result.fail<Version>(`Cannot create version with validation errors: ${validation.errors.join(', ')}`);
+        }
       }
 
       // Create new version based on current version
@@ -57,8 +64,6 @@ export class ModelVersioningService implements IModelVersioningService {
         case 'patch':
           newVersion = currentVersion.incrementPatch();
           break;
-        default:
-          return Result.fail<Version>('Invalid version type. Must be major, minor, or patch');
       }
 
       return Result.ok<Version>(newVersion);

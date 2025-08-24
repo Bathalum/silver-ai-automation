@@ -39,6 +39,12 @@ export {
   type ValidationResult, 
   type ExecutionResult 
 } from './entities/function-model';
+export { FunctionModelVersion, type FunctionModelVersionProps } from './entities/function-model-version';
+export { AuditLog, type AuditLogProps } from './entities/audit-log';
+export { NodeLink, type NodeLinkProps } from './entities/node-link';
+export { CrossFeatureLink, type CrossFeatureLinkProps } from './entities/cross-feature-link';
+export { AIAgent, type AIAgentProps, type AIAgentCapabilities, type AIAgentTools } from './entities/ai-agent';
+export { NodeMetadata, type NodeMetadataProps } from './entities/node-metadata';
 
 // Business Rules
 export { WorkflowValidationRules } from './rules/workflow-validation';
@@ -68,6 +74,25 @@ export {
   type ModelChanges,
   type VersionComparison
 } from './services/model-versioning-service';
+export { 
+  ActionNodeExecutionService,
+  type ExecutionMetrics,
+  type ExecutionSnapshot 
+} from './services/action-node-execution-service';
+export { NodeContextAccessService } from './services/node-context-access-service';
+export { ActionNodeOrchestrationService } from './services/action-node-orchestration-service';
+export { FractalOrchestrationService } from './services/fractal-orchestration-service';
+export { CrossFeatureLinkingService } from './services/cross-feature-linking-service';
+export { AIAgentOrchestrationService } from './services/ai-agent-orchestration-service';
+
+// Repository Interfaces
+export type {
+  FunctionModelRepository,
+  NodeRepository,
+  NodeLinkRepository,
+  AIAgentRepository,
+  AuditLogRepository
+} from './interfaces';
 
 // Domain Events
 export { DomainEvent } from './events/domain-event';
@@ -77,7 +102,19 @@ export {
   ModelPublished,
   ModelArchived,
   ModelDeleted,
-  VersionCreated
+  VersionCreated,
+  FunctionModelVersionCreated,
+  ActionNodeExecutionOrderChanged,
+  ActionNodeExecutionModeChanged,
+  ActionNodePriorityChanged,
+  ActionNodeRetryPolicyUpdated,
+  ContainerNodeOrchestrationStarted,
+  ContainerNodeOrchestrationCompleted,
+  FractalOrchestrationLevelChanged,
+  AIAgentConfigurationUpdated,
+  AIAgentTaskStarted,
+  AIAgentTaskCompleted,
+  AIAgentTaskFailed
 } from './events/model-events';
 export {
   ExecutionStarted,

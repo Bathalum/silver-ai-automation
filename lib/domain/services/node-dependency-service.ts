@@ -17,12 +17,12 @@ export interface ExecutionPath {
 }
 
 export class NodeDependencyService {
-  public static validateAcyclicity(nodes: Node[]): Result<ValidationResult> {
+  public validateAcyclicity(nodes: Node[]): Result<ValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    const graph = NodeDependencyService.buildDependencyGraph(nodes);
-    const cycleResult = NodeDependencyService.detectCycles(graph);
+    const graph = this.buildDependencyGraphInternal(nodes);
+    const cycleResult = this.detectCycles(graph);
 
     if (cycleResult.isFailure) {
       errors.push(cycleResult.error);
@@ -45,12 +45,12 @@ export class NodeDependencyService {
     }
 
     // Check for potential performance issues
-    const maxDepth = NodeDependencyService.calculateMaxDepth(graph);
+    const maxDepth = this.calculateMaxDepth(graph);
     if (maxDepth > 15) {
       warnings.push(`Deep dependency chain detected (${maxDepth} levels) - consider restructuring for better performance`);
     }
 
-    const complexNodes = NodeDependencyService.findComplexNodes(graph);
+    const complexNodes = this.findComplexNodes(graph);
     complexNodes.forEach(({ nodeId, dependencyCount, dependentCount }) => {
       const node = graph.nodes.get(nodeId);
       const nodeName = node?.name || nodeId;
@@ -71,42 +71,76 @@ export class NodeDependencyService {
     });
   }
 
-  public static calculateExecutionOrder(nodes: Node[]): Result<Node[]> {
-    const graph = NodeDependencyService.buildDependencyGraph(nodes);
+  public calculateExecutionOrder(nodes: Node[]): Result<Node[]>;
+  public calculateExecutionOrder(graph: DependencyGraph): Result<string[]>;
+  public calculateExecutionOrder(input: Node[] | DependencyGraph | any): Result<Node[] | string[]> {
+    let graph: DependencyGraph;
+    let returnNodeObjects = false;
+    
+    if (Array.isArray(input)) {
+      // Handle Node[] input
+      graph = this.buildDependencyGraphInternal(input);
+      returnNodeObjects = true;
+    } else if (input && typeof input === 'object' && 'nodes' in input && 'adjacencyList' in input && 'reverseDependencies' in input) {
+      // Handle DependencyGraph input
+      graph = input;
+      returnNodeObjects = false;
+    } else {
+      // Handle malformed input gracefully
+      return Result.fail<Node[] | string[]>('Invalid input: expected Node[] or DependencyGraph');
+    }
     
     // Check for cycles first
-    const cycleResult = NodeDependencyService.detectCycles(graph);
+    const cycleResult = this.detectCycles(graph);
     if (cycleResult.isFailure) {
-      return Result.fail<Node[]>(cycleResult.error);
+      return Result.fail<Node[] | string[]>(cycleResult.error);
     }
 
     const cycles = cycleResult.value;
     if (cycles.length > 0) {
-      return Result.fail<Node[]>('Cannot calculate execution order: circular dependencies detected');
+      return Result.fail<Node[] | string[]>('Cannot calculate execution order: circular dependencies detected');
     }
 
     // Perform topological sort
-    const sortResult = NodeDependencyService.topologicalSort(graph);
+    const sortResult = this.topologicalSort(graph);
     if (sortResult.isFailure) {
-      return Result.fail<Node[]>(sortResult.error);
+      return Result.fail<Node[] | string[]>(sortResult.error);
     }
 
-    const sortedNodeIds = sortResult.value;
-    const sortedNodes = sortedNodeIds.map(nodeId => graph.nodes.get(nodeId)!);
-
-    return Result.ok<Node[]>(sortedNodes);
+    if (returnNodeObjects) {
+      const sortedNodeIds = sortResult.value;
+      const sortedNodes = sortedNodeIds.map(nodeId => graph.nodes.get(nodeId)!);
+      return Result.ok<Node[]>(sortedNodes);
+    } else {
+      // Return node IDs
+      return Result.ok<string[]>(sortResult.value);
+    }
   }
 
-  public static detectCircularDependencies(nodes: Node[]): Result<string[][]> {
-    const graph = NodeDependencyService.buildDependencyGraph(nodes);
-    return NodeDependencyService.detectCycles(graph);
+  public detectCircularDependencies(nodes: Node[]): Result<string[][]>;
+  public detectCircularDependencies(graph: DependencyGraph): Result<string[][]>;
+  public detectCircularDependencies(input: Node[] | DependencyGraph | any): Result<string[][]> {
+    let graph: DependencyGraph;
+    
+    if (Array.isArray(input)) {
+      // Handle Node[] input
+      graph = this.buildDependencyGraphInternal(input);
+    } else if (input && typeof input === 'object' && 'nodes' in input && 'adjacencyList' in input && 'reverseDependencies' in input) {
+      // Handle DependencyGraph input
+      graph = input;
+    } else {
+      // Handle malformed input gracefully
+      return Result.fail<string[][]>('Invalid input: expected Node[] or DependencyGraph');
+    }
+    
+    return this.detectCycles(graph);
   }
 
-  public static optimizeExecutionPaths(nodes: Node[]): Result<ExecutionPath[]> {
-    const graph = NodeDependencyService.buildDependencyGraph(nodes);
+  public optimizeExecutionPaths(nodes: Node[]): Result<ExecutionPath[]> {
+    const graph = this.buildDependencyGraphInternal(nodes);
     
     // Calculate execution levels for parallel optimization
-    const levels = NodeDependencyService.calculateExecutionLevels(graph);
+    const levels = this.calculateExecutionLevels(graph);
     if (levels.isFailure) {
       return Result.fail<ExecutionPath[]>(levels.error);
     }
@@ -125,7 +159,7 @@ export class NodeDependencyService {
         .map(([id, _]) => id);
       
       const canExecuteInParallel = nodesAtSameLevel.length > 1 && 
-        !NodeDependencyService.hasSharedDependencies(nodeId, nodesAtSameLevel, graph);
+        !this.hasSharedDependencies(nodeId, nodesAtSameLevel, graph);
 
       paths.push({
         nodeId,
@@ -157,8 +191,8 @@ export class NodeDependencyService {
     return Result.ok<ExecutionPath[]>(paths);
   }
 
-  public static findCriticalPath(nodes: Node[]): Result<string[]> {
-    const graph = NodeDependencyService.buildDependencyGraph(nodes);
+  public findCriticalPath(nodes: Node[]): Result<string[]> {
+    const graph = this.buildDependencyGraphInternal(nodes);
     
     // Find the longest path from any start node to any end node
     const startNodes = Array.from(graph.nodes.keys())
@@ -172,7 +206,7 @@ export class NodeDependencyService {
 
     // Calculate longest path from each start node
     for (const startNode of startNodes) {
-      const pathResult = NodeDependencyService.findLongestPath(startNode, graph);
+      const pathResult = this.findLongestPath(startNode, graph);
       if (pathResult.isSuccess) {
         const path = pathResult.value;
         if (path.length > maxLength) {
@@ -189,7 +223,84 @@ export class NodeDependencyService {
     return Result.ok<string[]>(longestPath);
   }
 
-  private static buildDependencyGraph(nodes: Node[]): DependencyGraph {
+  public buildDependencyGraph(nodes: Node[]): Result<DependencyGraph> {
+    try {
+      // Validate that all dependencies reference existing nodes
+      const nodeIds = new Set(nodes.map(node => node.nodeId.toString()));
+      
+      for (const node of nodes) {
+        for (const dependency of node.dependencies) {
+          const depId = dependency.toString();
+          if (!nodeIds.has(depId)) {
+            // Extract simple name from full node name for cleaner error messages
+            const nodeName = node.name.toLowerCase().replace(/^test\s+/, '').replace(/\s+node$/, '');
+            return Result.fail<DependencyGraph>(`Node "${nodeName}" references non-existent dependency: ${depId}`);
+          }
+        }
+      }
+      
+      const graph = this.buildDependencyGraphInternal(nodes);
+      return Result.ok<DependencyGraph>(graph);
+    } catch (error) {
+      return Result.fail<DependencyGraph>(`Failed to build dependency graph: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  public findReachableNodes(graph: DependencyGraph, startNodeId: string): string[] {
+    // Handle malformed input gracefully
+    if (!graph || typeof graph !== 'object' || !graph.adjacencyList || !graph.nodes) {
+      return [];
+    }
+
+    const reachable = new Set<string>();
+    const queue = [startNodeId];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (reachable.has(current)) continue;
+      
+      reachable.add(current);
+      const dependents = graph.adjacencyList.get(current) || [];
+      dependents.forEach(dependent => {
+        if (!reachable.has(dependent)) {
+          queue.push(dependent);
+        }
+      });
+    }
+
+    return Array.from(reachable);
+  }
+
+  public getDependencyDepth(graph: DependencyGraph, nodeId: string): number {
+    // Handle malformed input gracefully
+    if (!graph || typeof graph !== 'object' || !graph.nodes || !graph.reverseDependencies) {
+      return -1;
+    }
+
+    if (!graph.nodes.has(nodeId)) {
+      return -1;
+    }
+
+    const visited = new Set<string>();
+    const calculateDepth = (current: string): number => {
+      if (visited.has(current)) return 0; // Prevent infinite loops
+      visited.add(current);
+
+      const dependencies = graph.reverseDependencies.get(current) || [];
+      if (dependencies.length === 0) {
+        visited.delete(current);
+        return 0;
+      }
+
+      const maxDepth = Math.max(...dependencies.map(dep => calculateDepth(dep)));
+      visited.delete(current);
+      return maxDepth + 1;
+    };
+
+    return calculateDepth(nodeId);
+  }
+
+  private buildDependencyGraphInternal(nodes: Node[]): DependencyGraph {
     const nodeMap = new Map(nodes.map(node => [node.nodeId.toString(), node]));
     const adjacencyList = new Map<string, string[]>();
     const reverseDependencies = new Map<string, string[]>();
@@ -222,17 +333,20 @@ export class NodeDependencyService {
     };
   }
 
-  private static detectCycles(graph: DependencyGraph): Result<string[][]> {
+  private detectCycles(graph: DependencyGraph): Result<string[][]> {
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
     const cycles: string[][] = [];
 
     const dfs = (nodeId: string, path: string[]): void => {
       if (recursionStack.has(nodeId)) {
-        // Found a cycle
+        // Found a cycle - extract the cycle from current path
         const cycleStart = path.indexOf(nodeId);
-        const cycle = path.slice(cycleStart);
-        cycles.push([...cycle, nodeId]);
+        if (cycleStart >= 0) {
+          const cycle = path.slice(cycleStart);
+          cycle.push(nodeId); // Complete the cycle
+          cycles.push(cycle);
+        }
         return;
       }
 
@@ -242,10 +356,12 @@ export class NodeDependencyService {
 
       visited.add(nodeId);
       recursionStack.add(nodeId);
+      const newPath = [...path, nodeId];
 
+      // Follow the adjacency list (dependents) to find cycles in dependency chain
       const dependents = graph.adjacencyList.get(nodeId) || [];
       dependents.forEach(dependent => {
-        dfs(dependent, [...path, nodeId]);
+        dfs(dependent, newPath);
       });
 
       recursionStack.delete(nodeId);
@@ -260,7 +376,7 @@ export class NodeDependencyService {
     return Result.ok<string[][]>(cycles);
   }
 
-  private static topologicalSort(graph: DependencyGraph): Result<string[]> {
+  private topologicalSort(graph: DependencyGraph): Result<string[]> {
     const inDegree = new Map<string, number>();
     const result: string[] = [];
     const queue: string[] = [];
@@ -299,7 +415,7 @@ export class NodeDependencyService {
     return Result.ok<string[]>(result);
   }
 
-  private static calculateExecutionLevels(graph: DependencyGraph): Result<Map<string, number>> {
+  private calculateExecutionLevels(graph: DependencyGraph): Result<Map<string, number>> {
     const levels = new Map<string, number>();
     const calculated = new Set<string>();
 
@@ -341,8 +457,8 @@ export class NodeDependencyService {
     }
   }
 
-  private static calculateMaxDepth(graph: DependencyGraph): number {
-    const levelsResult = NodeDependencyService.calculateExecutionLevels(graph);
+  private calculateMaxDepth(graph: DependencyGraph): number {
+    const levelsResult = this.calculateExecutionLevels(graph);
     if (levelsResult.isFailure) {
       return 0;
     }
@@ -351,7 +467,7 @@ export class NodeDependencyService {
     return Math.max(...Array.from(levels.values())) + 1;
   }
 
-  private static findComplexNodes(graph: DependencyGraph): Array<{
+  private findComplexNodes(graph: DependencyGraph): Array<{
     nodeId: string;
     dependencyCount: number;
     dependentCount: number;
@@ -378,7 +494,7 @@ export class NodeDependencyService {
     return complexNodes;
   }
 
-  private static hasSharedDependencies(
+  private hasSharedDependencies(
     nodeId: string, 
     nodesAtSameLevel: string[], 
     graph: DependencyGraph
@@ -393,7 +509,7 @@ export class NodeDependencyService {
     });
   }
 
-  private static findLongestPath(startNode: string, graph: DependencyGraph): Result<string[]> {
+  private findLongestPath(startNode: string, graph: DependencyGraph): Result<string[]> {
     const visited = new Set<string>();
     const currentPath: string[] = [];
     let longestPath: string[] = [];

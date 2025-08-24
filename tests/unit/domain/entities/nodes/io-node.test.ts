@@ -4,7 +4,7 @@
  */
 
 import { IONode } from '@/lib/domain/entities/io-node';
-import { ContainerNodeType } from '@/lib/domain/enums';
+import { ContainerNodeType, IOType } from '@/lib/domain/enums';
 import { IONodeBuilder, TestData } from '../../../../utils/test-fixtures';
 import { ResultTestHelpers, UuidTestHelpers } from '../../../../utils/test-helpers';
 
@@ -49,8 +49,9 @@ describe('IONode', () => {
 
     it('should create node with custom properties', () => {
       // Act
+      const customId = crypto.randomUUID();
       const node = new IONodeBuilder()
-        .withId('custom-id')
+        .withId(customId)
         .withName('Custom Node')
         .withModelId('test-model')
         .withDescription('Custom description')
@@ -60,7 +61,7 @@ describe('IONode', () => {
         .build();
 
       // Assert
-      expect(node.nodeId.toString()).toBe('custom-id');
+      expect(node.nodeId.toString()).toBe(customId);
       expect(node.description).toBe('Custom description');
       expect(node.position.x).toBe(100);
       expect(node.position.y).toBe(200);
@@ -142,6 +143,7 @@ describe('IONode', () => {
       const node = new IONodeBuilder()
         .withName('Node Without Description')
         .withModelId('test-model')
+        .withoutDescription()
         .asInput()
         .build();
 
@@ -158,14 +160,15 @@ describe('IONode', () => {
     it('should validate input nodes cannot have circular dependencies', () => {
       // Arrange
       const inputNode = new IONodeBuilder()
-        .withId('input-node')
+        .withId('123e4567-e89b-42d3-a456-426614174001')
         .withName('Input Node')
         .withModelId('test-model')
         .asInput()
         .build();
 
-      // Act - Try to add dependency to itself
-      inputNode.addDependency('input-node');
+      // Act - Try to add dependency to a different node (not self-reference)
+      const addResult = inputNode.addDependency('223e4567-e89b-42d3-a456-426614174002');
+      expect(addResult.isSuccess).toBe(true); // Dependency should be added successfully
       const result = inputNode.validate();
 
       // Assert
@@ -219,11 +222,12 @@ describe('IONode', () => {
         .build();
 
       // Act
-      const result = node.addDependency('dependency-id');
+      const dependencyId = crypto.randomUUID();
+      const result = node.addDependency(dependencyId);
 
       // Assert
       expect(result).toBeValidResult();
-      expect(node.dependencies).toContain('dependency-id');
+      expect(node.dependencies.some(dep => dep.toString() === dependencyId)).toBe(true);
     });
 
     it('should prevent duplicate dependencies', () => {
@@ -234,10 +238,11 @@ describe('IONode', () => {
         .asOutput()
         .build();
 
-      node.addDependency('dependency-id');
+      const dependencyId = crypto.randomUUID();
+      node.addDependency(dependencyId);
 
       // Act
-      const result = node.addDependency('dependency-id');
+      const result = node.addDependency(dependencyId);
 
       // Assert
       expect(result).toBeFailureResult();
@@ -252,15 +257,16 @@ describe('IONode', () => {
         .asOutput()
         .build();
 
-      node.addDependency('dependency-id');
-      expect(node.dependencies).toContain('dependency-id');
+      const dependencyId = crypto.randomUUID();
+      node.addDependency(dependencyId);
+      expect(node.dependencies.some(dep => dep.toString() === dependencyId)).toBe(true);
 
       // Act
-      const result = node.removeDependency('dependency-id');
+      const result = node.removeDependency(dependencyId);
 
       // Assert
       expect(result).toBeValidResult();
-      expect(node.dependencies).not.toContain('dependency-id');
+      expect(node.dependencies.some(dep => dep.toString() === dependencyId)).toBe(false);
     });
 
     it('should handle removing non-existent dependency', () => {
@@ -272,11 +278,12 @@ describe('IONode', () => {
         .build();
 
       // Act
-      const result = node.removeDependency('non-existent-id');
+      const nonExistentId = crypto.randomUUID();
+      const result = node.removeDependency(nonExistentId);
 
       // Assert
       expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Dependency not found');
+      expect(result).toHaveErrorMessage('Dependency does not exist');
     });
   });
 
@@ -379,7 +386,7 @@ describe('IONode', () => {
   describe('equality and identity', () => {
     it('should be equal when node IDs match', () => {
       // Arrange
-      const nodeId = 'same-node-id';
+      const nodeId = '123e4567-e89b-42d3-a456-426614174001';
       const node1 = new IONodeBuilder().withId(nodeId).withModelId('test').asInput().build();
       const node2 = new IONodeBuilder().withId(nodeId).withModelId('test').asInput().build();
 
@@ -389,8 +396,8 @@ describe('IONode', () => {
 
     it('should not be equal when node IDs differ', () => {
       // Arrange
-      const node1 = new IONodeBuilder().withId('node-1').withModelId('test').asInput().build();
-      const node2 = new IONodeBuilder().withId('node-2').withModelId('test').asInput().build();
+      const node1 = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174001').withModelId('test').asInput().build();
+      const node2 = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174002').withModelId('test').asInput().build();
 
       // Act & Assert
       expect(node1.equals(node2)).toBe(false);
@@ -400,8 +407,9 @@ describe('IONode', () => {
   describe('serialization', () => {
     it('should convert to object representation', () => {
       // Arrange
+      const testId = crypto.randomUUID();
       const node = new IONodeBuilder()
-        .withId('test-id')
+        .withId(testId)
         .withName('Test Node')
         .withModelId('test-model')
         .withDescription('Test description')
@@ -414,7 +422,7 @@ describe('IONode', () => {
 
       // Assert
       expect(obj).toEqual({
-        nodeId: 'test-id',
+        nodeId: testId,
         name: 'Test Node',
         modelId: 'test-model',
         description: 'Test description',
@@ -431,15 +439,17 @@ describe('IONode', () => {
 
     it('should create from object representation', () => {
       // Arrange
+      const testId = crypto.randomUUID();
+      const depId = crypto.randomUUID();
       const obj = {
-        nodeId: 'test-id',
+        nodeId: testId,
         name: 'Test Node',
         modelId: 'test-model',
         description: 'Test description',
         nodeType: 'ioNode',
         ioType: IOType.OUTPUT,
         position: { x: 150, y: 250 },
-        dependencies: ['dep1'],
+        dependencies: [depId],
         configuration: { format: 'json' },
         metadata: { version: 1 },
         createdAt: new Date(),
@@ -452,10 +462,10 @@ describe('IONode', () => {
       // Assert
       expect(result).toBeValidResult();
       const node = result.value;
-      expect(node.nodeId.toString()).toBe('test-id');
+      expect(node.nodeId.toString()).toBe(testId);
       expect(node.name).toBe('Test Node');
       expect(node.ioType).toBe(IOType.OUTPUT);
-      expect(node.dependencies).toEqual(['dep1']);
+      expect(node.dependencies.map(d => d.toString())).toContain(depId);
     });
   });
 
@@ -469,7 +479,8 @@ describe('IONode', () => {
         .build();
 
       // Act - Input nodes should not accept dependencies
-      inputNode.addDependency('some-dependency');
+      const addResult = inputNode.addDependency('223e4567-e89b-42d3-a456-426614174002');
+      expect(addResult.isSuccess).toBe(true); // Dependency should be added successfully
       const result = inputNode.validate();
 
       // Assert

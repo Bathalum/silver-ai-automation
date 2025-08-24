@@ -1,163 +1,426 @@
 import { DomainEvent } from './domain-event';
+import { ActionStatus, ExecutionMode } from '../enums';
 
-export class ExecutionStarted extends DomainEvent {
-  constructor(
-    aggregateId: string,
-    public readonly modelId: string,
-    public readonly executionId: string,
-    public readonly startedBy: string,
-    public readonly context: Record<string, any>,
-    eventVersion = 1
-  ) {
-    super(aggregateId, eventVersion);
+export interface ActionExecutionContextData {
+  executionMode: ExecutionMode;
+  priority: number;
+  estimatedDuration: number;
+  retryPolicy?: {
+    maxAttempts: number;
+    backoffStrategy: string;
+    backoffDelay: number;
+    failureThreshold: number;
+  };
+}
+
+export interface ActionNodeExecutionStartedData {
+  modelId: string;
+  actionId: string;
+  executionId: string;
+  actionType: string;
+  actionName: string;
+  parentNodeId: string;
+  executionContext: ActionExecutionContextData;
+  startedAt: Date;
+  triggeredBy: string;
+}
+
+export interface ActionExecutionResultData {
+  success: boolean;
+  output: Record<string, any>;
+  duration: number;
+  resourceUsage: Record<string, any>;
+}
+
+export interface ActionNodeExecutionCompletedData {
+  modelId: string;
+  actionId: string;
+  executionId: string;
+  actionName: string;
+  executionResult: ActionExecutionResultData;
+  startedAt: Date;
+  completedAt: Date;
+}
+
+export interface ActionExecutionErrorData {
+  code: string;
+  message: string;
+  stackTrace: string;
+  category: string;
+}
+
+export interface ActionNodeExecutionFailedData {
+  modelId: string;
+  actionId: string;
+  executionId: string;
+  actionName: string;
+  error: ActionExecutionErrorData;
+  retryAttempt: number;
+  willRetry: boolean;
+  startedAt: Date;
+  failedAt: Date;
+}
+
+export interface ActionNodeExecutionRetriedData {
+  modelId: string;
+  actionId: string;
+  executionId: string;
+  actionName: string;
+  retryAttempt: number;
+  maxRetries: number;
+  retryDelay: number;
+  retriedAt: Date;
+  reason: string;
+}
+
+export interface ActionNodeStatusChangedData {
+  modelId: string;
+  actionId: string;
+  actionName: string;
+  previousStatus: ActionStatus;
+  currentStatus: ActionStatus;
+  changedAt: Date;
+  changedBy: string;
+  reason?: string;
+}
+
+export interface ExecutionStartedData {
+  modelId: string;
+  executionId: string;
+  startedBy: string;
+  context: Record<string, any>;
+  startedAt: Date;
+}
+
+export interface NodeExecutedData {
+  executionId: string;
+  nodeId: string;
+  nodeName: string;
+  success: boolean;
+  executionTime: number;
+  executedAt: Date;
+  output?: Record<string, any>;
+  error?: string;
+}
+
+export interface ActionNodeExecutionOrderChangedData {
+  modelId: string;
+  actionId: string;
+  oldOrder: number;
+  newOrder: number;
+  changedBy: string;
+  changedAt: Date;
+}
+
+export interface ActionNodeExecutionModeChangedData {
+  modelId: string;
+  actionId: string;
+  oldMode: ExecutionMode;
+  newMode: ExecutionMode;
+  changedBy: string;
+  changedAt: Date;
+}
+
+export interface ActionNodePriorityChangedData {
+  modelId: string;
+  actionId: string;
+  oldPriority: number;
+  newPriority: number;
+  changedBy: string;
+  changedAt: Date;
+}
+
+export class ActionNodeExecutionStarted extends DomainEvent {
+  public readonly eventType = 'ActionNodeExecutionStarted';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodeExecutionStartedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
   }
 
   public getEventName(): string {
-    return 'ExecutionStarted';
+    return this.eventType;
   }
 
   public getEventData(): Record<string, any> {
     return {
-      modelId: this.modelId,
-      executionId: this.executionId,
-      startedBy: this.startedBy,
-      context: this.context,
+      ...this.data,
+      startedAt: this.data.startedAt.toISOString()
     };
   }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get executionId(): string { return this.data.executionId; }
+  public get actionType(): string { return this.data.actionType; }
+  public get actionName(): string { return this.data.actionName; }
+  public get parentNodeId(): string { return this.data.parentNodeId; }
+  public get executionContext(): ActionExecutionContextData { return this.data.executionContext; }
+  public get startedAt(): Date { return this.data.startedAt; }
+  public get triggeredBy(): string { return this.data.triggeredBy; }
+}
+
+export class ActionNodeExecutionCompleted extends DomainEvent {
+  public readonly eventType = 'ActionNodeExecutionCompleted';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodeExecutionCompletedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
+  }
+
+  public getEventName(): string {
+    return this.eventType;
+  }
+
+  public getEventData(): Record<string, any> {
+    return {
+      ...this.data,
+      startedAt: this.data.startedAt.toISOString(),
+      completedAt: this.data.completedAt.toISOString()
+    };
+  }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get executionId(): string { return this.data.executionId; }
+  public get actionName(): string { return this.data.actionName; }
+  public get executionResult(): ActionExecutionResultData { return this.data.executionResult; }
+  public get startedAt(): Date { return this.data.startedAt; }
+  public get completedAt(): Date { return this.data.completedAt; }
+}
+
+export class ActionNodeExecutionFailed extends DomainEvent {
+  public readonly eventType = 'ActionNodeExecutionFailed';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodeExecutionFailedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
+  }
+
+  public getEventName(): string {
+    return this.eventType;
+  }
+
+  public getEventData(): Record<string, any> {
+    return {
+      ...this.data,
+      startedAt: this.data.startedAt.toISOString(),
+      failedAt: this.data.failedAt.toISOString()
+    };
+  }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get executionId(): string { return this.data.executionId; }
+  public get actionName(): string { return this.data.actionName; }
+  public get error(): ActionExecutionErrorData { return this.data.error; }
+  public get retryAttempt(): number { return this.data.retryAttempt; }
+  public get willRetry(): boolean { return this.data.willRetry; }
+  public get startedAt(): Date { return this.data.startedAt; }
+  public get failedAt(): Date { return this.data.failedAt; }
+}
+
+export class ActionNodeExecutionRetried extends DomainEvent {
+  public readonly eventType = 'ActionNodeExecutionRetried';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodeExecutionRetriedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
+  }
+
+  public getEventName(): string {
+    return this.eventType;
+  }
+
+  public getEventData(): Record<string, any> {
+    return {
+      ...this.data,
+      retriedAt: this.data.retriedAt.toISOString()
+    };
+  }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get executionId(): string { return this.data.executionId; }
+  public get actionName(): string { return this.data.actionName; }
+  public get retryAttempt(): number { return this.data.retryAttempt; }
+  public get maxRetries(): number { return this.data.maxRetries; }
+  public get retryDelay(): number { return this.data.retryDelay; }
+  public get retriedAt(): Date { return this.data.retriedAt; }
+  public get reason(): string { return this.data.reason; }
+}
+
+export class ActionNodeStatusChanged extends DomainEvent {
+  public readonly eventType = 'ActionNodeStatusChanged';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodeStatusChangedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
+  }
+
+  public getEventName(): string {
+    return this.eventType;
+  }
+
+  public getEventData(): Record<string, any> {
+    return {
+      ...this.data,
+      changedAt: this.data.changedAt.toISOString()
+    };
+  }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get actionName(): string { return this.data.actionName; }
+  public get previousStatus(): ActionStatus { return this.data.previousStatus; }
+  public get currentStatus(): ActionStatus { return this.data.currentStatus; }
+  public get changedAt(): Date { return this.data.changedAt; }
+  public get changedBy(): string { return this.data.changedBy; }
+  public get reason(): string | undefined { return this.data.reason; }
+}
+
+export class ExecutionStarted extends DomainEvent {
+  public readonly eventType = 'ExecutionStarted';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ExecutionStartedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
+  }
+
+  public getEventName(): string {
+    return this.eventType;
+  }
+
+  public getEventData(): Record<string, any> {
+    return {
+      ...this.data,
+      startedAt: this.data.startedAt.toISOString()
+    };
+  }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get executionId(): string { return this.data.executionId; }
+  public get startedBy(): string { return this.data.startedBy; }
+  public get context(): Record<string, any> { return JSON.parse(JSON.stringify(this.data.context)); }
+  public get startedAt(): Date { return this.data.startedAt; }
 }
 
 export class NodeExecuted extends DomainEvent {
-  constructor(
-    aggregateId: string,
-    public readonly executionId: string,
-    public readonly nodeId: string,
-    public readonly nodeName: string,
-    public readonly success: boolean,
-    public readonly executionTime: number,
-    public readonly output?: any,
-    public readonly error?: string,
-    eventVersion = 1
-  ) {
-    super(aggregateId, eventVersion);
+  public readonly eventType = 'NodeExecuted';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: NodeExecutedData) {
+    super(data.executionId); // Use executionId as aggregateId for node executions
+    this.occurredAt = new Date();
   }
 
   public getEventName(): string {
-    return 'NodeExecuted';
+    return this.eventType;
   }
 
   public getEventData(): Record<string, any> {
     return {
-      executionId: this.executionId,
-      nodeId: this.nodeId,
-      nodeName: this.nodeName,
-      success: this.success,
-      executionTime: this.executionTime,
-      output: this.output,
-      error: this.error,
+      ...this.data,
+      executedAt: this.data.executedAt.toISOString()
     };
   }
+
+  public get executionId(): string { return this.data.executionId; }
+  public get nodeId(): string { return this.data.nodeId; }
+  public get nodeName(): string { return this.data.nodeName; }
+  public get success(): boolean { return this.data.success; }
+  public get executionTime(): number { return this.data.executionTime; }
+  public get executedAt(): Date { return this.data.executedAt; }
+  public get output(): Record<string, any> | undefined { return this.data.output ? { ...this.data.output } : undefined; }
+  public get error(): string | undefined { return this.data.error; }
 }
 
-export class ExecutionPaused extends DomainEvent {
-  constructor(
-    aggregateId: string,
-    public readonly executionId: string,
-    public readonly pausedBy: string,
-    public readonly currentProgress: number,
-    eventVersion = 1
-  ) {
-    super(aggregateId, eventVersion);
+export class ActionNodeExecutionOrderChanged extends DomainEvent {
+  public readonly eventType = 'ActionNodeExecutionOrderChanged';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodeExecutionOrderChangedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
   }
 
   public getEventName(): string {
-    return 'ExecutionPaused';
+    return this.eventType;
   }
 
   public getEventData(): Record<string, any> {
     return {
-      executionId: this.executionId,
-      pausedBy: this.pausedBy,
-      currentProgress: this.currentProgress,
+      ...this.data,
+      changedAt: this.data.changedAt.toISOString()
     };
   }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get oldOrder(): number { return this.data.oldOrder; }
+  public get newOrder(): number { return this.data.newOrder; }
+  public get changedBy(): string { return this.data.changedBy; }
+  public get changedAt(): Date { return this.data.changedAt; }
 }
 
-export class ExecutionResumed extends DomainEvent {
-  constructor(
-    aggregateId: string,
-    public readonly executionId: string,
-    public readonly resumedBy: string,
-    eventVersion = 1
-  ) {
-    super(aggregateId, eventVersion);
+export class ActionNodeExecutionModeChanged extends DomainEvent {
+  public readonly eventType = 'ActionNodeExecutionModeChanged';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodeExecutionModeChangedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
   }
 
   public getEventName(): string {
-    return 'ExecutionResumed';
+    return this.eventType;
   }
 
   public getEventData(): Record<string, any> {
     return {
-      executionId: this.executionId,
-      resumedBy: this.resumedBy,
+      ...this.data,
+      changedAt: this.data.changedAt.toISOString()
     };
   }
+
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get oldMode(): ExecutionMode { return this.data.oldMode; }
+  public get newMode(): ExecutionMode { return this.data.newMode; }
+  public get changedBy(): string { return this.data.changedBy; }
+  public get changedAt(): Date { return this.data.changedAt; }
 }
 
-export class ExecutionCompleted extends DomainEvent {
-  constructor(
-    aggregateId: string,
-    public readonly executionId: string,
-    public readonly success: boolean,
-    public readonly totalExecutionTime: number,
-    public readonly completedNodes: string[],
-    public readonly failedNodes: string[],
-    public readonly finalOutput?: any,
-    eventVersion = 1
-  ) {
-    super(aggregateId, eventVersion);
+export class ActionNodePriorityChanged extends DomainEvent {
+  public readonly eventType = 'ActionNodePriorityChanged';
+  public readonly occurredAt: Date;
+
+  constructor(public readonly data: ActionNodePriorityChangedData) {
+    super(data.modelId);
+    this.occurredAt = new Date();
   }
 
   public getEventName(): string {
-    return 'ExecutionCompleted';
+    return this.eventType;
   }
 
   public getEventData(): Record<string, any> {
     return {
-      executionId: this.executionId,
-      success: this.success,
-      totalExecutionTime: this.totalExecutionTime,
-      completedNodes: this.completedNodes,
-      failedNodes: this.failedNodes,
-      finalOutput: this.finalOutput,
+      ...this.data,
+      changedAt: this.data.changedAt.toISOString()
     };
   }
-}
 
-export class ExecutionFailed extends DomainEvent {
-  constructor(
-    aggregateId: string,
-    public readonly executionId: string,
-    public readonly failureReason: string,
-    public readonly failedNodeId?: string,
-    public readonly failedNodeName?: string,
-    public readonly executionTime?: number,
-    eventVersion = 1
-  ) {
-    super(aggregateId, eventVersion);
-  }
-
-  public getEventName(): string {
-    return 'ExecutionFailed';
-  }
-
-  public getEventData(): Record<string, any> {
-    return {
-      executionId: this.executionId,
-      failureReason: this.failureReason,
-      failedNodeId: this.failedNodeId,
-      failedNodeName: this.failedNodeName,
-      executionTime: this.executionTime,
-    };
-  }
+  public get modelId(): string { return this.data.modelId; }
+  public get actionId(): string { return this.data.actionId; }
+  public get oldPriority(): number { return this.data.oldPriority; }
+  public get newPriority(): number { return this.data.newPriority; }
+  public get changedBy(): string { return this.data.changedBy; }
+  public get changedAt(): Date { return this.data.changedAt; }
 }

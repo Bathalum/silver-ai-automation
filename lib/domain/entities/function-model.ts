@@ -137,7 +137,7 @@ export class FunctionModel {
 
   public updateName(name: ModelName): Result<void> {
     if (this.props.status === ModelStatus.PUBLISHED) {
-      return Result.fail<void>('Cannot modify published model. Create a new version instead.');
+      return Result.fail<void>('Cannot modify published model');
     }
 
     this.props.name = name;
@@ -147,7 +147,7 @@ export class FunctionModel {
 
   public updateDescription(description?: string): Result<void> {
     if (this.props.status === ModelStatus.PUBLISHED) {
-      return Result.fail<void>('Cannot modify published model. Create a new version instead.');
+      return Result.fail<void>('Cannot modify published model');
     }
 
     if (description && description.length > 5000) {
@@ -161,16 +161,16 @@ export class FunctionModel {
 
   public addNode(node: Node): Result<void> {
     if (this.props.status === ModelStatus.PUBLISHED) {
-      return Result.fail<void>('Cannot modify published model. Create a new version instead.');
+      return Result.fail<void>('Cannot modify published model');
     }
 
     if (this.props.nodes.has(node.nodeId.toString())) {
-      return Result.fail<void>('Node with this ID already exists in the model');
+      return Result.fail<void>('Node with this ID already exists');
     }
 
     // Validate node belongs to this model
     if (node.modelId !== this.modelId) {
-      return Result.fail<void>('Node does not belong to this model');
+      return Result.fail<void>('Node belongs to different model');
     }
 
     this.props.nodes.set(node.nodeId.toString(), node);
@@ -180,12 +180,12 @@ export class FunctionModel {
 
   public removeNode(nodeId: NodeId): Result<void> {
     if (this.props.status === ModelStatus.PUBLISHED) {
-      return Result.fail<void>('Cannot modify published model. Create a new version instead.');
+      return Result.fail<void>('Cannot modify published model');
     }
 
     const nodeIdStr = nodeId.toString();
     if (!this.props.nodes.has(nodeIdStr)) {
-      return Result.fail<void>('Node does not exist in the model');
+      return Result.fail<void>('Node not found');
     }
 
     // Check for dependencies
@@ -214,11 +214,11 @@ export class FunctionModel {
 
   public addActionNode(actionNode: ActionNode): Result<void> {
     if (this.props.status === ModelStatus.PUBLISHED) {
-      return Result.fail<void>('Cannot modify published model. Create a new version instead.');
+      return Result.fail<void>('Cannot modify published model');
     }
 
     if (this.props.actionNodes.has(actionNode.actionId.toString())) {
-      return Result.fail<void>('Action node with this ID already exists in the model');
+      return Result.fail<void>('Action with this ID already exists');
     }
 
     // Validate action node belongs to this model
@@ -229,7 +229,7 @@ export class FunctionModel {
     // Validate parent node exists
     const parentNodeExists = this.props.nodes.has(actionNode.parentNodeId.toString());
     if (!parentNodeExists) {
-      return Result.fail<void>('Parent container node does not exist');
+      return Result.fail<void>('Parent node not found');
     }
 
     this.props.actionNodes.set(actionNode.actionId.toString(), actionNode);
@@ -239,7 +239,7 @@ export class FunctionModel {
 
   public removeActionNode(actionId: NodeId): Result<void> {
     if (this.props.status === ModelStatus.PUBLISHED) {
-      return Result.fail<void>('Cannot modify published model. Create a new version instead.');
+      return Result.fail<void>('Cannot modify published model');
     }
 
     const actionIdStr = actionId.toString();
@@ -256,10 +256,19 @@ export class FunctionModel {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Validate at least one IO node exists
-    const ioNodes = Array.from(this.props.nodes.values()).filter(node => node instanceof IONode);
-    if (ioNodes.length === 0) {
-      errors.push('Workflow must have at least one IO node');
+    // Validate IO node requirements
+    const ioNodes = Array.from(this.props.nodes.values()).filter(node => node instanceof IONode) as IONode[];
+    
+    // Always check for specific input and output nodes
+    const inputNodes = ioNodes.filter(node => node.ioData.boundaryType === 'input' || node.ioData.boundaryType === 'input-output');
+    const outputNodes = ioNodes.filter(node => node.ioData.boundaryType === 'output' || node.ioData.boundaryType === 'input-output');
+    
+    if (inputNodes.length === 0) {
+      errors.push('Workflow must have at least one input node');
+    }
+    
+    if (outputNodes.length === 0) {
+      errors.push('Workflow must have at least one output node');
     }
 
     // Validate node dependencies don't create cycles
@@ -302,6 +311,32 @@ export class FunctionModel {
       warnings.push('Consider adding stage nodes for better workflow organization');
     }
 
+    // Check for orphaned nodes (nodes with no connections and no actions)
+    Array.from(this.props.nodes.values()).forEach(node => {
+      const hasIncomingConnections = Array.from(this.props.nodes.values()).some(otherNode => 
+        otherNode.dependencies.some(dep => dep.equals(node.nodeId))
+      );
+      const hasOutgoingConnections = node.dependencies.length > 0;
+      const hasActions = Array.from(this.props.actionNodes.values()).some(action => 
+        action.parentNodeId.equals(node.nodeId)
+      );
+      
+      // Warn about orphaned nodes (exclude IO nodes as they have special connection rules)
+      if (!hasIncomingConnections && !hasOutgoingConnections && !hasActions && !(node instanceof IONode)) {
+        warnings.push(`Node "${node.name}" has no connections`);
+      }
+    });
+
+    // Check for stage nodes without actions
+    stageNodes.forEach(stageNode => {
+      const hasActions = Array.from(this.props.actionNodes.values()).some(action => 
+        action.parentNodeId.equals(stageNode.nodeId)
+      );
+      if (!hasActions) {
+        warnings.push(`Stage node "${stageNode.name}" has no actions`);
+      }
+    });
+
     return Result.ok<ValidationResult>({
       isValid: errors.length === 0,
       errors,
@@ -310,6 +345,14 @@ export class FunctionModel {
   }
 
   public publish(): Result<void> {
+    if (this.props.status === ModelStatus.PUBLISHED) {
+      return Result.fail<void>('Model is already published');
+    }
+    
+    if (this.props.status === ModelStatus.ARCHIVED) {
+      return Result.fail<void>('Cannot publish archived model');
+    }
+    
     if (this.props.status !== ModelStatus.DRAFT) {
       return Result.fail<void>('Only draft models can be published');
     }
@@ -321,7 +364,7 @@ export class FunctionModel {
 
     const validation = validationResult.value;
     if (!validation.isValid) {
-      return Result.fail<void>(`Cannot publish model with validation errors: ${validation.errors.join(', ')}`);
+      return Result.fail<void>('Cannot publish invalid workflow');
     }
 
     this.props.status = ModelStatus.PUBLISHED;
@@ -340,17 +383,19 @@ export class FunctionModel {
     return Result.ok<void>(undefined);
   }
 
-  public softDelete(deletedBy: string): Result<void> {
+  public isDeleted(): boolean {
+    return this.props.deletedAt !== undefined;
+  }
+
+  public softDelete(deletedBy?: string): Result<void> {
     if (this.props.deletedAt) {
       return Result.fail<void>('Model is already deleted');
     }
 
-    if (!deletedBy || deletedBy.trim().length === 0) {
-      return Result.fail<void>('Deleted by user ID is required');
-    }
-
     this.props.deletedAt = new Date();
-    this.props.deletedBy = deletedBy.trim();
+    if (deletedBy) {
+      this.props.deletedBy = deletedBy.trim();
+    }
     this.props.status = ModelStatus.ARCHIVED;
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
@@ -416,7 +461,7 @@ export class FunctionModel {
     for (const nodeId of Array.from(this.props.nodes.keys())) {
       if (!visited.has(nodeId)) {
         if (hasCycle(nodeId)) {
-          return Result.fail<void>('Circular dependency detected in node dependencies');
+          return Result.fail<void>('Circular dependency detected');
         }
       }
     }
@@ -436,7 +481,138 @@ export class FunctionModel {
     return Result.ok<void>(undefined);
   }
 
+  public addContainerNode(node: Node): Result<void> {
+    if (this.isDeleted()) {
+      return Result.fail<void>('Cannot modify deleted model');
+    }
+
+    if (this.props.status === ModelStatus.PUBLISHED) {
+      return Result.fail<void>('Cannot modify published model');
+    }
+
+    if (this.props.status === ModelStatus.ARCHIVED) {
+      return Result.fail<void>('Cannot modify archived model');
+    }
+
+    if (this.props.nodes.has(node.nodeId.toString())) {
+      return Result.fail<void>('Node with this ID already exists');
+    }
+
+    // Validate node belongs to this model
+    if (node.modelId !== this.modelId) {
+      return Result.fail<void>('Node belongs to different model');
+    }
+
+    this.props.nodes.set(node.nodeId.toString(), node);
+    this.props.updatedAt = new Date();
+    return Result.ok<void>(undefined);
+  }
+
+  public calculateStatistics(): any {
+    const totalNodes = this.props.nodes.size;
+    const totalActions = this.props.actionNodes.size;
+    
+    // Calculate complexity based on connections and nodes
+    const averageComplexity = totalNodes > 0 ? (totalActions / totalNodes) : 0;
+    
+    // Calculate node type breakdown
+    const nodeTypeBreakdown: Record<string, number> = {};
+    Array.from(this.props.nodes.values()).forEach(node => {
+      const nodeType = node.constructor.name.toLowerCase();
+      const key = nodeType.replace('node', 'Node');
+      nodeTypeBreakdown[key] = (nodeTypeBreakdown[key] || 0) + 1;
+    });
+    
+    // Calculate action type breakdown
+    const actionTypeBreakdown: Record<string, number> = {};
+    Array.from(this.props.actionNodes.values()).forEach(action => {
+      const actionType = action.constructor.name.toLowerCase();
+      const key = actionType.replace('node', 'Node');
+      actionTypeBreakdown[key] = (actionTypeBreakdown[key] || 0) + 1;
+    });
+    
+    // Calculate maximum dependency depth
+    const maxDependencyDepth = this.calculateMaxDependencyDepth();
+    
+    return {
+      totalNodes,
+      totalActions,
+      averageComplexity,
+      containerNodeCount: totalNodes,
+      actionNodeCount: totalActions,
+      containerNodes: totalNodes,
+      actionNodes: totalActions,
+      nodeTypeBreakdown,
+      actionTypeBreakdown,
+      maxDependencyDepth
+    };
+  }
+
+  private calculateMaxDependencyDepth(): number {
+    const visited = new Set<string>();
+    const getDepth = (nodeId: string, currentDepth: number): number => {
+      if (visited.has(nodeId)) return currentDepth;
+      visited.add(nodeId);
+      
+      const node = this.props.nodes.get(nodeId);
+      if (!node || node.dependencies.length === 0) {
+        return currentDepth;
+      }
+      
+      const maxChildDepth = Math.max(...node.dependencies.map(dep => 
+        getDepth(dep.toString(), currentDepth + 1)
+      ));
+      
+      return maxChildDepth;
+    };
+    
+    return Math.max(0, ...Array.from(this.props.nodes.keys()).map(nodeId => getDepth(nodeId, 0)));
+  }
+
+  public updateLastSaved(timestamp: Date): void {
+    this.props.lastSavedAt = timestamp;
+  }
+
+  public removeContainerNode(nodeId: NodeId): Result<void> {
+    // Container nodes are just nodes, so delegate to removeNode
+    return this.removeNode(nodeId);
+  }
+
   public equals(other: FunctionModel): boolean {
     return this.modelId === other.modelId;
+  }
+
+  public createVersion(newVersionString: string): Result<FunctionModel> {
+    if (this.props.status !== ModelStatus.PUBLISHED) {
+      return Result.fail<FunctionModel>('Can only create version from published model');
+    }
+
+    const newVersionResult = Version.create(newVersionString);
+    if (newVersionResult.isFailure) {
+      return Result.fail<FunctionModel>(newVersionResult.error);
+    }
+
+    const newVersion = newVersionResult.value;
+    
+    // Check if new version is greater than current
+    if (!newVersion.isGreaterThan(this.props.version)) {
+      return Result.fail<FunctionModel>('New version must be greater than current version');
+    }
+
+    // Create new model instance with incremented version
+    const newModelProps: FunctionModelProps = {
+      ...this.props,
+      version: newVersion,
+      currentVersion: newVersion,
+      status: ModelStatus.DRAFT,
+      versionCount: this.props.versionCount + 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSavedAt: new Date(),
+      deletedAt: undefined,
+      deletedBy: undefined,
+    };
+
+    return Result.ok<FunctionModel>(new FunctionModel(newModelProps));
   }
 }

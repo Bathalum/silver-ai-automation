@@ -35,19 +35,22 @@ describe('StageNode', () => {
     });
 
     it('should create stage node with custom properties', () => {
+      // Arrange
+      const customId = crypto.randomUUID();
+      
       // Act
       const node = new StageNodeBuilder()
-        .withId('custom-stage-id')
+        .withId(customId)
         .withName('Custom Stage')
         .withModelId('test-model')
         .withPosition(300, 400)
         .withTimeout(30000)
         .withParallelExecution(true)
-        .withRetryPolicy({ maxAttempts: 5, strategy: 'exponential' })
+        .withRetryPolicy({ maxAttempts: 5, strategy: 'exponential', baseDelayMs: 1000, maxDelayMs: 10000, enabled: true })
         .build();
 
       // Assert
-      expect(node.nodeId.toString()).toBe('custom-stage-id');
+      expect(node.nodeId.toString()).toBe(customId);
       expect(node.position.x).toBe(300);
       expect(node.position.y).toBe(400);
       expect(node.timeout).toBe(30000);
@@ -155,14 +158,15 @@ describe('StageNode', () => {
   describe('action node management', () => {
     it('should add action node successfully', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Test Stage')
         .withModelId('test-model')
         .build();
 
       const actionNode = new TetherNodeBuilder()
-        .withParentNode('stage-id')
+        .withParentNode(stageId)
         .withModelId('test-model')
         .build();
 
@@ -177,14 +181,15 @@ describe('StageNode', () => {
 
     it('should reject action node from different model', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Test Stage')
         .withModelId('test-model')
         .build();
 
       const actionNode = new TetherNodeBuilder()
-        .withParentNode('stage-id')
+        .withParentNode(stageId)
         .withModelId('different-model') // Different model
         .build();
 
@@ -198,14 +203,16 @@ describe('StageNode', () => {
 
     it('should reject action node with different parent', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Test Stage')
         .withModelId('test-model')
         .build();
 
+      const differentParentId = crypto.randomUUID();
       const actionNode = new TetherNodeBuilder()
-        .withParentNode('different-parent-id') // Different parent
+        .withParentNode(differentParentId) // Different parent
         .withModelId('test-model')
         .build();
 
@@ -219,15 +226,17 @@ describe('StageNode', () => {
 
     it('should prevent duplicate action nodes', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Test Stage')
         .withModelId('test-model')
         .build();
 
+      const actionId = crypto.randomUUID();
       const actionNode = new TetherNodeBuilder()
-        .withId('action-id')
-        .withParentNode('stage-id')
+        .withId(actionId)
+        .withParentNode(stageId)
         .withModelId('test-model')
         .build();
 
@@ -243,15 +252,17 @@ describe('StageNode', () => {
 
     it('should remove action node successfully', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Test Stage')
         .withModelId('test-model')
         .build();
 
+      const actionId = crypto.randomUUID();
       const actionNode = new TetherNodeBuilder()
-        .withId('action-id')
-        .withParentNode('stage-id')
+        .withId(actionId)
+        .withParentNode(stageId)
         .withModelId('test-model')
         .build();
 
@@ -259,7 +270,7 @@ describe('StageNode', () => {
       expect(stageNode.getActionCount()).toBe(1);
 
       // Act
-      const result = stageNode.removeActionNode('action-id');
+      const result = stageNode.removeActionNode(actionId);
 
       // Assert
       expect(result).toBeValidResult();
@@ -284,15 +295,16 @@ describe('StageNode', () => {
 
     it('should clear all action nodes', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Test Stage')
         .withModelId('test-model')
         .build();
 
       // Add multiple actions
-      const action1 = new TetherNodeBuilder().withParentNode('stage-id').withModelId('test-model').build();
-      const action2 = new TetherNodeBuilder().withParentNode('stage-id').withModelId('test-model').build();
+      const action1 = new TetherNodeBuilder().withId(crypto.randomUUID()).withParentNode(stageId).withModelId('test-model').build();
+      const action2 = new TetherNodeBuilder().withId(crypto.randomUUID()).withParentNode(stageId).withModelId('test-model').build();
       
       stageNode.addActionNode(action1);
       stageNode.addActionNode(action2);
@@ -452,8 +464,9 @@ describe('StageNode', () => {
   describe('performance and complexity analysis', () => {
     it('should calculate stage complexity based on actions', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Complex Stage')
         .withModelId('test-model')
         .build();
@@ -461,7 +474,8 @@ describe('StageNode', () => {
       // Add multiple actions to increase complexity
       for (let i = 0; i < 5; i++) {
         const action = new TetherNodeBuilder()
-          .withParentNode('stage-id')
+          .withId(crypto.randomUUID())
+          .withParentNode(stageId)
           .withModelId('test-model')
           .build();
         stageNode.addActionNode(action);
@@ -477,8 +491,9 @@ describe('StageNode', () => {
 
     it('should estimate execution time based on actions and configuration', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Timed Stage')
         .withModelId('test-model')
         .withTimeout(30000)
@@ -486,7 +501,7 @@ describe('StageNode', () => {
 
       // Add some actions
       const action = new TetherNodeBuilder()
-        .withParentNode('stage-id')
+        .withParentNode(stageId)
         .withModelId('test-model')
         .build();
       stageNode.addActionNode(action);
@@ -501,8 +516,9 @@ describe('StageNode', () => {
 
     it('should analyze resource requirements', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const stageNode = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Resource Intensive Stage')
         .withModelId('test-model')
         .withParallelExecution(true)
@@ -511,7 +527,8 @@ describe('StageNode', () => {
       // Add multiple parallel actions
       for (let i = 0; i < 3; i++) {
         const action = new TetherNodeBuilder()
-          .withParentNode('stage-id')
+          .withId(crypto.randomUUID())
+          .withParentNode(stageId)
           .withModelId('test-model')
           .build();
         stageNode.addActionNode(action);
@@ -531,8 +548,9 @@ describe('StageNode', () => {
   describe('serialization', () => {
     it('should convert to object representation', () => {
       // Arrange
+      const serialId = crypto.randomUUID();
       const node = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(serialId)
         .withName('Test Stage')
         .withModelId('test-model')
         .withDescription('Test description')
@@ -545,7 +563,7 @@ describe('StageNode', () => {
 
       // Assert
       expect(obj).toEqual({
-        nodeId: 'stage-id',
+        nodeId: serialId,
         name: 'Test Stage',
         modelId: 'test-model',
         description: 'Test description',
@@ -565,14 +583,16 @@ describe('StageNode', () => {
 
     it('should create from object representation', () => {
       // Arrange
+      const objId = crypto.randomUUID();
+      const depId = crypto.randomUUID();
       const obj = {
-        nodeId: 'stage-id',
+        nodeId: objId,
         name: 'Test Stage',
         modelId: 'test-model',
         description: 'Test description',
         nodeType: 'stageNode',
         position: { x: 100, y: 200 },
-        dependencies: ['dep1'],
+        dependencies: [depId],
         timeout: 15000,
         parallelExecution: false,
         retryPolicy: {
@@ -595,7 +615,7 @@ describe('StageNode', () => {
       // Assert
       expect(result).toBeValidResult();
       const node = result.value;
-      expect(node.nodeId.toString()).toBe('stage-id');
+      expect(node.nodeId.toString()).toBe(objId);
       expect(node.timeout).toBe(15000);
       expect(node.parallelExecution).toBe(false);
       expect(node.retryPolicy?.maxAttempts).toBe(3);
@@ -624,7 +644,9 @@ describe('StageNode', () => {
 
     it('should warn about performance anti-patterns', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const node = new StageNodeBuilder()
+        .withId(stageId)
         .withName('Problematic Stage')
         .withModelId('test-model')
         .withTimeout(1000) // Very short timeout
@@ -634,7 +656,8 @@ describe('StageNode', () => {
       // Add many actions that should be parallel
       for (let i = 0; i < 10; i++) {
         const action = new TetherNodeBuilder()
-          .withParentNode(node.nodeId.toString())
+          .withId(crypto.randomUUID())
+          .withParentNode(stageId)
           .withModelId('test-model')
           .build();
         node.addActionNode(action);
@@ -650,19 +673,21 @@ describe('StageNode', () => {
 
     it('should prevent circular dependencies in stage configuration', () => {
       // Arrange
+      const stageId = crypto.randomUUID();
       const node = new StageNodeBuilder()
-        .withId('stage-id')
+        .withId(stageId)
         .withName('Self Referencing Stage')
         .withModelId('test-model')
         .build();
 
       // Act - Try to add dependency to itself
-      node.addDependency('stage-id');
+      const addResult = node.addDependency(stageId);
       const result = node.validate();
 
       // Assert
-      expect(result).toBeValidResult();
-      expect(result.value.errors).toContain('Node cannot depend on itself');
+      expect(addResult).toBeFailureResult();
+      expect(addResult).toHaveErrorMessage('Node cannot depend on itself');
+      expect(result).toBeValidResult(); // Validation should pass since the dependency wasn't added
     });
   });
 

@@ -1,69 +1,83 @@
-# 🧠 **Unified Implementation Planning Protocol**
+# 🧠 **Implementation Planning Protocol**
 
-*A rigorous protocol for engineers and AI agents tasked with implementing code safely, scalably, and contextually.*
-
----
-
-## 🧭 Role & Mindset
-
-You are a methodical, system-aware engineer (human or AI) responsible for implementing features or changes only **after achieving full contextual clarity**. You **do not guess**, **do not assume**, and **never rush to code**.
+*A rigorous protocol for planning, implementing, and tracking code changes with Clean Architecture compliance and comprehensive testing.*
 
 ---
 
-## 🧩 Instructions
+## 🎯 **Core Principles**
 
-### 1. **Do Not Begin with Implementation.**
-
-Begin by slowing down to gather **complete context**:
-
-* What is the exact feature, problem, or requested change?
-* What is the desired outcome or behavior?
-* What Clean Architecture layers will this affect (Entities, Use Cases, Interface Adapters, Frameworks & Drivers)?
-* What triggers or user actions are involved?
-* Are there existing flows this will integrate with or disrupt?
-* What assumptions are being made — and which ones need verification?
-* Are there performance, security, or compatibility requirements?
-* Are there known constraints or recent changes in the system?
+1. **Context First**: Fully understand the system before coding
+2. **Architecture Compliance**: Maintain Clean Architecture boundaries
+3. **Testing Requirements**: No feature is complete without tests
+4. **Honest Assessment**: Accurate status tracking with clear criteria
 
 ---
 
-### 2. **Trace the Current System First.**
+## 📊 **Implementation Status Matrix**
 
-Before proposing solutions:
+### **Status Criteria Definitions**
 
-* Navigate the real system: inspect the codebase, logs, runtime data, or documentation.
-* Understand the **start-to-end execution flow** relevant to the change.
-* Identify all involved modules, functions, inputs, state updates, service calls, and side effects.
-* Map **dependencies and second-order effects**:
+**100% Complete**:
+- ✅ Compiles without errors
+- ✅ Follows Clean Architecture (proper dependency direction)
+- ✅ Has comprehensive unit tests (>80% coverage)
+- ✅ Has integration tests for key workflows
+- ✅ Business logic properly encapsulated in entities
+- ✅ All interfaces defined in inner layers
 
-  * What relies on this?
-  * How might this impact other modules or future extensibility?
+**75-95% Complete**:
+- ✅ Compiles without errors
+- ✅ Architecturally sound
+- ⚠️ Missing some tests or minor compliance issues
+
+**50-75% Complete**:
+- ✅ Core functionality implemented
+- ⚠️ Some compilation issues or architectural concerns
+- ❌ Limited or no testing
+
+**<50% Complete**:
+- ❌ Significant gaps in implementation
+- ❌ May not compile or function properly
+
+### **Standard Implementation Matrix**
+
+| Component | Status | Testing Status | Priority | Est. Fix Time |
+|-----------|--------|----------------|----------|---------------|
+| **Component Name** | % Complete + Description | Test Coverage Status | Priority Level | Time Estimate |
+
+**Testing Status Options**:
+- ✅ **Complete** (Unit + Integration tests, >80% coverage)
+- 🟨 **Partial** (Some tests, <80% coverage)  
+- ❌ **Missing** (No tests)
+- 🚫 **Blocked** (Cannot test due to dependencies)
 
 ---
 
-### 3. **Mentally Draft and Question Your Solution.**
+## 🔄 **Planning Process**
 
-After investigation:
+### **Phase 1: Context Gathering**
+- Map current system architecture
+- Identify affected Clean Architecture layers
+- Document dependencies and integration points
+- Verify business requirements and constraints
 
-* Mentally draft a solution (still no code).
-* Question it:
+### **Phase 2: Architecture Design**
+- Design entities and business rules (innermost layer)
+- Define use case interfaces and workflows
+- Plan adapter interfaces and implementations
+- Ensure dependency inversion compliance
 
-  * Is this minimal and sufficient?
-  * What are the risks, regressions, or inconsistencies?
-  * What are the edge cases, failure scenarios, and load implications?
-  * What happens under scale or unexpected input?
-* Consider alternatives. Challenge assumptions. Test theories manually if needed.
+### **Phase 3: Implementation Strategy**
+- Implement layer by layer (inside-out)
+- Write tests for each layer before moving outward
+- Validate Clean Architecture compliance at each step
+- Document any architectural decisions or trade-offs
 
----
-
-### 4. **Only Then: Plan Implementation.**
-
-Now write:
-
-* A **1-line summary** of the intended change.
-* A **step-by-step plan** broken into safe, testable chunks.
-* A **compatibility review**: how it integrates without breaking current behavior.
-* A **reflection** on long-term impact, tech debt, testability, or UX consequences.
+### **Phase 4: Testing & Validation**
+- Unit tests for domain logic (entities, value objects)
+- Integration tests for use cases and workflows
+- End-to-end tests for critical user journeys
+- Architecture compliance verification
 
 ---
 

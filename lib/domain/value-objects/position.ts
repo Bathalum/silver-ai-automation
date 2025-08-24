@@ -7,7 +7,10 @@ export class Position {
   private constructor(
     private readonly _x: number,
     private readonly _y: number
-  ) {}
+  ) {
+    // Make the instance immutable at runtime
+    Object.freeze(this);
+  }
 
   public get x(): number {
     return this._x;

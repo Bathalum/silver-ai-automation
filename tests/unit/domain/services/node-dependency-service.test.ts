@@ -8,7 +8,8 @@ import { ContainerNode } from '@/lib/domain/entities';
 import { 
   IONodeBuilder, 
   StageNodeBuilder,
-  TestFactories 
+  TestFactories,
+  getTestUUID
 } from '../../../utils/test-fixtures';
 import { ResultTestHelpers } from '../../../utils/test-helpers';
 
@@ -25,28 +26,28 @@ describe('NodeDependencyService', () => {
       const modelId = 'test-model';
       
       const inputNode = new IONodeBuilder()
-        .withId('input')
+        .withId('123e4567-e89b-42d3-a456-426614174001')
         .withModelId(modelId)
         .withName('Input')
         .asInput()
         .build();
       
       const stageNode = new StageNodeBuilder()
-        .withId('stage')
+        .withId('123e4567-e89b-42d3-a456-426614174002')
         .withModelId(modelId)
         .withName('Stage')
         .build();
       
       const outputNode = new IONodeBuilder()
-        .withId('output')
+        .withId('123e4567-e89b-42d3-a456-426614174003')
         .withModelId(modelId)
         .withName('Output')
         .asOutput()
         .build();
 
       // Create dependencies: stage depends on input, output depends on stage
-      stageNode.addDependency('input');
-      outputNode.addDependency('stage');
+      stageNode.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      outputNode.addDependency('123e4567-e89b-42d3-a456-426614174002');
       
       const nodes = [inputNode, stageNode, outputNode];
 
@@ -57,13 +58,13 @@ describe('NodeDependencyService', () => {
       expect(result).toBeValidResult();
       const graph = result.value;
       
-      expect(graph.has('input')).toBe(true);
-      expect(graph.has('stage')).toBe(true);
-      expect(graph.has('output')).toBe(true);
+      expect(graph.nodes.has('123e4567-e89b-42d3-a456-426614174001')).toBe(true);
+      expect(graph.nodes.has('123e4567-e89b-42d3-a456-426614174002')).toBe(true);
+      expect(graph.nodes.has('123e4567-e89b-42d3-a456-426614174003')).toBe(true);
       
-      expect(graph.get('input')?.dependencies).toEqual([]);
-      expect(graph.get('stage')?.dependencies).toEqual(['input']);
-      expect(graph.get('output')?.dependencies).toEqual(['stage']);
+      expect(graph.reverseDependencies.get('123e4567-e89b-42d3-a456-426614174001')).toEqual([]);
+      expect(graph.reverseDependencies.get('123e4567-e89b-42d3-a456-426614174002')).toEqual(['123e4567-e89b-42d3-a456-426614174001']);
+      expect(graph.reverseDependencies.get('123e4567-e89b-42d3-a456-426614174003')).toEqual(['123e4567-e89b-42d3-a456-426614174002']);
     });
 
     it('should build complex dependency graph', () => {
@@ -71,7 +72,7 @@ describe('NodeDependencyService', () => {
       const modelId = 'test-model';
       
       const inputNode = new IONodeBuilder()
-        .withId('input')
+        .withId('123e4567-e89b-42d3-a456-426614174001')
         .withModelId(modelId)
         .asInput()
         .build();
@@ -92,17 +93,33 @@ describe('NodeDependencyService', () => {
         .build();
       
       const outputNode = new IONodeBuilder()
-        .withId('output')
+        .withId('123e4567-e89b-42d3-a456-426614174003')
         .withModelId(modelId)
         .asOutput()
         .build();
 
-      // Create diamond dependencies
-      stageA.addDependency('input');
-      stageB.addDependency('input');
-      mergeStage.addDependency('stage-a');
-      mergeStage.addDependency('stage-b');
-      outputNode.addDependency('merge');
+      // Create diamond dependencies using actual node UUIDs
+      const inputUUID = '123e4567-e89b-42d3-a456-426614174001';
+      const stageAUUID = stageA.nodeId.value;
+      const stageBUUID = stageB.nodeId.value;
+      const mergeUUID = mergeStage.nodeId.value;
+      
+      console.log('Actual node UUIDs:');
+      console.log('stageA ->', stageAUUID);
+      console.log('stageB ->', stageBUUID);
+      console.log('merge ->', mergeUUID);
+      
+      console.log('Adding dependencies...');
+      const dep1 = stageA.addDependency(inputUUID);
+      console.log('stageA.addDependency result:', dep1);
+      const dep2 = stageB.addDependency(inputUUID);
+      console.log('stageB.addDependency result:', dep2);
+      const dep3 = mergeStage.addDependency(stageAUUID);
+      console.log('mergeStage.addDependency(stageA) result:', dep3);
+      const dep4 = mergeStage.addDependency(stageBUUID);
+      console.log('mergeStage.addDependency(stageB) result:', dep4);
+      const dep5 = outputNode.addDependency(mergeUUID);
+      console.log('outputNode.addDependency result:', dep5);
       
       const nodes = [inputNode, stageA, stageB, mergeStage, outputNode];
 
@@ -113,17 +130,27 @@ describe('NodeDependencyService', () => {
       expect(result).toBeValidResult();
       const graph = result.value;
       
-      expect(graph.get('stage-a')?.dependencies).toEqual(['input']);
-      expect(graph.get('stage-b')?.dependencies).toEqual(['input']);
-      expect(graph.get('merge')?.dependencies.sort()).toEqual(['stage-a', 'stage-b']);
-      expect(graph.get('output')?.dependencies).toEqual(['merge']);
+      // Debug: Check what's in the graph
+      console.log('All node keys in graph:', Array.from(graph.nodes.keys()));
+      console.log('All reverse dependency keys:', Array.from(graph.reverseDependencies.keys()));
+      console.log('stageAUUID:', stageAUUID);
+      console.log('Reverse deps for stageA:', graph.reverseDependencies.get(stageAUUID));
+      
+      // Test using proper DependencyGraph interface with UUIDs
+      const outputUUID = '123e4567-e89b-42d3-a456-426614174003';
+      
+      expect(graph.reverseDependencies.get(stageAUUID)).toEqual([inputUUID]);
+      expect(graph.reverseDependencies.get(stageBUUID)).toEqual([inputUUID]);
+      expect(graph.reverseDependencies.get(mergeUUID)?.sort()).toEqual([stageAUUID, stageBUUID].sort());
+      expect(graph.reverseDependencies.get(outputUUID)).toEqual([mergeUUID]);
     });
 
     it('should handle nodes with no dependencies', () => {
       // Arrange
       const modelId = 'test-model';
+      const inputNodeId = '123e4567-e89b-42d3-a456-426614174001';
       const inputNode = new IONodeBuilder()
-        .withId('input')
+        .withId(inputNodeId)
         .withModelId(modelId)
         .asInput()
         .build();
@@ -136,14 +163,14 @@ describe('NodeDependencyService', () => {
       // Assert
       expect(result).toBeValidResult();
       const graph = result.value;
-      expect(graph.get('input')?.dependencies).toEqual([]);
+      expect(graph.nodes.get(inputNodeId)?.dependencies).toEqual([]);
     });
 
     it('should reject nodes with invalid dependency references', () => {
       // Arrange
       const modelId = 'test-model';
       const stageNode = new StageNodeBuilder()
-        .withId('stage')
+        .withId('123e4567-e89b-42d3-a456-426614174002')
         .withModelId(modelId)
         .build();
 
@@ -288,12 +315,12 @@ describe('NodeDependencyService', () => {
     it('should calculate correct execution order for linear chain', () => {
       // Arrange - Input -> Stage -> Output
       const modelId = 'test-model';
-      const inputNode = new IONodeBuilder().withId('input').withModelId(modelId).asInput().build();
-      const stageNode = new StageNodeBuilder().withId('stage').withModelId(modelId).build();
-      const outputNode = new IONodeBuilder().withId('output').withModelId(modelId).asOutput().build();
+      const inputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174001').withModelId(modelId).asInput().build();
+      const stageNode = new StageNodeBuilder().withId('123e4567-e89b-42d3-a456-426614174002').withModelId(modelId).build();
+      const outputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174003').withModelId(modelId).asOutput().build();
       
-      stageNode.addDependency('input');
-      outputNode.addDependency('stage');
+      stageNode.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      outputNode.addDependency('123e4567-e89b-42d3-a456-426614174002');
       
       const nodes = [outputNode, stageNode, inputNode]; // Intentionally out of order
       const graph = ResultTestHelpers.expectSuccess(
@@ -311,14 +338,14 @@ describe('NodeDependencyService', () => {
     it('should handle parallel execution paths correctly', () => {
       // Arrange - Diamond: Input -> (A, B) -> Merge -> Output
       const modelId = 'test-model';
-      const inputNode = new IONodeBuilder().withId('input').withModelId(modelId).asInput().build();
+      const inputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174001').withModelId(modelId).asInput().build();
       const stageA = new StageNodeBuilder().withId('stage-a').withModelId(modelId).build();
       const stageB = new StageNodeBuilder().withId('stage-b').withModelId(modelId).build();
       const mergeNode = new StageNodeBuilder().withId('merge').withModelId(modelId).build();
-      const outputNode = new IONodeBuilder().withId('output').withModelId(modelId).asOutput().build();
+      const outputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174003').withModelId(modelId).asOutput().build();
       
-      stageA.addDependency('input');
-      stageB.addDependency('input');
+      stageA.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      stageB.addDependency('123e4567-e89b-42d3-a456-426614174001');
       mergeNode.addDependency('stage-a');
       mergeNode.addDependency('stage-b');
       outputNode.addDependency('merge');
@@ -379,8 +406,8 @@ describe('NodeDependencyService', () => {
       const nodeMap = new Map(nodes.map(n => [n.nodeId.toString(), n]));
       
       // Build tree: input -> (a->c, b->d) -> (merge1, merge2) -> output
-      nodeMap.get('a')!.addDependency('input');
-      nodeMap.get('b')!.addDependency('input');
+      nodeMap.get('a')!.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      nodeMap.get('b')!.addDependency('123e4567-e89b-42d3-a456-426614174001');
       nodeMap.get('c')!.addDependency('a');
       nodeMap.get('d')!.addDependency('b');
       nodeMap.get('merge1')!.addDependency('c');
@@ -414,12 +441,12 @@ describe('NodeDependencyService', () => {
     it('should find all reachable nodes from start node', () => {
       // Arrange - Linear chain
       const modelId = 'test-model';
-      const inputNode = new IONodeBuilder().withId('input').withModelId(modelId).asInput().build();
-      const stageNode = new StageNodeBuilder().withId('stage').withModelId(modelId).build();
-      const outputNode = new IONodeBuilder().withId('output').withModelId(modelId).asOutput().build();
+      const inputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174001').withModelId(modelId).asInput().build();
+      const stageNode = new StageNodeBuilder().withId('123e4567-e89b-42d3-a456-426614174002').withModelId(modelId).build();
+      const outputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174003').withModelId(modelId).asOutput().build();
       
-      stageNode.addDependency('input');
-      outputNode.addDependency('stage');
+      stageNode.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      outputNode.addDependency('123e4567-e89b-42d3-a456-426614174002');
       
       const nodes = [inputNode, stageNode, outputNode];
       const graph = ResultTestHelpers.expectSuccess(
@@ -437,13 +464,13 @@ describe('NodeDependencyService', () => {
     it('should handle branching paths correctly', () => {
       // Arrange - Diamond pattern
       const modelId = 'test-model';
-      const inputNode = new IONodeBuilder().withId('input').withModelId(modelId).asInput().build();
+      const inputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174001').withModelId(modelId).asInput().build();
       const stageA = new StageNodeBuilder().withId('stage-a').withModelId(modelId).build();
       const stageB = new StageNodeBuilder().withId('stage-b').withModelId(modelId).build();
-      const outputNode = new IONodeBuilder().withId('output').withModelId(modelId).asOutput().build();
+      const outputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174003').withModelId(modelId).asOutput().build();
       
-      stageA.addDependency('input');
-      stageB.addDependency('input');
+      stageA.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      stageB.addDependency('123e4567-e89b-42d3-a456-426614174001');
       outputNode.addDependency('stage-a');
       outputNode.addDependency('stage-b');
       
@@ -495,12 +522,12 @@ describe('NodeDependencyService', () => {
     it('should calculate correct depth for linear chain', () => {
       // Arrange - Input(0) -> Stage(1) -> Output(2)
       const modelId = 'test-model';
-      const inputNode = new IONodeBuilder().withId('input').withModelId(modelId).asInput().build();
-      const stageNode = new StageNodeBuilder().withId('stage').withModelId(modelId).build();
-      const outputNode = new IONodeBuilder().withId('output').withModelId(modelId).asOutput().build();
+      const inputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174001').withModelId(modelId).asInput().build();
+      const stageNode = new StageNodeBuilder().withId('123e4567-e89b-42d3-a456-426614174002').withModelId(modelId).build();
+      const outputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174003').withModelId(modelId).asOutput().build();
       
-      stageNode.addDependency('input');
-      outputNode.addDependency('stage');
+      stageNode.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      outputNode.addDependency('123e4567-e89b-42d3-a456-426614174002');
       
       const nodes = [inputNode, stageNode, outputNode];
       const graph = ResultTestHelpers.expectSuccess(
@@ -516,14 +543,14 @@ describe('NodeDependencyService', () => {
     it('should handle diamond pattern depths correctly', () => {
       // Arrange - Diamond: Input(0) -> A,B(1) -> Merge(2) -> Output(3)
       const modelId = 'test-model';
-      const inputNode = new IONodeBuilder().withId('input').withModelId(modelId).asInput().build();
+      const inputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174001').withModelId(modelId).asInput().build();
       const stageA = new StageNodeBuilder().withId('stage-a').withModelId(modelId).build();
       const stageB = new StageNodeBuilder().withId('stage-b').withModelId(modelId).build();
       const mergeNode = new StageNodeBuilder().withId('merge').withModelId(modelId).build();
-      const outputNode = new IONodeBuilder().withId('output').withModelId(modelId).asOutput().build();
+      const outputNode = new IONodeBuilder().withId('123e4567-e89b-42d3-a456-426614174003').withModelId(modelId).asOutput().build();
       
-      stageA.addDependency('input');
-      stageB.addDependency('input');
+      stageA.addDependency('123e4567-e89b-42d3-a456-426614174001');
+      stageB.addDependency('123e4567-e89b-42d3-a456-426614174001');
       mergeNode.addDependency('stage-a');
       mergeNode.addDependency('stage-b');
       outputNode.addDependency('merge');
@@ -560,7 +587,7 @@ describe('NodeDependencyService', () => {
 
       // Assert
       expect(result).toBeValidResult();
-      expect(result.value.size).toBe(0);
+      expect(result.value.nodes.size).toBe(0);
     });
 
     it('should handle single node with no dependencies', () => {
