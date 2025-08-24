@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Sparkles, Mail, Phone, MapPin, Twitter, Linkedin, Github, ArrowUp } from "lucide-react"
+import { Sparkles, Mail, Phone, MapPin, Twitter, Linkedin, Github, ChevronUp } from "lucide-react"
 
 export function Footer() {
   const scrollToTop = () => {
@@ -136,7 +136,7 @@ export function Footer() {
                 onClick={scrollToTop}
                 className="ml-4 p-2 bg-blue-600 hover:bg-blue-700 rounded-full transition-all duration-300 hover:scale-110 hover:-translate-y-1 group"
               >
-                <ArrowUp className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform duration-300" />
+                <ChevronUp className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform duration-300" />
               </button>
             </div>
           </div>

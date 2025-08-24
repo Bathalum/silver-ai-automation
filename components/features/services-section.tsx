@@ -1,7 +1,7 @@
 "use client"
 
 import { Section } from "@/components/ui/section"
-import { ServiceCard } from "@/components/composites/service-card"
+import { ServiceCard } from "@/components/features/service-card"
 import { getWorkProcess } from "@/lib/use-cases/get-services"
 
 export function ServicesSection() {

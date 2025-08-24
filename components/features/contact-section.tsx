@@ -16,6 +16,7 @@ export function ContactSection() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    subject: "",
     message: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -35,7 +36,7 @@ export function ContactSection() {
       const result = await submitContactForm(formData)
       setSubmitMessage(result.message)
       if (result.success) {
-        setFormData({ name: "", email: "", message: "" })
+        setFormData({ name: "", email: "", subject: "", message: "" })
       }
     } catch (error) {
       setSubmitMessage("An error occurred. Please try again.")
@@ -79,6 +80,15 @@ export function ContactSection() {
                   placeholder="Your Email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 group-hover:border-blue-300"
+                  required
+                />
+              </div>
+              <div className="group">
+                <Input
+                  placeholder="Subject"
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                   className="transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 group-hover:border-blue-300"
                   required
                 />
