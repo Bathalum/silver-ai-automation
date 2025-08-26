@@ -75,6 +75,12 @@ export {
   type VersionComparison
 } from './services/model-versioning-service';
 export { 
+  FunctionModelVersioningService,
+  type VersionCreationResult,
+  type VersionTransition,
+  type CompleteVersionData
+} from './services/function-model-versioning-service';
+export { 
   ActionNodeExecutionService,
   type ExecutionMetrics,
   type ExecutionSnapshot 

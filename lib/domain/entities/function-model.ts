@@ -140,6 +140,10 @@ export class FunctionModel {
       return Result.fail<void>('Cannot modify published model');
     }
 
+    if (this.props.status === ModelStatus.ARCHIVED) {
+      return Result.fail<void>('Cannot modify archived model');
+    }
+
     this.props.name = name;
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
@@ -148,6 +152,10 @@ export class FunctionModel {
   public updateDescription(description?: string): Result<void> {
     if (this.props.status === ModelStatus.PUBLISHED) {
       return Result.fail<void>('Cannot modify published model');
+    }
+
+    if (this.props.status === ModelStatus.ARCHIVED) {
+      return Result.fail<void>('Cannot modify archived model');
     }
 
     if (description && description.length > 5000) {
@@ -397,6 +405,19 @@ export class FunctionModel {
       this.props.deletedBy = deletedBy.trim();
     }
     this.props.status = ModelStatus.ARCHIVED;
+    this.props.updatedAt = new Date();
+    return Result.ok<void>(undefined);
+  }
+
+  public restore(): Result<void> {
+    if (!this.props.deletedAt) {
+      return Result.fail<void>('Model is not deleted and cannot be restored');
+    }
+
+    this.props.deletedAt = undefined;
+    this.props.deletedBy = undefined;
+    // Restore to previous status - for now, assume PUBLISHED
+    this.props.status = ModelStatus.PUBLISHED;
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }

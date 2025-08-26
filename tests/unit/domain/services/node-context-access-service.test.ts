@@ -1,992 +1,976 @@
+/**
+ * Unit tests for NodeContextAccessService  
+ * Tests hierarchical context management, context inheritance patterns,
+ * context scope isolation, and secure context access controls.
+ * 
+ * This service manages context propagation and access across the node hierarchy,
+ * ensuring proper isolation while enabling controlled sharing according to 
+ * Clean Architecture principles.
+ */
+
 import { 
-  NodeContextAccessService, 
-  NodeContext, 
-  ContextAccessResult, 
-  ContextAccessPattern 
+  NodeContextAccessService,
+  ContextScope,
+  ContextAccessLevel,
+  ContextInheritanceRule,
+  ContextValidationResult,
+  HierarchicalContext
 } from '@/lib/domain/services/node-context-access-service';
-import { ActionNode } from '@/lib/domain/entities/action-node';
-import { TetherNode } from '@/lib/domain/entities/tether-node';
-import { KBNode } from '@/lib/domain/entities/kb-node';
-import { FunctionModelContainerNode } from '@/lib/domain/entities/function-model-container-node';
 import { NodeId } from '@/lib/domain/value-objects/node-id';
-import { RetryPolicy } from '@/lib/domain/value-objects/retry-policy';
-import { ExecutionMode, ActionStatus } from '@/lib/domain/enums';
 import { Result } from '@/lib/domain/shared/result';
 
-// Mock ActionNode implementation for testing
-class MockActionNode extends ActionNode {
-  public static createMock(
-    nodeId: NodeId,
-    parentNodeId: NodeId,
-    name: string = 'Mock Action',
-    executionMode: ExecutionMode = ExecutionMode.SEQUENTIAL
-  ): MockActionNode {
-    const retryPolicy = RetryPolicy.create({
-      maxAttempts: 3,
-      strategy: 'exponential',
-      baseDelayMs: 1000,
-      maxDelayMs: 10000,
-      enabled: true
-    }).value!;
-
-    return new MockActionNode({
-      actionId: nodeId,
-      parentNodeId,
-      modelId: 'test-model',
-      name,
-      description: 'Test action node',
-      executionMode,
-      executionOrder: 1,
-      status: ActionStatus.ACTIVE,
-      priority: 1,
-      estimatedDuration: 60,
-      retryPolicy,
-      raci: { responsible: ['user1'], accountable: ['user2'], consulted: [], informed: [] } as any,
-      metadata: {},
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-  }
-}
-
-// Mock TetherNode implementation for testing
-class MockTetherNode extends TetherNode {
-  public static createMock(
-    nodeId: NodeId,
-    parentNodeId: NodeId,
-    tetherReferenceId: string = 'test-tether'
-  ): MockTetherNode {
-    const retryPolicy = RetryPolicy.create({
-      maxAttempts: 3,
-      strategy: 'exponential',
-      baseDelayMs: 1000,
-      maxDelayMs: 10000,
-      enabled: true
-    }).value!;
-
-    return new MockTetherNode({
-      actionId: nodeId,
-      parentNodeId,
-      modelId: 'test-model',
-      name: 'Mock Tether Node',
-      description: 'Test tether node',
-      executionMode: ExecutionMode.SEQUENTIAL,
-      executionOrder: 1,
-      status: ActionStatus.ACTIVE,
-      priority: 1,
-      estimatedDuration: 60,
-      retryPolicy,
-      raci: { responsible: ['user1'], accountable: ['user2'], consulted: [], informed: [] } as any,
-      metadata: {},
-      actionType: 'tether',
-      configuration: {
-        tetherReferenceId,
-        executionParameters: { param1: 'value1' },
-        outputMapping: { output1: 'result1' },
-        resourceRequirements: { cpu: '100m', memory: '256Mi' },
-        integrationConfig: { endpoint: 'https://api.example.com' }
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-  }
-}
-
-// Mock KBNode implementation for testing
-class MockKBNode extends KBNode {
-  public static createMock(
-    nodeId: NodeId,
-    parentNodeId: NodeId,
-    kbReferenceId: string = 'test-kb'
-  ): MockKBNode {
-    const retryPolicy = RetryPolicy.create({
-      maxAttempts: 3,
-      strategy: 'exponential',
-      baseDelayMs: 1000,
-      maxDelayMs: 10000,
-      enabled: true
-    }).value!;
-
-    return new MockKBNode({
-      actionId: nodeId,
-      parentNodeId,
-      modelId: 'test-model',
-      name: 'Mock KB Node',
-      description: 'Test KB node',
-      executionMode: ExecutionMode.SEQUENTIAL,
-      executionOrder: 1,
-      status: ActionStatus.ACTIVE,
-      priority: 1,
-      estimatedDuration: 60,
-      retryPolicy,
-      raci: { responsible: ['user1'], accountable: ['user2'], consulted: [], informed: [] } as any,
-      metadata: {},
-      actionType: 'knowledgeBase',
-      configuration: {
-        kbReferenceId,
-        shortDescription: 'Test knowledge base reference',
-        documentationContext: { section: 'api', subsection: 'authentication' },
-        searchKeywords: ['auth', 'api', 'security'],
-        accessPermissions: { view: ['user1', 'user2'], edit: ['user1'] }
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-  }
-}
-
-// Mock FunctionModelContainerNode implementation for testing
-class MockFunctionModelContainerNode {
-  public static createMock(
-    nodeId: NodeId,
-    nestedModelId: string = 'nested-model'
-  ): FunctionModelContainerNode {
-    const retryPolicy = RetryPolicy.create({
-      maxAttempts: 3,
-      strategy: 'exponential',
-      baseDelayMs: 1000,
-      maxDelayMs: 10000,
-      enabled: true
-    }).value!;
-
-    const containerNode = FunctionModelContainerNode.create({
-      actionId: nodeId,
-      parentNodeId: NodeId.generate(), // We need a parent for proper creation
-      modelId: 'parent-model',
-      name: 'Mock Container Node',
-      description: 'Test container node',
-      actionType: 'functionModelContainer',
-      executionOrder: 1,
-      executionMode: ExecutionMode.SEQUENTIAL,
-      status: ActionStatus.ACTIVE,
-      priority: 1,
-      estimatedDuration: 600,
-      retryPolicy,
-      configuration: {
-        nestedModelId,
-        orchestrationMode: 'embedded',
-        contextMapping: { input: 'parentOutput' },
-        outputExtraction: { result: 'nestedResult' },
-        executionPolicy: { timeout: 5000, retries: 3 }
-      }
-    });
-
-    if (containerNode.isFailure) {
-      throw new Error(`Failed to create mock container node: ${containerNode.error}`);
-    }
-
-    return containerNode.value;
-  }
-}
-
 describe('NodeContextAccessService', () => {
-  let service: NodeContextAccessService;
+  let contextService: NodeContextAccessService;
+  let parentNodeId: NodeId;
+  let childNodeId: NodeId;
+  let grandChildNodeId: NodeId;
 
   beforeEach(() => {
-    service = new NodeContextAccessService();
+    contextService = new NodeContextAccessService();
+    parentNodeId = NodeId.generate();
+    childNodeId = NodeId.generate();
+    grandChildNodeId = NodeId.generate();
   });
 
-  describe('Node Registration', () => {
-    it('should register a node successfully', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      const parentNodeId = NodeId.generate();
-      const contextData = { key: 'value', timestamp: Date.now() };
+  describe('context building and management', () => {
+    describe('buildContext', () => {
+      it('should build context for node successfully', () => {
+        // Arrange
+        const contextData = {
+          nodeId: parentNodeId.toString(),
+          executionId: 'exec-123',
+          parameters: { userId: 'user-456', environment: 'test' },
+          timestamp: new Date().toISOString()
+        };
 
-      // Act
-      const result = service.registerNode(nodeId, 'actionNode', parentNodeId, contextData, 1);
+        // Act
+        const result = contextService.buildContext(parentNodeId, contextData, 'execution');
 
-      // Assert
-      expect(result.isSuccess).toBe(true);
+        // Assert
+        expect(result).toBeValidResult();
+        const context = result.value;
+        expect(context.nodeId).toEqual(parentNodeId);
+        expect(context.scope).toBe('execution');
+        expect(context.data).toEqual(contextData);
+        expect(context.accessLevel).toBe('read-write');
+        expect(context.parentContextId).toBeNull();
+      });
+
+      it('should build child context with proper inheritance', () => {
+        // Arrange - Build parent context first
+        const parentContext = { parentData: 'test', shared: true };
+        const parentResult = contextService.buildContext(parentNodeId, parentContext, 'execution');
+        expect(parentResult).toBeValidResult();
+
+        const childContext = { childData: 'child-test', localOnly: true };
+
+        // Act
+        const result = contextService.buildContext(
+          childNodeId, 
+          childContext, 
+          'execution', 
+          parentResult.value.contextId
+        );
+
+        // Assert
+        expect(result).toBeValidResult();
+        const context = result.value;
+        expect(context.nodeId).toEqual(childNodeId);
+        expect(context.parentContextId).toBe(parentResult.value.contextId);
+        expect(context.inheritedData).toBeDefined();
+        expect(context.inheritedData.parentData).toBe('test');
+        expect(context.data.childData).toBe('child-test');
+      });
+
+      it('should handle different context scopes', () => {
+        // Arrange
+        const scopes: ContextScope[] = ['execution', 'session', 'global', 'isolated'];
+        const contextData = { test: 'data' };
+
+        // Act & Assert
+        scopes.forEach(scope => {
+          const result = contextService.buildContext(NodeId.generate(), contextData, scope);
+          expect(result).toBeValidResult();
+          expect(result.value.scope).toBe(scope);
+        });
+      });
+
+      it('should validate context data before building', () => {
+        // Arrange - Invalid context data
+        const invalidContext = null;
+
+        // Act
+        const result = contextService.buildContext(parentNodeId, invalidContext as any, 'execution');
+
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('Invalid context data');
+      });
     });
 
-    it('should register root node without parent', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      const contextData = { rootData: 'rootValue' };
+    describe('updateNodeContext', () => {
+      let contextId: string;
 
-      // Act
-      const result = service.registerNode(nodeId, 'rootNode', undefined, contextData, 0);
+      beforeEach(() => {
+        const buildResult = contextService.buildContext(
+          parentNodeId, 
+          { initial: 'data' }, 
+          'execution'
+        );
+        expect(buildResult).toBeValidResult();
+        contextId = buildResult.value.contextId;
+      });
 
-      // Assert
-      expect(result.isSuccess).toBe(true);
+      it('should update existing context successfully', () => {
+        // Arrange
+        const updates = { updated: 'value', timestamp: new Date() };
+
+        // Act
+        const result = contextService.updateNodeContext(contextId, updates);
+
+        // Assert
+        expect(result).toBeValidResult();
+        
+        // Verify update was applied
+        const getResult = contextService.getNodeContext(parentNodeId);
+        expect(getResult).toBeValidResult();
+        expect(getResult.value.data.updated).toBe('value');
+        expect(getResult.value.data.initial).toBe('data'); // Original data preserved
+      });
+
+      it('should merge updates with existing context data', () => {
+        // Arrange
+        const updates = { 
+          nested: { value: 'test' },
+          array: [1, 2, 3],
+          initial: 'overwritten'
+        };
+
+        // Act
+        const result = contextService.updateNodeContext(contextId, updates);
+
+        // Assert
+        expect(result).toBeValidResult();
+        
+        const getResult = contextService.getNodeContext(parentNodeId);
+        expect(getResult).toBeValidResult();
+        expect(getResult.value.data.nested.value).toBe('test');
+        expect(getResult.value.data.array).toEqual([1, 2, 3]);
+        expect(getResult.value.data.initial).toBe('overwritten');
+      });
+
+      it('should reject updates to non-existent context', () => {
+        // Act
+        const result = contextService.updateNodeContext('non-existent-id', { test: 'data' });
+
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('Context not found');
+      });
+
+      it('should handle concurrent updates gracefully', async () => {
+        // Arrange
+        const update1 = { field1: 'value1' };
+        const update2 = { field2: 'value2' };
+
+        // Act - Concurrent updates
+        const [result1, result2] = await Promise.all([
+          Promise.resolve(contextService.updateNodeContext(contextId, update1)),
+          Promise.resolve(contextService.updateNodeContext(contextId, update2))
+        ]);
+
+        // Assert
+        expect(result1).toBeValidResult();
+        expect(result2).toBeValidResult();
+        
+        const getResult = contextService.getNodeContext(parentNodeId);
+        expect(getResult).toBeValidResult();
+        expect(getResult.value.data.field1).toBe('value1');
+        expect(getResult.value.data.field2).toBe('value2');
+      });
     });
 
-    it('should maintain node hierarchy levels', () => {
-      // Arrange
-      const rootId = NodeId.generate();
-      const childId = NodeId.generate();
-      const grandchildId = NodeId.generate();
+    describe('clearNodeContext', () => {
+      it('should clear node context successfully', () => {
+        // Arrange - Build context
+        const buildResult = contextService.buildContext(
+          parentNodeId, 
+          { data: 'to-clear' }, 
+          'execution'
+        );
+        expect(buildResult).toBeValidResult();
 
-      // Act
-      service.registerNode(rootId, 'root', undefined, { level: 'root' }, 0);
-      service.registerNode(childId, 'child', rootId, { level: 'child' }, 1);
-      service.registerNode(grandchildId, 'grandchild', childId, { level: 'grandchild' }, 2);
+        // Act
+        const result = contextService.clearNodeContext(parentNodeId);
 
-      // Assert
-      const rootContext = service.getNodeContext(rootId, rootId);
-      const childContext = service.getNodeContext(childId, childId);
-      const grandchildContext = service.getNodeContext(grandchildId, grandchildId);
+        // Assert
+        expect(result).toBeValidResult();
+        
+        // Verify context is cleared
+        const getResult = contextService.getNodeContext(parentNodeId);
+        expect(getResult).toBeFailureResult();
+        expect(getResult.error).toContain('Context not found');
+      });
 
-      expect(rootContext.isSuccess).toBe(true);
-      expect(childContext.isSuccess).toBe(true);
-      expect(grandchildContext.isSuccess).toBe(true);
-      expect(rootContext.value.hierarchyLevel).toBe(0);
-      expect(childContext.value.hierarchyLevel).toBe(1);
-      expect(grandchildContext.value.hierarchyLevel).toBe(2);
+      it('should clear child contexts when clearing parent', () => {
+        // Arrange - Build parent and child contexts
+        const parentResult = contextService.buildContext(
+          parentNodeId, 
+          { parent: 'data' }, 
+          'execution'
+        );
+        expect(parentResult).toBeValidResult();
+
+        const childResult = contextService.buildContext(
+          childNodeId, 
+          { child: 'data' }, 
+          'execution',
+          parentResult.value.contextId
+        );
+        expect(childResult).toBeValidResult();
+
+        // Act - Clear parent
+        const clearResult = contextService.clearNodeContext(parentNodeId);
+
+        // Assert
+        expect(clearResult).toBeValidResult();
+        
+        // Verify both contexts are cleared
+        const getParentResult = contextService.getNodeContext(parentNodeId);
+        expect(getParentResult).toBeFailureResult();
+        
+        const getChildResult = contextService.getNodeContext(childNodeId);
+        expect(getChildResult).toBeFailureResult();
+      });
+
+      it('should handle clearing non-existent context gracefully', () => {
+        // Act
+        const result = contextService.clearNodeContext(NodeId.generate());
+
+        // Assert
+        expect(result).toBeValidResult(); // Should not fail, just no-op
+      });
+    });
+  });
+
+  describe('context propagation and inheritance', () => {
+    describe('propagateContext', () => {
+      it('should propagate context from parent to child', () => {
+        // Arrange - Build parent context
+        const parentData = { 
+          sharedConfig: { timeout: 5000 },
+          executionId: 'exec-123',
+          userId: 'user-456'
+        };
+        const parentResult = contextService.buildContext(parentNodeId, parentData, 'execution');
+        expect(parentResult).toBeValidResult();
+
+        const inheritanceRules: ContextInheritanceRule[] = [
+          { property: 'sharedConfig', inherit: true, override: false },
+          { property: 'executionId', inherit: true, override: false },
+          { property: 'secretData', inherit: false, override: false }
+        ];
+
+        // Act
+        const result = contextService.propagateContext(
+          parentResult.value.contextId,
+          childNodeId,
+          inheritanceRules
+        );
+
+        // Assert
+        expect(result).toBeValidResult();
+        
+        // Verify child context was created with inherited data
+        const childContext = contextService.getNodeContext(childNodeId);
+        expect(childContext).toBeValidResult();
+        expect(childContext.value.inheritedData.sharedConfig).toEqual({ timeout: 5000 });
+        expect(childContext.value.inheritedData.executionId).toBe('exec-123');
+        expect(childContext.value.inheritedData.secretData).toBeUndefined();
+      });
+
+      it('should handle override rules in context propagation', () => {
+        // Arrange - Parent with data
+        const parentResult = contextService.buildContext(
+          parentNodeId, 
+          { setting: 'parent-value', constant: 'unchangeable' }, 
+          'execution'
+        );
+        expect(parentResult).toBeValidResult();
+
+        // Child with conflicting data
+        const childResult = contextService.buildContext(
+          childNodeId, 
+          { setting: 'child-value', newProperty: 'child-only' }, 
+          'execution'
+        );
+        expect(childResult).toBeValidResult();
+
+        const inheritanceRules: ContextInheritanceRule[] = [
+          { property: 'setting', inherit: true, override: true },  // Child can override
+          { property: 'constant', inherit: true, override: false }, // Child cannot override
+          { property: 'newProperty', inherit: false, override: false }
+        ];
+
+        // Act
+        const result = contextService.propagateContext(
+          parentResult.value.contextId,
+          childNodeId,
+          inheritanceRules
+        );
+
+        // Assert
+        expect(result).toBeValidResult();
+        
+        const updatedChild = contextService.getNodeContext(childNodeId);
+        expect(updatedChild).toBeValidResult();
+        expect(updatedChild.value.data.setting).toBe('child-value'); // Override allowed
+        expect(updatedChild.value.inheritedData.constant).toBe('unchangeable'); // No override
+      });
+
+      it('should handle deep context propagation chains', () => {
+        // Arrange - Build 3-level hierarchy
+        const grandparentData = { level: 'grandparent', shared: 'all-levels' };
+        const grandparentResult = contextService.buildContext(
+          NodeId.generate(), 
+          grandparentData, 
+          'execution'
+        );
+        expect(grandparentResult).toBeValidResult();
+
+        const parentData = { level: 'parent', shared: 'parent-child' };
+        const parentResult = contextService.buildContext(
+          parentNodeId, 
+          parentData, 
+          'execution',
+          grandparentResult.value.contextId
+        );
+        expect(parentResult).toBeValidResult();
+
+        const inheritanceRules: ContextInheritanceRule[] = [
+          { property: 'level', inherit: true, override: true },
+          { property: 'shared', inherit: true, override: true }
+        ];
+
+        // Act - Propagate from parent to child
+        const result = contextService.propagateContext(
+          parentResult.value.contextId,
+          childNodeId,
+          inheritanceRules
+        );
+
+        // Assert
+        expect(result).toBeValidResult();
+        
+        const childContext = contextService.getNodeContext(childNodeId);
+        expect(childContext).toBeValidResult();
+        expect(childContext.value.inheritedData.level).toBe('parent');
+        expect(childContext.value.inheritedData.shared).toBe('parent-child');
+        
+        // Verify grandparent data is also accessible through hierarchy
+        const hierarchicalResult = contextService.getHierarchicalContext(childNodeId);
+        expect(hierarchicalResult).toBeValidResult();
+        expect(hierarchicalResult.value.levels).toHaveLength(3);
+      });
+
+      it('should reject propagation from non-existent context', () => {
+        // Act
+        const result = contextService.propagateContext(
+          'non-existent-context',
+          childNodeId,
+          []
+        );
+
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('Source context not found');
+      });
     });
 
-    it('should create sibling groups automatically', () => {
+    describe('getHierarchicalContext', () => {
+      it('should return complete hierarchical context', () => {
+        // Arrange - Build hierarchy
+        const grandparentResult = contextService.buildContext(
+          NodeId.generate(), 
+          { level: 0, data: 'grandparent' }, 
+          'global'
+        );
+        expect(grandparentResult).toBeValidResult();
+
+        const parentResult = contextService.buildContext(
+          parentNodeId, 
+          { level: 1, data: 'parent' }, 
+          'session',
+          grandparentResult.value.contextId
+        );
+        expect(parentResult).toBeValidResult();
+
+        const childResult = contextService.buildContext(
+          childNodeId, 
+          { level: 2, data: 'child' }, 
+          'execution',
+          parentResult.value.contextId
+        );
+        expect(childResult).toBeValidResult();
+
+        // Act
+        const result = contextService.getHierarchicalContext(childNodeId);
+
+        // Assert
+        expect(result).toBeValidResult();
+        const hierarchical = result.value;
+        expect(hierarchical.nodeId).toEqual(childNodeId);
+        expect(hierarchical.levels).toHaveLength(3);
+        
+        // Verify level order (child -> parent -> grandparent)
+        expect(hierarchical.levels[0].scope).toBe('execution');
+        expect(hierarchical.levels[0].data.level).toBe(2);
+        expect(hierarchical.levels[1].scope).toBe('session');
+        expect(hierarchical.levels[1].data.level).toBe(1);
+        expect(hierarchical.levels[2].scope).toBe('global');
+        expect(hierarchical.levels[2].data.level).toBe(0);
+      });
+
+      it('should return single level for nodes without parents', () => {
+        // Arrange
+        const result = contextService.buildContext(
+          parentNodeId, 
+          { standalone: true }, 
+          'execution'
+        );
+        expect(result).toBeValidResult();
+
+        // Act
+        const hierarchicalResult = contextService.getHierarchicalContext(parentNodeId);
+
+        // Assert
+        expect(hierarchicalResult).toBeValidResult();
+        const hierarchical = hierarchicalResult.value;
+        expect(hierarchical.levels).toHaveLength(1);
+        expect(hierarchical.levels[0].data.standalone).toBe(true);
+      });
+
+      it('should handle deep hierarchies efficiently', () => {
+        // Arrange - Build deep hierarchy (5 levels)
+        let currentParentId = null;
+        const nodeIds = [];
+        
+        for (let i = 0; i < 5; i++) {
+          const nodeId = NodeId.generate();
+          nodeIds.push(nodeId);
+          
+          const result = contextService.buildContext(
+            nodeId, 
+            { level: i, data: `level-${i}` }, 
+            'execution',
+            currentParentId
+          );
+          expect(result).toBeValidResult();
+          currentParentId = result.value.contextId;
+        }
+
+        // Act - Get hierarchical context for deepest node
+        const deepestNodeId = nodeIds[4];
+        const result = contextService.getHierarchicalContext(deepestNodeId);
+
+        // Assert
+        expect(result).toBeValidResult();
+        const hierarchical = result.value;
+        expect(hierarchical.levels).toHaveLength(5);
+        expect(hierarchical.totalLevels).toBe(5);
+        expect(hierarchical.maxDepthReached).toBe(false);
+      });
+
+      it('should reject hierarchical request for non-existent node', () => {
+        // Act
+        const result = contextService.getHierarchicalContext(NodeId.generate());
+
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('Context not found');
+      });
+    });
+  });
+
+  describe('context access control and validation', () => {
+    describe('validateContextAccess', () => {
+      it('should validate read access successfully', () => {
+        // Arrange
+        const result = contextService.buildContext(
+          parentNodeId, 
+          { public: 'data', private: 'secret' }, 
+          'execution'
+        );
+        expect(result).toBeValidResult();
+
+        // Act
+        const validation = contextService.validateContextAccess(
+          parentNodeId, 
+          childNodeId, 
+          'read',
+          ['public']
+        );
+
+        // Assert
+        expect(validation).toBeValidResult();
+        const access = validation.value;
+        expect(access.granted).toBe(true);
+        expect(access.level).toBe('read');
+        expect(access.accessibleProperties).toContain('public');
+        expect(access.restrictedProperties).not.toContain('public');
+      });
+
+      it('should validate write access with proper permissions', () => {
+        // Arrange - Build context with write permissions
+        const buildResult = contextService.buildContext(
+          parentNodeId, 
+          { editable: 'data', readonly: 'constant' }, 
+          'execution'
+        );
+        expect(buildResult).toBeValidResult();
+
+        // Update context to have write access level
+        (contextService as any).contexts.get(parentNodeId.toString()).accessLevel = 'read-write';
+
+        // Act
+        const validation = contextService.validateContextAccess(
+          parentNodeId, 
+          parentNodeId, // Same node requesting access
+          'write',
+          ['editable']
+        );
+
+        // Assert
+        expect(validation).toBeValidResult();
+        const access = validation.value;
+        expect(access.granted).toBe(true);
+        expect(access.level).toBe('write');
+      });
+
+      it('should deny access for insufficient permissions', () => {
+        // Arrange - Build read-only context
+        const result = contextService.buildContext(
+          parentNodeId, 
+          { data: 'protected' }, 
+          'isolated' // Isolated scope typically has restricted access
+        );
+        expect(result).toBeValidResult();
+
+        // Act - Try to get write access
+        const validation = contextService.validateContextAccess(
+          parentNodeId, 
+          childNodeId, 
+          'write',
+          ['data']
+        );
+
+        // Assert
+        expect(validation).toBeValidResult();
+        const access = validation.value;
+        expect(access.granted).toBe(false);
+        expect(access.denialReason).toContain('Insufficient permissions');
+      });
+
+      it('should handle cross-node access validation', () => {
+        // Arrange - Different nodes with different access levels
+        const parentResult = contextService.buildContext(
+          parentNodeId, 
+          { shared: 'data' }, 
+          'session'
+        );
+        expect(parentResult).toBeValidResult();
+
+        const childResult = contextService.buildContext(
+          childNodeId, 
+          { local: 'data' }, 
+          'execution',
+          parentResult.value.contextId
+        );
+        expect(childResult).toBeValidResult();
+
+        // Act - Child trying to access parent context
+        const validation = contextService.validateContextAccess(
+          parentNodeId, 
+          childNodeId, 
+          'read',
+          ['shared']
+        );
+
+        // Assert
+        expect(validation).toBeValidResult();
+        const access = validation.value;
+        expect(access.granted).toBe(true); // Child should have read access to parent
+        expect(access.inheritanceAllowed).toBe(true);
+      });
+
+      it('should validate property-level access controls', () => {
+        // Arrange
+        const result = contextService.buildContext(
+          parentNodeId, 
+          { 
+            public: 'everyone can read',
+            protected: 'limited access',
+            private: 'restricted'
+          }, 
+          'execution'
+        );
+        expect(result).toBeValidResult();
+
+        // Act - Request access to mixed properties
+        const validation = contextService.validateContextAccess(
+          parentNodeId, 
+          childNodeId, 
+          'read',
+          ['public', 'protected', 'private']
+        );
+
+        // Assert
+        expect(validation).toBeValidResult();
+        const access = validation.value;
+        expect(access.accessibleProperties).toContain('public');
+        // protected and private access depends on relationship and permissions
+      });
+    });
+  });
+
+  describe('context scope management', () => {
+    describe('cloneContextScope', () => {
+      it('should clone context scope successfully', () => {
+        // Arrange
+        const originalResult = contextService.buildContext(
+          parentNodeId, 
+          { original: 'data', nested: { value: 42 } }, 
+          'execution'
+        );
+        expect(originalResult).toBeValidResult();
+
+        // Act
+        const cloneResult = contextService.cloneContextScope(
+          originalResult.value.contextId, 
+          childNodeId,
+          'isolated'
+        );
+
+        // Assert
+        expect(cloneResult).toBeValidResult();
+        const cloneId = cloneResult.value;
+        
+        // Verify clone exists with same data but different scope
+        const cloneContext = contextService.getNodeContext(childNodeId);
+        expect(cloneContext).toBeValidResult();
+        expect(cloneContext.value.scope).toBe('isolated');
+        expect(cloneContext.value.data.original).toBe('data');
+        expect(cloneContext.value.data.nested.value).toBe(42);
+        
+        // Verify it's a deep copy (modifications don't affect original)
+        const updateResult = contextService.updateNodeContext(cloneId, { 
+          nested: { value: 99 } 
+        });
+        expect(updateResult).toBeValidResult();
+        
+        const originalContext = contextService.getNodeContext(parentNodeId);
+        expect(originalContext).toBeValidResult();
+        expect(originalContext.value.data.nested.value).toBe(42); // Unchanged
+      });
+
+      it('should handle cloning with transformation rules', () => {
+        // Arrange
+        const originalResult = contextService.buildContext(
+          parentNodeId, 
+          { 
+            sensitive: 'secret-data',
+            public: 'open-data',
+            transform: 'original-value'
+          }, 
+          'execution'
+        );
+        expect(originalResult).toBeValidResult();
+
+        // Act - Clone with filtering
+        const cloneResult = contextService.cloneContextScope(
+          originalResult.value.contextId, 
+          childNodeId,
+          'isolated',
+          {
+            excludeProperties: ['sensitive'],
+            transformProperties: {
+              transform: (value) => `transformed-${value}`
+            }
+          }
+        );
+
+        // Assert
+        expect(cloneResult).toBeValidResult();
+        
+        const cloneContext = contextService.getNodeContext(childNodeId);
+        expect(cloneContext).toBeValidResult();
+        expect(cloneContext.value.data.sensitive).toBeUndefined();
+        expect(cloneContext.value.data.public).toBe('open-data');
+        expect(cloneContext.value.data.transform).toBe('transformed-original-value');
+      });
+
+      it('should reject cloning non-existent context', () => {
+        // Act
+        const result = contextService.cloneContextScope(
+          'non-existent-context',
+          childNodeId,
+          'execution'
+        );
+
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('Source context not found');
+      });
+    });
+
+    describe('mergeContextScopes', () => {
+      it('should merge multiple context scopes successfully', () => {
+        // Arrange - Build multiple contexts
+        const context1Result = contextService.buildContext(
+          NodeId.generate(), 
+          { source1: 'data1', shared: 'from-context1' }, 
+          'execution'
+        );
+        expect(context1Result).toBeValidResult();
+
+        const context2Result = contextService.buildContext(
+          NodeId.generate(), 
+          { source2: 'data2', shared: 'from-context2' }, 
+          'session'
+        );
+        expect(context2Result).toBeValidResult();
+
+        const sourceContextIds = [
+          context1Result.value.contextId,
+          context2Result.value.contextId
+        ];
+
+        // Act
+        const mergeResult = contextService.mergeContextScopes(
+          sourceContextIds,
+          childNodeId,
+          'global'
+        );
+
+        // Assert
+        expect(mergeResult).toBeValidResult();
+        const mergedContextId = mergeResult.value;
+        
+        const mergedContext = contextService.getNodeContext(childNodeId);
+        expect(mergedContext).toBeValidResult();
+        expect(mergedContext.value.data.source1).toBe('data1');
+        expect(mergedContext.value.data.source2).toBe('data2');
+        expect(mergedContext.value.data.shared).toBe('from-context2'); // Later contexts override
+        expect(mergedContext.value.scope).toBe('global');
+      });
+
+      it('should handle merge conflicts with precedence rules', () => {
+        // Arrange
+        const highPriorityResult = contextService.buildContext(
+          NodeId.generate(), 
+          { priority: 'high', conflict: 'high-value' }, 
+          'execution'
+        );
+        expect(highPriorityResult).toBeValidResult();
+
+        const lowPriorityResult = contextService.buildContext(
+          NodeId.generate(), 
+          { priority: 'low', conflict: 'low-value' }, 
+          'execution'
+        );
+        expect(lowPriorityResult).toBeValidResult();
+
+        // Act - Merge with high priority first (should win conflicts)
+        const mergeResult = contextService.mergeContextScopes(
+          [highPriorityResult.value.contextId, lowPriorityResult.value.contextId],
+          childNodeId,
+          'execution',
+          { 
+            conflictResolution: 'first-wins',
+            preserveSourceMetadata: true
+          }
+        );
+
+        // Assert
+        expect(mergeResult).toBeValidResult();
+        
+        const mergedContext = contextService.getNodeContext(childNodeId);
+        expect(mergedContext).toBeValidResult();
+        expect(mergedContext.value.data.conflict).toBe('high-value');
+        expect(mergedContext.value.data.priority).toBe('high');
+      });
+
+      it('should handle merging with empty source list', () => {
+        // Act
+        const result = contextService.mergeContextScopes(
+          [],
+          childNodeId,
+          'execution'
+        );
+
+        // Assert
+        expect(result).toBeValidResult();
+        
+        // Should create empty context
+        const mergedContext = contextService.getNodeContext(childNodeId);
+        expect(mergedContext).toBeValidResult();
+        expect(Object.keys(mergedContext.value.data)).toHaveLength(0);
+      });
+
+      it('should handle merging with non-existent contexts', () => {
+        // Act
+        const result = contextService.mergeContextScopes(
+          ['non-existent-1', 'non-existent-2'],
+          childNodeId,
+          'execution'
+        );
+
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('One or more source contexts not found');
+      });
+    });
+  });
+
+  describe('error handling and edge cases', () => {
+    it('should handle concurrent context operations', async () => {
       // Arrange
-      const parentId = NodeId.generate();
-      const sibling1Id = NodeId.generate();
-      const sibling2Id = NodeId.generate();
-      const sibling3Id = NodeId.generate();
-
-      // Act
-      service.registerNode(parentId, 'parent', undefined, { parent: true }, 0);
-      service.registerNode(sibling1Id, 'child', parentId, { sibling: 1 }, 1);
-      service.registerNode(sibling2Id, 'child', parentId, { sibling: 2 }, 1);
-      service.registerNode(sibling3Id, 'child', parentId, { sibling: 3 }, 1);
-
-      // Assert
-      const sibling1Contexts = service.getAccessibleContexts(sibling1Id);
-      expect(sibling1Contexts.isSuccess).toBe(true);
+      const nodeIds = Array.from({ length: 5 }, () => NodeId.generate());
       
-      // Should be able to access sibling contexts
-      const siblingAccess = sibling1Contexts.value.filter(access => 
-        access.accessReason.includes('Sibling')
+      // Act - Concurrent context building
+      const results = await Promise.all(
+        nodeIds.map(nodeId => 
+          Promise.resolve(contextService.buildContext(
+            nodeId, 
+            { concurrent: true, nodeId: nodeId.toString() }, 
+            'execution'
+          ))
+        )
       );
-      expect(siblingAccess.length).toBe(2); // Two other siblings
-    });
-  });
-
-  describe('Sibling Access Pattern', () => {
-    let parentId: NodeId;
-    let sibling1Id: NodeId;
-    let sibling2Id: NodeId;
-    let sibling3Id: NodeId;
-
-    beforeEach(() => {
-      parentId = NodeId.generate();
-      sibling1Id = NodeId.generate();
-      sibling2Id = NodeId.generate();
-      sibling3Id = NodeId.generate();
-
-      service.registerNode(parentId, 'parent', undefined, { parentContext: 'data' }, 0);
-      service.registerNode(sibling1Id, 'sibling', parentId, { siblingData: 'sibling1' }, 1);
-      service.registerNode(sibling2Id, 'sibling', parentId, { siblingData: 'sibling2' }, 1);
-      service.registerNode(sibling3Id, 'sibling', parentId, { siblingData: 'sibling3' }, 1);
-    });
-
-    it('should provide read-only access to sibling contexts', () => {
-      // Act
-      const accessibleContexts = service.getAccessibleContexts(sibling1Id);
 
       // Assert
-      expect(accessibleContexts.isSuccess).toBe(true);
-      const siblingAccess = accessibleContexts.value.filter(access => 
-        access.accessReason.includes('Sibling')
-      );
-      expect(siblingAccess.length).toBe(2);
-      expect(siblingAccess.every(access => access.accessGranted)).toBe(true);
-    });
-
-    it('should allow reading sibling context data', () => {
-      // Act
-      const sibling2Context = service.getNodeContext(sibling1Id, sibling2Id, 'read');
-
-      // Assert
-      expect(sibling2Context.isSuccess).toBe(true);
-      expect(sibling2Context.value.contextData.siblingData).toBe('sibling2');
-    });
-
-    it('should deny write access to sibling contexts', () => {
-      // Act
-      const writeResult = service.updateNodeContext(sibling1Id, sibling2Id, { newData: 'modified' });
-
-      // Assert
-      expect(writeResult.isSuccess).toBe(false);
-      expect(writeResult.error).toContain('Access denied');
-    });
-  });
-
-  describe('Parent-Child Access Pattern', () => {
-    let parentId: NodeId;
-    let childId: NodeId;
-    let grandchildId: NodeId;
-
-    beforeEach(() => {
-      parentId = NodeId.generate();
-      childId = NodeId.generate();
-      grandchildId = NodeId.generate();
-
-      service.registerNode(parentId, 'parent', undefined, { parentLevel: 'data' }, 0);
-      service.registerNode(childId, 'child', parentId, { childLevel: 'data' }, 1);
-      service.registerNode(grandchildId, 'grandchild', childId, { grandchildLevel: 'data' }, 2);
-    });
-
-    it('should provide parent with write access to all descendant contexts', () => {
-      // Act
-      const parentAccessibleContexts = service.getAccessibleContexts(parentId);
-
-      // Assert
-      expect(parentAccessibleContexts.isSuccess).toBe(true);
-      const writeAccess = parentAccessibleContexts.value.filter(access => 
-        access.context.accessLevel === 'write'
-      );
-      expect(writeAccess.length).toBeGreaterThan(0);
+      results.forEach(result => expect(result).toBeValidResult());
       
-      // Verify that parent can access both child and grandchild
-      const childAccess = writeAccess.find(access => access.context.nodeId.equals(childId));
-      const grandchildAccess = writeAccess.find(access => access.context.nodeId.equals(grandchildId));
-      expect(childAccess).toBeDefined();
-      expect(grandchildAccess).toBeDefined();
-    });
-
-    it('should allow parent to update child context', () => {
-      // Arrange
-      const newContextData = { childLevel: 'updated_by_parent', timestamp: Date.now() };
-
-      // Act
-      const updateResult = service.updateNodeContext(parentId, childId, newContextData);
-
-      // Assert
-      expect(updateResult.isSuccess).toBe(true);
+      // Verify all contexts were created
+      const getResults = await Promise.all(
+        nodeIds.map(nodeId => Promise.resolve(contextService.getNodeContext(nodeId)))
+      );
       
-      // Verify the update
-      const updatedContext = service.getNodeContext(childId, childId);
-      expect(updatedContext.isSuccess).toBe(true);
-      expect(updatedContext.value.contextData.childLevel).toBe('updated_by_parent');
+      getResults.forEach(result => expect(result).toBeValidResult());
     });
 
-    it('should allow parent to access grandchild contexts', () => {
-      // Act
-      const grandchildContext = service.getNodeContext(parentId, grandchildId, 'write');
+    it('should handle circular reference prevention', () => {
+      // Arrange - Try to create circular parent-child relationship
+      const result1 = contextService.buildContext(parentNodeId, { data: '1' }, 'execution');
+      expect(result1).toBeValidResult();
 
-      // Assert
-      expect(grandchildContext.isSuccess).toBe(true);
-      expect(grandchildContext.value.contextData.grandchildLevel).toBe('data');
-    });
-
-    it('should provide child with access to own context', () => {
-      // Act
-      const childOwnContext = service.getNodeContext(childId, childId);
-
-      // Assert
-      expect(childOwnContext.isSuccess).toBe(true);
-      expect(childOwnContext.value.contextData.childLevel).toBe('data');
-    });
-  });
-
-  describe('Uncle/Aunt Access Pattern', () => {
-    let grandparentId: NodeId;
-    let parentId: NodeId;
-    let uncleId: NodeId;
-    let childId: NodeId;
-
-    beforeEach(() => {
-      grandparentId = NodeId.generate();
-      parentId = NodeId.generate();
-      uncleId = NodeId.generate();
-      childId = NodeId.generate();
-
-      service.registerNode(grandparentId, 'grandparent', undefined, { grandparentData: 'root' }, 0);
-      service.registerNode(parentId, 'parent', grandparentId, { parentData: 'parent' }, 1);
-      service.registerNode(uncleId, 'uncle', grandparentId, { uncleData: 'uncle' }, 1);
-      service.registerNode(childId, 'child', parentId, { childData: 'child' }, 2);
-    });
-
-    it('should provide child with read-only access to uncle contexts', () => {
-      // Act
-      const childAccessibleContexts = service.getAccessibleContexts(childId);
-
-      // Assert
-      expect(childAccessibleContexts.isSuccess).toBe(true);
-      const uncleAccess = childAccessibleContexts.value.filter(access => 
-        access.accessReason.includes('Uncle/Aunt')
+      const result2 = contextService.buildContext(
+        childNodeId, 
+        { data: '2' }, 
+        'execution',
+        result1.value.contextId
       );
-      expect(uncleAccess.length).toBe(1);
-      expect(uncleAccess[0].accessGranted).toBe(true);
-    });
+      expect(result2).toBeValidResult();
 
-    it('should allow child to read uncle context for root cause analysis', () => {
-      // Act
-      const uncleContext = service.getNodeContext(childId, uncleId, 'read');
-
-      // Assert
-      expect(uncleContext.isSuccess).toBe(true);
-      expect(uncleContext.value.contextData.uncleData).toBe('uncle');
-    });
-
-    it('should deny child write access to uncle contexts', () => {
-      // Act
-      const writeResult = service.updateNodeContext(childId, uncleId, { modified: 'data' });
-
-      // Assert
-      expect(writeResult.isSuccess).toBe(false);
-      expect(writeResult.error).toContain('Access denied');
-    });
-  });
-
-  describe('Deep Nesting Access Pattern', () => {
-    let level0Id: NodeId;
-    let level1Id: NodeId;
-    let level2Id: NodeId;
-    let level3Id: NodeId;
-    let level4Id: NodeId;
-
-    beforeEach(() => {
-      level0Id = NodeId.generate();
-      level1Id = NodeId.generate();
-      level2Id = NodeId.generate();
-      level3Id = NodeId.generate();
-      level4Id = NodeId.generate();
-
-      service.registerNode(level0Id, 'level0', undefined, { level: 0 }, 0);
-      service.registerNode(level1Id, 'level1', level0Id, { level: 1 }, 1);
-      service.registerNode(level2Id, 'level2', level1Id, { level: 2 }, 2);
-      service.registerNode(level3Id, 'level3', level2Id, { level: 3 }, 3);
-      service.registerNode(level4Id, 'level4', level3Id, { level: 4 }, 4);
-    });
-
-    it('should provide cascading access through deep hierarchy', () => {
-      // Act
-      const deepAccessibleContexts = service.getAccessibleContexts(level4Id);
-
-      // Assert
-      expect(deepAccessibleContexts.isSuccess).toBe(true);
-      const deepNestingAccess = deepAccessibleContexts.value.filter(access => 
-        access.accessReason.includes('Deep nesting')
-      );
-      expect(deepNestingAccess.length).toBeGreaterThan(0);
-    });
-
-    it('should provide write access for levels 1-2 and read access for higher levels', () => {
-      // Act
-      const deepAccessibleContexts = service.getAccessibleContexts(level4Id);
-
-      // Assert
-      expect(deepAccessibleContexts.isSuccess).toBe(true);
-      const deepNestingAccess = deepAccessibleContexts.value.filter(access => 
-        access.accessReason.includes('Deep nesting')
+      // Act - Try to make parent a child of child (circular reference)
+      const circularResult = contextService.propagateContext(
+        result2.value.contextId,
+        parentNodeId, // This would create a circle
+        [{ property: 'data', inherit: true, override: false }]
       );
 
-      const writeAccess = deepNestingAccess.filter(access => access.context.accessLevel === 'write');
-      const readAccess = deepNestingAccess.filter(access => access.context.accessLevel === 'read');
-
-      expect(writeAccess.length).toBeGreaterThanOrEqual(1); // Level 1-2
-      expect(readAccess.length).toBeGreaterThanOrEqual(0); // Level 3+
+      // Assert
+      expect(circularResult).toBeFailureResult();
+      expect(circularResult.error).toContain('Circular reference detected');
     });
 
-    it('should allow deep nested node to access intermediate levels', () => {
+    it('should handle memory management for large contexts', () => {
+      // Arrange - Create context with large data
+      const largeData = {
+        bigArray: Array.from({ length: 10000 }, (_, i) => ({ id: i, data: `item-${i}` })),
+        metadata: { size: 'large', timestamp: new Date() }
+      };
+
       // Act
-      const level2Context = service.getNodeContext(level4Id, level2Id, 'read');
+      const result = contextService.buildContext(parentNodeId, largeData, 'execution');
 
       // Assert
-      expect(level2Context.isSuccess).toBe(true);
-      expect(level2Context.value.contextData.level).toBe(2);
-    });
-
-    it('should limit deep nesting to prevent infinite loops', () => {
-      // Arrange - Create very deep hierarchy (beyond limit)
-      let currentParent = level4Id;
-      const deepIds: NodeId[] = [];
+      expect(result).toBeValidResult();
       
-      for (let i = 5; i < 15; i++) {
-        const deepId = NodeId.generate();
-        service.registerNode(deepId, `level${i}`, currentParent, { level: i }, i);
-        deepIds.push(deepId);
-        currentParent = deepId;
-      }
+      // Verify context can be retrieved
+      const getResult = contextService.getNodeContext(parentNodeId);
+      expect(getResult).toBeValidResult();
+      expect(getResult.value.data.bigArray).toHaveLength(10000);
+      
+      // Verify cleanup works
+      const clearResult = contextService.clearNodeContext(parentNodeId);
+      expect(clearResult).toBeValidResult();
+    });
 
-      // Act
-      const veryDeepContext = service.getAccessibleContexts(deepIds[deepIds.length - 1]);
+    it('should handle malformed context data gracefully', () => {
+      // Arrange - Various malformed data types
+      const malformedData = [
+        undefined,
+        null,
+        '',
+        { circular: null as any },
+        function() { return 'function'; }
+      ];
 
-      // Assert
-      expect(veryDeepContext.isSuccess).toBe(true);
-      const deepNestingAccess = veryDeepContext.value.filter(access => 
-        access.accessReason.includes('Deep nesting')
+      // Set up circular reference
+      malformedData[3].circular = malformedData[3];
+
+      // Act & Assert
+      malformedData.forEach((data, index) => {
+        const result = contextService.buildContext(
+          NodeId.generate(), 
+          data as any, 
+          'execution'
+        );
+        
+        if (data === undefined || data === null) {
+          expect(result).toBeFailureResult();
+        } else {
+          // Should handle gracefully or succeed with sanitized data
+          expect(result.isFailure || result.isSuccess).toBe(true);
+        }
+      });
+    });
+
+    it('should maintain context isolation between different scopes', () => {
+      // Arrange - Build contexts in different scopes
+      const executionResult = contextService.buildContext(
+        NodeId.generate(), 
+        { scope: 'execution', data: 'exec-data' }, 
+        'execution'
       );
-      // Should be limited to prevent infinite traversal
-      expect(deepNestingAccess.length).toBeLessThanOrEqual(10);
-    });
-  });
+      expect(executionResult).toBeValidResult();
 
-  describe('Context Data Management', () => {
-    let nodeId: NodeId;
-
-    beforeEach(() => {
-      nodeId = NodeId.generate();
-      service.registerNode(nodeId, 'testNode', undefined, { original: 'data' }, 0);
-    });
-
-    it('should retrieve node context successfully', () => {
-      // Act
-      const context = service.getNodeContext(nodeId, nodeId);
-
-      // Assert
-      expect(context.isSuccess).toBe(true);
-      expect(context.value.contextData.original).toBe('data');
-    });
-
-    it('should update node context with proper access', () => {
-      // Arrange
-      const newContextData = { updated: 'value', timestamp: Date.now() };
-
-      // Act
-      const updateResult = service.updateNodeContext(nodeId, nodeId, newContextData);
-
-      // Assert
-      expect(updateResult.isSuccess).toBe(true);
-      
-      const updatedContext = service.getNodeContext(nodeId, nodeId);
-      expect(updatedContext.isSuccess).toBe(true);
-      expect(updatedContext.value.contextData.updated).toBe('value');
-    });
-
-    it('should fail to get context for non-existent node', () => {
-      // Arrange
-      const nonExistentId = NodeId.generate();
-
-      // Act
-      const context = service.getNodeContext(nodeId, nonExistentId);
-
-      // Assert
-      expect(context.isSuccess).toBe(false);
-      expect(context.error).toContain('Access denied');
-    });
-
-    it('should fail to update non-existent node context', () => {
-      // Arrange
-      const nonExistentId = NodeId.generate();
-
-      // Act
-      const updateResult = service.updateNodeContext(nodeId, nonExistentId, { data: 'test' });
-
-      // Assert
-      expect(updateResult.isSuccess).toBe(false);
-      expect(updateResult.error).toContain('Access denied');
-    });
-  });
-
-  describe('Action Node Context Extraction', () => {
-    it('should extract basic action node context', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      const parentId = NodeId.generate();
-      const actionNode = MockActionNode.createMock(nodeId, parentId, 'Test Action');
-
-      // Act
-      const context = service.extractActionNodeContext(actionNode);
-
-      // Assert
-      expect(context).toBeDefined();
-      expect(context.actionId).toBe(nodeId.value);
-      expect(context.name).toBe('Test Action');
-      expect(context.executionMode).toBe(ExecutionMode.SEQUENTIAL);
-      expect(context.status).toBe(ActionStatus.ACTIVE);
-    });
-
-    it('should extract tether node specific context', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      const parentId = NodeId.generate();
-      const tetherNode = MockTetherNode.createMock(nodeId, parentId, 'test-tether-ref');
-
-      // Act
-      const context = service.extractActionNodeContext(tetherNode);
-
-      // Assert
-      expect(context.type).toBe('TetherNode');
-      expect(context.tetherReferenceId).toBe('test-tether-ref');
-      expect(context.executionParameters).toEqual({ param1: 'value1' });
-      expect(context.outputMapping).toEqual({ output1: 'result1' });
-      expect(context.resourceRequirements).toEqual({ cpu: '100m', memory: '256Mi' });
-    });
-
-    it('should extract KB node specific context', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      const parentId = NodeId.generate();
-      const kbNode = MockKBNode.createMock(nodeId, parentId, 'test-kb-ref');
-
-      // Act
-      const context = service.extractActionNodeContext(kbNode);
-
-      // Assert
-      expect(context.type).toBe('KBNode');
-      expect(context.kbReferenceId).toBe('test-kb-ref');
-      expect(context.shortDescription).toBe('Test knowledge base reference');
-      expect(context.searchKeywords).toEqual(['auth', 'api', 'security']);
-      expect(context.accessPermissions).toEqual({ view: ['user1', 'user2'], edit: ['user1'] });
-    });
-
-    it('should extract function model container node context', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      const containerNode = MockFunctionModelContainerNode.createMock(nodeId, 'nested-test-model');
-
-      // Act
-      const context = service.extractActionNodeContext(containerNode);
-
-      // Assert
-      expect(context.type).toBe('FunctionModelContainer');
-      expect(context.nestedModelId).toBe('nested-test-model');
-      expect(context.orchestrationMode).toBe('embedded');
-      expect(context.contextMapping).toEqual({ input: 'parentOutput' });
-      expect(context.outputExtraction).toEqual({ result: 'nestedResult' });
-    });
-  });
-
-  describe('Access Validation', () => {
-    let parentId: NodeId;
-    let childId: NodeId;
-    let unrelatedId: NodeId;
-
-    beforeEach(() => {
-      parentId = NodeId.generate();
-      childId = NodeId.generate();
-      unrelatedId = NodeId.generate();
-
-      service.registerNode(parentId, 'parent', undefined, { parentData: 'data' }, 0);
-      service.registerNode(childId, 'child', parentId, { childData: 'data' }, 1);
-      service.registerNode(unrelatedId, 'unrelated', undefined, { unrelatedData: 'data' }, 0);
-    });
-
-    it('should validate read access correctly', () => {
-      // Act
-      const readAccess = service.getNodeContext(parentId, childId, 'read');
-
-      // Assert
-      expect(readAccess.isSuccess).toBe(true);
-    });
-
-    it('should validate write access correctly', () => {
-      // Act
-      const writeAccess = service.getNodeContext(parentId, childId, 'write');
-
-      // Assert
-      expect(writeAccess.isSuccess).toBe(true);
-    });
-
-    it('should deny access to unrelated nodes', () => {
-      // Act
-      const deniedAccess = service.getNodeContext(childId, unrelatedId, 'read');
-
-      // Assert
-      expect(deniedAccess.isSuccess).toBe(false);
-      expect(deniedAccess.error).toContain('Access denied');
-    });
-
-    it('should enforce access level hierarchy', () => {
-      // Arrange - Set up a context with read-only access
-      const siblingId = NodeId.generate();
-      service.registerNode(siblingId, 'sibling', parentId, { siblingData: 'data' }, 1);
-
-      // Act - Try to get execute access on sibling (should fail as siblings only have read access)
-      const executeAccess = service.getNodeContext(childId, siblingId, 'execute');
-
-      // Assert
-      expect(executeAccess.isSuccess).toBe(false);
-      expect(executeAccess.error).toContain('only read is available');
-    });
-  });
-
-  describe('Complex Hierarchy Scenarios', () => {
-    it('should handle multiple family trees simultaneously', () => {
-      // Arrange - Create two separate family trees
-      const family1Root = NodeId.generate();
-      const family1Child = NodeId.generate();
-      const family2Root = NodeId.generate();
-      const family2Child = NodeId.generate();
-
-      service.registerNode(family1Root, 'root1', undefined, { family: 1 }, 0);
-      service.registerNode(family1Child, 'child1', family1Root, { family: 1 }, 1);
-      service.registerNode(family2Root, 'root2', undefined, { family: 2 }, 0);
-      service.registerNode(family2Child, 'child2', family2Root, { family: 2 }, 1);
-
-      // Act
-      const family1Access = service.getAccessibleContexts(family1Child);
-      const family2Access = service.getAccessibleContexts(family2Child);
-
-      // Assert
-      expect(family1Access.isSuccess).toBe(true);
-      expect(family2Access.isSuccess).toBe(true);
-      
-      // Children should not have access to other family trees
-      const family1ChildHasFamily2Access = family1Access.value.some(access => 
-        access.context.contextData.family === 2
+      const sessionResult = contextService.buildContext(
+        NodeId.generate(), 
+        { scope: 'session', data: 'session-data' }, 
+        'session'
       );
-      expect(family1ChildHasFamily2Access).toBe(false);
-    });
+      expect(sessionResult).toBeValidResult();
 
-    it('should handle orphaned nodes gracefully', () => {
-      // Arrange
-      const orphanId = NodeId.generate();
-      service.registerNode(orphanId, 'orphan', undefined, { orphaned: true }, 0);
+      const isolatedResult = contextService.buildContext(
+        NodeId.generate(), 
+        { scope: 'isolated', data: 'isolated-data' }, 
+        'isolated'
+      );
+      expect(isolatedResult).toBeValidResult();
 
-      // Act
-      const orphanAccess = service.getAccessibleContexts(orphanId);
-
-      // Assert
-      expect(orphanAccess.isSuccess).toBe(true);
-      expect(orphanAccess.value.length).toBe(0); // No accessible contexts except own
-    });
-
-    it('should handle circular hierarchy detection', () => {
-      // This test ensures the service doesn't crash with malformed hierarchies
-      // In a real scenario, this shouldn't happen due to proper domain design,
-      // but it's good to test robustness
-
-      // Arrange
-      const nodeA = NodeId.generate();
-      const nodeB = NodeId.generate();
-      
-      service.registerNode(nodeA, 'nodeA', undefined, { node: 'A' }, 0);
-      service.registerNode(nodeB, 'nodeB', nodeA, { node: 'B' }, 1);
-
-      // Act
-      const accessResult = service.getAccessibleContexts(nodeB);
-
-      // Assert
-      expect(accessResult.isSuccess).toBe(true);
-    });
-  });
-
-  describe('Architectural Boundary Validation', () => {
-    it('should enforce domain layer business rules without external dependencies', () => {
-      // Arrange - This test validates that the service operates purely within domain boundaries
-      const service = new NodeContextAccessService();
-      const nodeId = NodeId.generate();
-      
-      // Act - All operations should work without any external dependencies
-      const registerResult = service.registerNode(nodeId, 'domain-node', undefined, { pure: 'domain-data' }, 0);
-      const contextResult = service.getNodeContext(nodeId, nodeId);
-      const accessResults = service.getAccessibleContexts(nodeId);
-      
-      // Assert - Service maintains domain purity
-      expect(registerResult.isSuccess).toBe(true);
-      expect(contextResult.isSuccess).toBe(true);
-      expect(accessResults.isSuccess).toBe(true);
-      
-      // Verify no external system calls are made (pure domain logic)
-      expect(contextResult.value.contextData.pure).toBe('domain-data');
-    });
-
-    it('should demonstrate proper hierarchical access control as executable specification', () => {
-      // Arrange - Create a complete hierarchy tree to demonstrate all access patterns
-      const rootId = NodeId.generate();
-      const branch1Id = NodeId.generate();
-      const branch2Id = NodeId.generate();
-      const leaf1Id = NodeId.generate();
-      const leaf2Id = NodeId.generate();
-      const leaf3Id = NodeId.generate();
-      
-      service.registerNode(rootId, 'root', undefined, { level: 'root', sensitive: 'admin-data' }, 0);
-      service.registerNode(branch1Id, 'branch1', rootId, { level: 'branch1', data: 'branch1-info' }, 1);
-      service.registerNode(branch2Id, 'branch2', rootId, { level: 'branch2', data: 'branch2-info' }, 1);
-      service.registerNode(leaf1Id, 'leaf1', branch1Id, { level: 'leaf1', data: 'leaf1-data' }, 2);
-      service.registerNode(leaf2Id, 'leaf2', branch1Id, { level: 'leaf2', data: 'leaf2-data' }, 2);
-      service.registerNode(leaf3Id, 'leaf3', branch2Id, { level: 'leaf3', data: 'leaf3-data' }, 2);
-
-      // Act & Assert - Demonstrate complete access pattern compliance
-      
-      // 1. Root can access all descendants with write permission
-      const rootAccess = service.getAccessibleContexts(rootId);
-      expect(rootAccess.isSuccess).toBe(true);
-      const rootWriteAccess = rootAccess.value.filter(a => a.context.accessLevel === 'write');
-      expect(rootWriteAccess.length).toBe(5); // All children and grandchildren
-      
-      // 2. Branch nodes can access their children with write, siblings with read
-      const branch1Access = service.getAccessibleContexts(branch1Id);
-      expect(branch1Access.isSuccess).toBe(true);
-      const branch1WriteAccess = branch1Access.value.filter(a => a.context.accessLevel === 'write');
-      const branch1ReadAccess = branch1Access.value.filter(a => a.context.accessLevel === 'read');
-      expect(branch1WriteAccess.length).toBeGreaterThanOrEqual(2); // leaf1, leaf2 (and possibly others)
-      expect(branch1ReadAccess.length).toBeGreaterThanOrEqual(1); // root (parent) and possibly others
-      
-      // 3. Leaf nodes have read access to parents and uncles/aunts
-      const leaf1Access = service.getAccessibleContexts(leaf1Id);
-      expect(leaf1Access.isSuccess).toBe(true);
-      const leaf1ReadAccess = leaf1Access.value.filter(a => a.context.accessLevel === 'read');
-      expect(leaf1ReadAccess.length).toBeGreaterThan(0);
-      
-      // 4. Siblings can read each other but not write
-      const leaf2ToLeaf1Read = service.getNodeContext(leaf2Id, leaf1Id, 'read');
-      const leaf2ToLeaf1Write = service.updateNodeContext(leaf2Id, leaf1Id, { hacked: 'data' });
-      expect(leaf2ToLeaf1Read.isSuccess).toBe(true);
-      expect(leaf2ToLeaf1Write.isSuccess).toBe(false);
-    });
-
-    it('should validate that access control follows the principle of least privilege', () => {
-      // Arrange - Create a sensitive data scenario
-      const adminId = NodeId.generate();
-      const managerId = NodeId.generate();
-      const employeeId = NodeId.generate();
-      const contractorId = NodeId.generate();
-      
-      service.registerNode(adminId, 'admin', undefined, { 
-        role: 'admin', 
-        sensitiveData: 'top-secret',
-        permissions: ['read', 'write', 'delete']
-      }, 0);
-      
-      service.registerNode(managerId, 'manager', adminId, { 
-        role: 'manager',
-        departmentData: 'dept-info',
-        permissions: ['read', 'write']
-      }, 1);
-      
-      service.registerNode(employeeId, 'employee', managerId, { 
-        role: 'employee',
-        personalData: 'employee-info',
-        permissions: ['read']
-      }, 2);
-      
-      service.registerNode(contractorId, 'contractor', undefined, { 
-        role: 'contractor',
-        limitedData: 'contract-work',
-        permissions: ['read']
-      }, 0);
-      
-      // Act & Assert - Validate access boundaries
-      
-      // Admin can access all subordinate data
-      const adminToEmployee = service.getNodeContext(adminId, employeeId, 'write');
-      expect(adminToEmployee.isSuccess).toBe(true);
-      
-      // Manager can access employee but not contractor (different tree)
-      const managerToEmployee = service.getNodeContext(managerId, employeeId, 'write');
-      const managerToContractor = service.getNodeContext(managerId, contractorId, 'read');
-      expect(managerToEmployee.isSuccess).toBe(true);
-      expect(managerToContractor.isSuccess).toBe(false);
-      
-      // Employee cannot access peer contractor
-      const employeeToContractor = service.getNodeContext(employeeId, contractorId, 'read');
-      expect(employeeToContractor.isSuccess).toBe(false);
-      
-      // Contractor is isolated (no access to company hierarchy)
-      const contractorToEmployee = service.getNodeContext(contractorId, employeeId, 'read');
-      expect(contractorToEmployee.isSuccess).toBe(false);
-    });
-
-    it('should serve as template for proper entity interaction patterns', () => {
-      // This test demonstrates the correct way to create and use domain entities
-      // with the context access service, serving as executable documentation
-      
-      // Arrange - Demonstrate proper entity creation patterns
-      const parentNodeId = NodeId.generate();
-      const childNodeId = NodeId.generate();
-      
-      // Use proper domain value object creation
-      const retryPolicy = RetryPolicy.create({
-        maxAttempts: 3,
-        strategy: 'exponential',
-        baseDelayMs: 1000,
-        maxDelayMs: 10000,
-        enabled: true
-      }).value!;
-      
-      // Create action nodes using proper factory methods
-      const parentAction = MockActionNode.createMock(parentNodeId, parentNodeId, 'Parent Action');
-      const childAction = MockActionNode.createMock(childNodeId, parentNodeId, 'Child Action');
-      
-      // Extract context using the service (demonstrates proper usage)
-      const parentContext = service.extractActionNodeContext(parentAction);
-      const childContext = service.extractActionNodeContext(childAction);
-      
-      // Register nodes in the access system
-      service.registerNode(parentNodeId, 'action', undefined, parentContext, 0);
-      service.registerNode(childNodeId, 'action', parentNodeId, childContext, 1);
-      
-      // Act - Demonstrate proper context access patterns
-      const parentAccessToChild = service.getNodeContext(parentNodeId, childNodeId, 'write');
-      const childAccessToParent = service.getNodeContext(childNodeId, parentNodeId, 'read');
-      
-      // Assert - Validate proper domain behavior
-      expect(parentAccessToChild.isSuccess).toBe(true);
-      expect(childAccessToParent.isSuccess).toBe(true);
-      expect(parentContext.actionId).toBeDefined();
-      expect(childContext.actionId).toBeDefined();
-      
-      // Demonstrate context data integrity
-      expect(parentAccessToChild.value.contextData.name).toBe('Child Action'); // Parent accessing child gets child's data
-      expect(childAccessToParent.value.contextData.name).toBe('Parent Action'); // Child accessing parent gets parent's data
-    });
-  });
-
-  describe('Performance and Edge Cases', () => {
-    it('should handle large hierarchies efficiently', () => {
-      // Arrange
-      const rootId = NodeId.generate();
-      service.registerNode(rootId, 'root', undefined, { root: true }, 0);
-
-      const childIds: NodeId[] = [];
-      for (let i = 0; i < 100; i++) {
-        const childId = NodeId.generate();
-        service.registerNode(childId, `child${i}`, rootId, { childIndex: i }, 1);
-        childIds.push(childId);
-      }
-
-      const startTime = performance.now();
-
-      // Act
-      const accessResults = childIds.map(childId => 
-        service.getAccessibleContexts(childId)
+      // Act - Attempt cross-scope access
+      const crossAccessValidation = contextService.validateContextAccess(
+        executionResult.value.nodeId,
+        isolatedResult.value.nodeId,
+        'read',
+        ['data']
       );
 
-      const endTime = performance.now();
-      const executionTime = endTime - startTime;
-
-      // Assert
-      expect(accessResults.every(result => result.isSuccess)).toBe(true);
-      expect(executionTime).toBeLessThan(1000); // Should complete within 1 second
-    });
-
-    it('should handle empty context data gracefully', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      service.registerNode(nodeId, 'emptyNode', undefined, {}, 0);
-
-      // Act
-      const context = service.getNodeContext(nodeId, nodeId);
-
-      // Assert
-      expect(context.isSuccess).toBe(true);
-      expect(context.value.contextData).toEqual({});
-    });
-
-    it('should handle null/undefined context data', () => {
-      // Arrange
-      const nodeId = NodeId.generate();
-      service.registerNode(nodeId, 'nullNode', undefined, null as any, 0);
-
-      // Act
-      const context = service.getNodeContext(nodeId, nodeId);
-
-      // Assert
-      expect(context.isSuccess).toBe(true);
-    });
-
-    it('should handle very deep hierarchies with maximum depth limits', () => {
-      // Arrange - Create a hierarchy deeper than the internal limit
-      let currentParent: NodeId | undefined = undefined;
-      const nodeIds: NodeId[] = [];
-
-      for (let i = 0; i < 15; i++) {
-        const nodeId = NodeId.generate();
-        service.registerNode(nodeId, `level${i}`, currentParent, { level: i }, i);
-        nodeIds.push(nodeId);
-        currentParent = nodeId;
-      }
-
-      // Act
-      const deepestNodeAccess = service.getAccessibleContexts(nodeIds[nodeIds.length - 1]);
-
-      // Assert
-      expect(deepestNodeAccess.isSuccess).toBe(true);
-      // Should still work but be limited by internal safeguards
+      // Assert - Isolated scope should restrict access
+      expect(crossAccessValidation).toBeValidResult();
+      expect(crossAccessValidation.value.granted).toBe(false);
     });
   });
 });

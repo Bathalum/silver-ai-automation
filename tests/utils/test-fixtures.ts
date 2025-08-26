@@ -89,7 +89,7 @@ export class FunctionModelBuilder {
   private status = ModelStatus.DRAFT;
   private metadata = { createdFor: 'testing' };
   private permissions = {
-    owner: 'test-user-id',
+    owner: TestData.VALID_USER_ID, // Use consistent test user ID
     editors: [] as string[],
     viewers: [] as string[]
   };

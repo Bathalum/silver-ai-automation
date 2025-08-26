@@ -108,7 +108,7 @@ export class FractalOrchestrationService {
       const result: FractalOrchestrationResult = {
         executionId,
         totalLevels: state.levels.length,
-        completedLevels: state.currentLevel,
+        completedLevels: state.levels.length, // All levels completed successfully
         failedLevels: 0,
         totalDuration: state.endTime.getTime() - (state.startTime?.getTime() || 0),
         contextOutputs: this.aggregateContextOutputs(state)

@@ -11,7 +11,10 @@ export {
   ModelUpdated,
   ActionNodeRetryPolicyUpdated,
   VersionCreated,
-  FunctionModelVersionCreated
+  FunctionModelVersionCreated,
+  ModelSoftDeletedEvent,
+  ModelUndeletedEvent,
+  ModelRestoredEvent
 } from './model-events';
 
 // Node management events  

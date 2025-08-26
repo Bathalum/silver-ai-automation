@@ -111,21 +111,26 @@ export class CreateFunctionModelUseCase {
         return Result.fail<CreateModelResult>(`Failed to save model: ${saveResult.error}`);
       }
 
-      // Publish domain event
-      await this.eventBus.publish({
-        eventType: 'FunctionModelCreated',
-        aggregateId: modelId,
-        eventData: {
-          modelId,
-          name: command.name,
-          description: command.description,
-          templateId: command.templateId,
-          organizationId: command.organizationId,
-          createdBy: command.userId
-        },
-        userId: command.userId,
-        timestamp: new Date()
-      });
+      // Publish domain event (failure should not fail the primary operation)
+      try {
+        await this.eventBus.publish({
+          eventType: 'FunctionModelCreated',
+          aggregateId: modelId,
+          eventData: {
+            modelId,
+            name: command.name,
+            description: command.description,
+            templateId: command.templateId,
+            organizationId: command.organizationId,
+            createdBy: command.userId
+          },
+          userId: command.userId,
+          timestamp: new Date()
+        });
+      } catch (eventError) {
+        // Log event publishing failure but don't fail the operation
+        console.warn('Failed to publish FunctionModelCreated event:', eventError);
+      }
 
       // Return success result
       return Result.ok<CreateModelResult>({
@@ -156,7 +161,7 @@ export class CreateFunctionModelUseCase {
       return Result.fail<void>('Model description cannot exceed 5000 characters');
     }
 
-    if (command.templateId && command.templateId.trim().length === 0) {
+    if (command.templateId !== undefined && command.templateId.trim().length === 0) {
       return Result.fail<void>('Template ID cannot be empty if provided');
     }
 

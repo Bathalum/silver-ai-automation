@@ -321,6 +321,141 @@ export class ModelDeleted extends DomainEvent {
   }
 }
 
+export interface ModelSoftDeletedData {
+  aggregateId: string;
+  deletedBy: string;
+  deletedAt: Date;
+  reason?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ModelUndeletedData {
+  aggregateId: string;
+  restoredBy: string;
+  restoredAt: Date;
+  reason?: string;
+}
+
+export class ModelSoftDeletedEvent extends DomainEvent {
+  public readonly deletedBy: string;
+  public readonly deletedAt: Date;
+  public readonly reason?: string;
+  public readonly metadata?: Record<string, any>;
+
+  constructor(data: ModelSoftDeletedData, eventVersion = 1) {
+    super(data.aggregateId, eventVersion);
+    this.deletedBy = data.deletedBy;
+    this.deletedAt = data.deletedAt;
+    this.reason = data.reason;
+    this.metadata = data.metadata;
+  }
+
+  public getEventName(): string {
+    return 'ModelSoftDeleted';
+  }
+
+  public getEventData(): Record<string, any> {
+    const data: Record<string, any> = {
+      aggregateId: this.aggregateId,
+      deletedBy: this.deletedBy,
+      deletedAt: this.deletedAt.toISOString(),
+    };
+
+    if (this.reason !== undefined) {
+      data.reason = this.reason;
+    }
+
+    if (this.metadata !== undefined) {
+      data.metadata = this.metadata;
+    }
+
+    return data;
+  }
+}
+
+export class ModelUndeletedEvent extends DomainEvent {
+  public readonly restoredBy: string;
+  public readonly restoredAt: Date;
+  public readonly reason?: string;
+
+  constructor(data: ModelUndeletedData, eventVersion = 1) {
+    super(data.aggregateId, eventVersion);
+    this.restoredBy = data.restoredBy;
+    this.restoredAt = data.restoredAt;
+    this.reason = data.reason;
+  }
+
+  public getEventName(): string {
+    return 'ModelUndeleted';
+  }
+
+  public getEventData(): Record<string, any> {
+    const data: Record<string, any> = {
+      aggregateId: this.aggregateId,
+      restoredBy: this.restoredBy,
+      restoredAt: this.restoredAt.toISOString(),
+    };
+
+    if (this.reason !== undefined) {
+      data.reason = this.reason;
+    }
+
+    return data;
+  }
+}
+
+export interface ModelRestoredData {
+  aggregateId: string;
+  restoredBy: string;
+  restoredAt: Date;
+  reason?: string;
+  previousStatus?: ModelStatus;
+  targetStatus?: ModelStatus;
+}
+
+export class ModelRestoredEvent extends DomainEvent {
+  public readonly restoredBy: string;
+  public readonly restoredAt: Date;
+  public readonly reason?: string;
+  public readonly previousStatus?: ModelStatus;
+  public readonly targetStatus?: ModelStatus;
+
+  constructor(data: ModelRestoredData, eventVersion = 1) {
+    super(data.aggregateId, eventVersion);
+    this.restoredBy = data.restoredBy;
+    this.restoredAt = data.restoredAt;
+    this.reason = data.reason;
+    this.previousStatus = data.previousStatus;
+    this.targetStatus = data.targetStatus;
+  }
+
+  public getEventName(): string {
+    return 'ModelRestored';
+  }
+
+  public getEventData(): Record<string, any> {
+    const data: Record<string, any> = {
+      aggregateId: this.aggregateId,
+      restoredBy: this.restoredBy,
+      restoredAt: this.restoredAt.toISOString(),
+    };
+
+    if (this.reason !== undefined) {
+      data.reason = this.reason;
+    }
+
+    if (this.previousStatus !== undefined) {
+      data.previousStatus = this.previousStatus;
+    }
+
+    if (this.targetStatus !== undefined) {
+      data.targetStatus = this.targetStatus;
+    }
+
+    return data;
+  }
+}
+
 export class ModelVersionCreated extends DomainEvent {
   public readonly eventType = 'ModelVersionCreated';
   public readonly occurredAt: Date;

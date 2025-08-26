@@ -14,7 +14,13 @@
       "Bash(grep:*)",
       "Bash(pntml test:*)",
       "Bash(timeout 30 pnpm test:*)",
-      "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects/**)"
+      "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects/**)",
+      "Bash(del test-debug.js)",
+      "Bash(npx jest:*)",
+      "mcp__ide__executeCode",
+      "Bash(npm run build:*)",
+      "Bash(sed:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": [],

@@ -35,84 +35,84 @@ export type ServiceIconType =
 export function getWorkProcess(): WorkProcessStep[] {
   return [
     {
-      id: "discovery",
-      step: 1,
-      title: "Discovery & Analysis", 
-      description: "We start by understanding your business processes, identifying pain points, and mapping current workflows to find the best automation opportunities.",
-      color: "#3B82F6",
-      duration: "1-2 weeks",
-      features: [
-        "Process mapping and documentation",
-        "Bottleneck identification", 
-        "ROI opportunity assessment",
-        "Stakeholder interviews"
+      "id": "audit",
+      "step": 1,
+      "title": "Audit & Analysis",
+      "description": "We conduct an event storming session to deeply understand your current workflow, define clear success metrics, and identify requirements to set the foundation for transformation.",
+      "color": "#3B82F6",
+      "duration": "1-2 weeks",
+      "features": [
+        "Event storming workshops",
+        "Success metrics definition",
+        "Requirement gathering",
+        "Stakeholder collaboration"
       ],
-      deliverables: [
-        "Current state analysis report",
-        "Automation opportunity matrix",
-        "Initial ROI projections"
+      "deliverables": [
+        "Current workflow documentation",
+        "Success metrics report",
+        "Requirements analysis"
       ],
-      tools: ["Process mapping software", "Analytics tools", "Interview frameworks"]
+      "tools": ["Event storming platforms", "Analytics tools", "Collaboration frameworks"]
     },
     {
-      id: "strategy",
-      step: 2,
-      title: "Strategy & Planning",
-      description: "Based on our findings, we create a comprehensive automation strategy with clear priorities, timelines, and success metrics.",
-      color: "#10B981",
-      duration: "1 week",
-      features: [
-        "Automation roadmap creation",
-        "Technology stack selection",
-        "Implementation timeline",
-        "Success metrics definition"
+      "id": "map_design",
+      "step": 2,
+      "title": "Map & Design",
+      "description": "We map your current workflow to our proprietary Data-Driven Function Model (D2FM), creating a design blueprint for the optimized workflow and identifying actionable steps for implementation, ensuring access is provided.",
+      "color": "#10B981",
+      "duration": "1-2 weeks",
+      "features": [
+        "Workflow mapping to D2FM",
+        "Design blueprint creation",
+        "Action step identification",
+        "Access and permissions setup"
       ],
-      deliverables: [
-        "Automation strategy document",
-        "Technical architecture plan",
-        "Project timeline and milestones"
+      "deliverables": [
+        "D2FM workflow map",
+        "Design blueprint document",
+        "Action plan with milestones"
       ],
-      tools: ["Strategic planning tools", "Architecture design software", "Project management platforms"]
+      "tools": ["D2FM modeling tools", "Design software", "Project management platforms"]
     },
     {
-      id: "implementation",
-      step: 3, 
-      title: "Implementation & Integration",
-      description: "Our expert team builds and integrates the AI automation solutions, ensuring seamless connectivity with your existing systems.",
-      color: "#F59E0B",
-      duration: "2-6 weeks",
-      features: [
-        "Custom AI solution development",
-        "System integration and APIs",
+      "id": "implementation_integration",
+      "step": 3,
+      "title": "Implementation & Integration",
+      "description": "We execute the action steps, implement the new workflow, integrate it with existing systems, and conduct thorough testing and quality assurance to ensure functionality.",
+      "color": "#F59E0B",
+      "duration": "2-4 weeks",
+      "features": [
+        "Action step execution",
+        "System integration",
         "Testing and quality assurance",
-        "Security and compliance setup"
+        "Workflow validation"
       ],
-      deliverables: [
-        "Deployed automation solution",
+      "deliverables": [
+        "Implemented workflow solution",
         "Integration documentation",
-        "Test results and validation"
+        "QA and test reports"
       ],
-      tools: ["AI/ML frameworks", "Integration platforms", "Testing tools", "Security scanners"]
+      "tools": ["Integration platforms", "Testing tools", "Workflow automation software"]
     },
     {
-      id: "optimization",
-      step: 4,
-      title: "Optimization & Support",
-      description: "We monitor performance, fine-tune the system, and provide ongoing support to ensure maximum efficiency and continuous improvement.",
-      color: "#8B5CF6", 
-      duration: "Ongoing",
-      features: [
-        "Performance monitoring and analytics",
-        "Continuous optimization",
-        "User training and support",
-        "Regular system updates"
+      "id": "rollout_support",
+      "step": 4,
+      "title": "Roll Out & Support",
+      "description": "We collaborate with your change management team to roll out the new workflow, propose a pilot system if needed, and provide bug fixes and updates for one week post-rollout.",
+      "color": "#8B5CF6",
+      "duration": "1 week",
+      "features": [
+        "Change management collaboration",
+        "Pilot system setup (if applicable)",
+        "Bug fixing and updates",
+        "User support during rollout"
       ],
-      deliverables: [
-        "Performance dashboard",
-        "Optimization reports",
-        "Support documentation"
+      "deliverables": [
+        "Rollout plan and execution report",
+        "Pilot system documentation (if applicable)",
+        "Support and bug fix logs"
       ],
-      tools: ["Monitoring platforms", "Analytics tools", "Support systems", "Training platforms"]
+      "tools": ["Change management tools", "Support systems", "Monitoring platforms"]
     }
   ]
 }
