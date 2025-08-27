@@ -94,6 +94,12 @@ export {
   type ManageFractalOrchestrationCommand
 } from './function-model/manage-fractal-orchestration-use-case';
 
+export {
+  ManageErrorHandlingAndRecoveryUseCase,
+  type ErrorHandlingRequest,
+  type ErrorHandlingResult
+} from './function-model/manage-error-handling-and-recovery-use-case';
+
 // Query Handlers
 export {
   GetFunctionModelQueryHandler,

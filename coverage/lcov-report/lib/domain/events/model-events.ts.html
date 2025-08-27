@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">3.24% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>10/308</span>
+                <span class='fraction'>0/308</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.21% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/82</span>
+                <span class='fraction'>0/82</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.06% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/94</span>
+                <span class='fraction'>0/94</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">3.24% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>10/308</span>
+                <span class='fraction'>0/308</span>
             </div>
         
             
@@ -1255,8 +1255,8 @@
 <a name='L1190'></a><a href='#L1190'>1190</a>
 <a name='L1191'></a><a href='#L1191'>1191</a>
 <a name='L1192'></a><a href='#L1192'>1192</a>
-<a name='L1193'></a><a href='#L1193'>1193</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<a name='L1193'></a><a href='#L1193'>1193</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2268,7 +2268,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">68x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2286,13 +2286,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">68x</span>
-<span class="cline-any cline-yes">68x</span>
-<span class="cline-any cline-yes">68x</span>
-<span class="cline-any cline-yes">68x</span>
-<span class="cline-any cline-yes">68x</span>
-<span class="cline-any cline-yes">68x</span>
-<span class="cline-any cline-yes">68x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2447,8 +2447,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { DomainEvent } from './domain-event';
-import { ModelStatus, ActionStatus, ExecutionMode, FeatureType, LinkType } from '../enums';
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { DomainEvent } from <span class="cstat-no" title="statement not covered" >'./domain-event';</span>
+import { ModelStatus, ActionStatus, ExecutionMode, FeatureType, LinkType } from <span class="cstat-no" title="statement not covered" >'../enums';</span>
 import { RetryPolicy } from '../value-objects/retry-policy';
 &nbsp;
 export interface ModelCreatedData {
@@ -3460,7 +3460,7 @@ export class <span class="cstat-no" title="statement not covered" >NodeLinkRemov
   }
 }
 &nbsp;
-export class CrossFeatureLinkEstablished extends DomainEvent {
+export class <span class="cstat-no" title="statement not covered" >CrossFeatureLinkEstablished </span>extends DomainEvent {
   public readonly linkId: string;
   public readonly sourceFeature: FeatureType;
   public readonly targetFeature: FeatureType;
@@ -3468,7 +3468,7 @@ export class CrossFeatureLinkEstablished extends DomainEvent {
   public readonly linkStrength: number;
   public readonly establishedBy: string;
 &nbsp;
-  constructor(
+<span class="fstat-no" title="function not covered" >  constructor(</span>
     aggregateId: string,
     linkId: string,
     sourceFeature: FeatureType,
@@ -3476,15 +3476,15 @@ export class CrossFeatureLinkEstablished extends DomainEvent {
     linkType: LinkType,
     linkStrength: number,
     establishedBy: string,
-    eventVersion = 1
+    eventVersion = <span class="branch-0 cbranch-no" title="branch not covered" >1</span>
   ) {
-    super(aggregateId, eventVersion);
-    this.linkId = linkId;
-    this.sourceFeature = sourceFeature;
-    this.targetFeature = targetFeature;
-    this.linkType = linkType;
-    this.linkStrength = linkStrength;
-    this.establishedBy = establishedBy;
+<span class="cstat-no" title="statement not covered" >    super(aggregateId, eventVersion);</span>
+<span class="cstat-no" title="statement not covered" >    this.linkId = linkId;</span>
+<span class="cstat-no" title="statement not covered" >    this.sourceFeature = sourceFeature;</span>
+<span class="cstat-no" title="statement not covered" >    this.targetFeature = targetFeature;</span>
+<span class="cstat-no" title="statement not covered" >    this.linkType = linkType;</span>
+<span class="cstat-no" title="statement not covered" >    this.linkStrength = linkStrength;</span>
+<span class="cstat-no" title="statement not covered" >    this.establishedBy = establishedBy;</span>
   }
 &nbsp;
   public <span class="fstat-no" title="function not covered" >getEventName(): string {</span>
@@ -3646,7 +3646,7 @@ export class <span class="cstat-no" title="statement not covered" >FractalOrches
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-26T08:19:51.393Z
+                at 2025-08-27T00:35:44.758Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
