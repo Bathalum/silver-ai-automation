@@ -92,7 +92,7 @@ describe('Domain Events Test Suite', () => {
       expect(event.aggregateId).toBe('test-aggregate-123');
       expect(event.eventVersion).toBe(1);
       expect(event.eventId).toBeDefined();
-      expect(event.occurredOn).toBeInstanceOf(Date);
+      expect(event.occurredAt).toBeInstanceOf(Date);
       expect(event.getEventName()).toBe('TestEvent');
       expect(event.getEventData()).toEqual({ testData: 'test-data' });
     });
@@ -129,7 +129,7 @@ describe('Domain Events Test Suite', () => {
         eventName: 'TestEvent',
         aggregateId: 'test-aggregate-456',
         eventVersion: 1,
-        occurredOn: event.occurredOn.toISOString(),
+        occurredAt: event.occurredAt.toISOString(),
         eventData: { testData: 'serialization-test' }
       });
     });
@@ -212,6 +212,7 @@ describe('Domain Events Test Suite', () => {
         expect(event.changes).toEqual(changes);
         expect(event.updatedBy).toBe('user-456');
         expect(event.getEventData()).toEqual({
+          modelId: 'model-123',
           changes: changes,
           updatedBy: 'user-456',
         });
@@ -543,7 +544,7 @@ describe('Domain Events Test Suite', () => {
 
       it('should create AI agent configured event without optional fields', () => {
         // Arrange & Act
-        const event = new AIAgentConfigured('agent-aggregate-123', 'agent-456', FeatureType.USER_STORY, 'entity-789');
+        const event = new AIAgentConfigured('agent-aggregate-123', 'agent-456', FeatureType.FUNCTION_MODEL, 'entity-789');
 
         // Assert
         expect(event.nodeId).toBeUndefined();
@@ -554,13 +555,29 @@ describe('Domain Events Test Suite', () => {
     describe('AIAgentExecutionStarted', () => {
       it('should create AI agent execution started event', () => {
         // Arrange & Act
-        const event = new AIAgentExecutionStarted('agent-aggregate-123', 'agent-456', 'execution-789', 'Data Analysis Task', 'task-starter-123');
+        const eventData = {
+          agentId: 'agent-456',
+          agentName: 'Test AI Agent',
+          executionId: 'execution-789',
+          trigger: {
+            eventType: 'DataAnalysisTask',
+            eventId: 'trigger-event-123',
+            triggeredBy: 'task-starter-123'
+          },
+          executionContext: {
+            availableTools: ['data-processor', 'analyzer'],
+            executionMode: 'batch',
+            timeoutMs: 30000
+          },
+          startedAt: new Date()
+        };
+        const event = new AIAgentExecutionStarted(eventData);
 
         // Assert
         expect(event.getEventName()).toBe('AIAgentExecutionStarted');
         expect(event.executionId).toBe('execution-789');
-        expect(event.task).toBe('Data Analysis Task');
-        expect(event.startedBy).toBe('task-starter-123');
+        expect(event.agentName).toBe('Test AI Agent');
+        expect(event.trigger.triggeredBy).toBe('task-starter-123');
       });
     });
 
@@ -883,8 +900,8 @@ describe('Domain Events Test Suite', () => {
       // Alternative test: Verify that modifying the event's returned data doesn't affect the event
       const eventData = event.getEventData();
       eventData.changes.name = 'Another Change';
-      // The event should ideally be unaffected, but current implementation shares references
-      expect(event.changes.name).toBe('Another Change'); // Current behavior
+      // With proper immutability, the event should not be affected
+      expect(event.changes.name).toBe('Modified Name'); // Still shares reference with constructor parameter
     });
 
     it('should validate retry policy event data integrity', () => {
@@ -906,7 +923,7 @@ describe('Domain Events Test Suite', () => {
       const serialized = event.toObject();
 
       // Assert
-      expect(serialized.eventData.retryPolicy).toBe(retryPolicy);
+      expect(serialized.eventData.retryPolicy).toEqual(retryPolicy.toObject());
       expect(serialized.eventData.updatedBy).toBe('updater-789');
     });
   });

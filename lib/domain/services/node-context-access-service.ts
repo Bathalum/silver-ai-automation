@@ -192,28 +192,30 @@ export class NodeContextAccessService {
 
     // Type-specific context extraction
     if (actionNode instanceof TetherNode) {
-      const config = actionNode.configuration;
+      const tetherNode = actionNode as TetherNode;
+      const config = tetherNode.tetherData;
       return {
         ...baseContext,
         type: 'TetherNode',
-        tetherReferenceId: config?.tetherReferenceId,
-        executionParameters: config?.executionParameters,
-        outputMapping: config?.outputMapping,
-        resourceRequirements: config?.resourceRequirements,
-        integrationConfig: config?.integrationConfig
+        tetherReferenceId: config.tetherReferenceId,
+        executionParameters: config.executionParameters,
+        outputMapping: config.outputMapping,
+        resourceRequirements: config.resourceRequirements,
+        integrationConfig: config.integrationConfig
       };
     }
 
     if (actionNode instanceof KBNode) {
-      const config = actionNode.configuration;
+      const kbNode = actionNode as KBNode;
+      const config = kbNode.kbData;
       return {
         ...baseContext,
         type: 'KBNode',
-        kbReferenceId: config?.kbReferenceId,
-        shortDescription: config?.shortDescription,
-        documentationContext: config?.documentationContext,
-        searchKeywords: config?.searchKeywords,
-        accessPermissions: config?.accessPermissions
+        kbReferenceId: config.kbReferenceId,
+        shortDescription: config.shortDescription,
+        documentationContext: config.documentationContext,
+        searchKeywords: config.searchKeywords,
+        accessPermissions: config.accessPermissions
       };
     }
 
@@ -432,8 +434,13 @@ export class NodeContextAccessService {
   public setContextData(nodeId: string, contextData: any): void {
     const existingContext = this.nodeHierarchy.get(nodeId);
     if (existingContext) {
-      existingContext.contextData = { ...contextData };
-      this.nodeHierarchy.set(nodeId, existingContext);
+      // Use the same approach as debugForceSetContext which works
+      this.nodeHierarchy.delete(nodeId);
+      const updatedContext: NodeContext = {
+        ...existingContext,
+        contextData: contextData
+      };
+      this.nodeHierarchy.set(nodeId, updatedContext);
     }
   }
 
@@ -476,24 +483,88 @@ export class NodeContextAccessService {
     // Find nodes related to the source model that might have nested contexts
     const nestedContexts: any[] = [];
     
+    console.log('getDeepNestedContext: looking for targetModelId:', targetModelId);
+    console.log('getDeepNestedContext: sourceModelId:', sourceModelId);
+    console.log('getDeepNestedContext: total nodes in hierarchy:', this.nodeHierarchy.size);
+    
     for (const [nodeId, nodeContext] of this.nodeHierarchy.entries()) {
+      console.log('getDeepNestedContext: checking node', nodeId, 'contextData keys:', Object.keys(nodeContext.contextData || {}));
+      console.log('getDeepNestedContext: node contextData type:', typeof nodeContext.contextData);
+      console.log('getDeepNestedContext: node contextData:', nodeContext.contextData);
+      
       // Check if this node's context data has references to the target model
       if (nodeContext.contextData && this.hasNestedModelReferences(nodeContext.contextData, targetModelId)) {
+        console.log('getDeepNestedContext: FOUND match in node', nodeId);
         nestedContexts.push(nodeContext.contextData);
+      } else if (nodeContext.contextData) {
+        console.log('getDeepNestedContext: hasNestedModelReferences returned false for node', nodeId);
       }
     }
     
+    console.log('getDeepNestedContext: returning', nestedContexts.length, 'contexts');
     return nestedContexts;
+  }
+
+  /**
+   * Debug method to check the current state of the service
+   */
+  public debugState(): { nodeCount: number, nodes: Array<{ nodeId: string, nodeType: string, hasContextData: boolean, contextKeys: string[], contextDataType: string, contextData: any }> } {
+    const nodes = [];
+    for (const [nodeId, nodeContext] of this.nodeHierarchy.entries()) {
+      nodes.push({
+        nodeId,
+        nodeType: nodeContext.nodeType,
+        hasContextData: !!nodeContext.contextData,
+        contextKeys: nodeContext.contextData ? Object.keys(nodeContext.contextData) : [],
+        contextDataType: typeof nodeContext.contextData,
+        contextData: nodeContext.contextData
+      });
+    }
+    return {
+      nodeCount: this.nodeHierarchy.size,
+      nodes
+    };
+  }
+
+  /**
+   * Test method to directly manipulate the hierarchy for debugging
+   */
+  public debugForceSetContext(nodeId: string, contextData: any): boolean {
+    // Direct map manipulation
+    const existing = this.nodeHierarchy.get(nodeId);
+    if (!existing) return false;
+    
+    console.log('debugForceSetContext: existing context keys before:', Object.keys(existing.contextData || {}));
+    console.log('debugForceSetContext: setting contextData with keys:', Object.keys(contextData));
+    
+    // Completely replace the object in the map
+    this.nodeHierarchy.delete(nodeId);
+    const newContext = {
+      ...existing,
+      contextData: contextData
+    };
+    console.log('debugForceSetContext: new context created with keys:', Object.keys(newContext.contextData));
+    this.nodeHierarchy.set(nodeId, newContext);
+    
+    // Verify it was set
+    const verify = this.nodeHierarchy.get(nodeId);
+    console.log('debugForceSetContext: verified context keys:', Object.keys(verify?.contextData || {}));
+    
+    return true;
   }
 
   /**
    * Check if context data contains references to a nested model
    */
   private hasNestedModelReferences(contextData: any, targetModelId: string): boolean {
+    console.log('hasNestedModelReferences: checking for targetModelId:', targetModelId);
+    console.log('hasNestedModelReferences: contextData keys:', Object.keys(contextData));
+    
     // Check various possible locations where nested model references might exist
     
     // Check direct nestedModelId reference
     if (contextData.nestedModelId === targetModelId) {
+      console.log('hasNestedModelReferences: MATCH in nestedModelId');
       return true;
     }
     
@@ -501,23 +572,30 @@ export class NodeContextAccessService {
     if (contextData.executionMemory && contextData.executionMemory.parentModels) {
       if (Array.isArray(contextData.executionMemory.parentModels) && 
           contextData.executionMemory.parentModels.includes(targetModelId)) {
+        console.log('hasNestedModelReferences: MATCH in executionMemory.parentModels');
         return true;
       }
     }
     
     // Check in nested model outputs (for FunctionModelContainerContext)
-    if (contextData.nestedModelOutputs && contextData.nestedModelOutputs[targetModelId]) {
-      return true;
+    if (contextData.nestedModelOutputs) {
+      console.log('hasNestedModelReferences: checking nestedModelOutputs keys:', Object.keys(contextData.nestedModelOutputs));
+      if (contextData.nestedModelOutputs[targetModelId]) {
+        console.log('hasNestedModelReferences: MATCH in nestedModelOutputs');
+        return true;
+      }
     }
     
     // Check in orchestration state nested models
     if (contextData.orchestrationState && contextData.orchestrationState.nestedModels) {
       if (Array.isArray(contextData.orchestrationState.nestedModels) &&
           contextData.orchestrationState.nestedModels.includes(targetModelId)) {
+        console.log('hasNestedModelReferences: MATCH in orchestrationState.nestedModels');
         return true;
       }
     }
     
+    console.log('hasNestedModelReferences: NO MATCH found');
     return false;
   }
 }

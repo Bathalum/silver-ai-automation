@@ -2,23 +2,31 @@ import { Result } from '../shared/result';
 
 export interface AuditLogProps {
   auditId: string;
-  tableName: string;
-  operation: 'create' | 'update' | 'delete';
-  recordId: string;
+  tableName?: string;  // Keep for backwards compatibility
+  operation?: 'create' | 'update' | 'delete';  // Keep for backwards compatibility
+  recordId?: string;  // Keep for backwards compatibility
   oldData?: any;
   newData?: any;
-  changedBy: string;
-  changedAt: Date;
+  changedBy?: string;  // Keep for backwards compatibility
+  changedAt?: Date;  // Keep for backwards compatibility
+  // New enhanced interface
+  entityType?: string;
+  entityId?: string;
+  action?: string;
+  userId?: string;
+  timestamp?: Date;
+  details?: any;
 }
 
 export class AuditLog {
   private constructor(private props: AuditLogProps) {}
 
-  public static create(props: Omit<AuditLogProps, 'changedAt'>): Result<AuditLog> {
+  public static create(props: Omit<AuditLogProps, 'changedAt' | 'timestamp'>): Result<AuditLog> {
     const now = new Date();
     const auditProps: AuditLogProps = {
       ...props,
-      changedAt: now,
+      changedAt: props.changedAt || now,
+      timestamp: props.timestamp || now,
     };
 
     const validationResult = AuditLog.validate(auditProps);
@@ -58,7 +66,32 @@ export class AuditLog {
   }
 
   public get changedAt(): Date {
-    return this.props.changedAt;
+    return this.props.changedAt || this.props.timestamp || new Date();
+  }
+
+  // New enhanced interface getters
+  public get entityType(): string {
+    return this.props.entityType || this.props.tableName || '';
+  }
+
+  public get entityId(): string {
+    return this.props.entityId || this.props.recordId || '';
+  }
+
+  public get action(): string {
+    return this.props.action || this.props.operation || '';
+  }
+
+  public get userId(): string {
+    return this.props.userId || this.props.changedBy || '';
+  }
+
+  public get timestamp(): Date {
+    return this.props.timestamp || this.props.changedAt || new Date();
+  }
+
+  public get details(): any {
+    return this.props.details;
   }
 
   public hasDataChange(): boolean {
@@ -108,33 +141,42 @@ export class AuditLog {
       return Result.fail<void>('Audit ID cannot be empty');
     }
 
-    if (!props.tableName || props.tableName.trim().length === 0) {
+    // Validate using the new interface if present, otherwise use legacy
+    const tableName = props.entityType || props.tableName;
+    const recordId = props.entityId || props.recordId;
+    const changedBy = props.userId || props.changedBy;
+    const operation = props.action || props.operation;
+
+    if (!tableName || tableName.trim().length === 0) {
       return Result.fail<void>('Table name cannot be empty');
     }
 
-    if (!props.recordId || props.recordId.trim().length === 0) {
+    if (!recordId || recordId.trim().length === 0) {
       return Result.fail<void>('Record ID cannot be empty');
     }
 
-    if (!props.changedBy || props.changedBy.trim().length === 0) {
+    if (!changedBy || changedBy.trim().length === 0) {
       return Result.fail<void>('Changed by user ID cannot be empty');
     }
 
-    if (!['create', 'update', 'delete'].includes(props.operation)) {
+    // Skip operation validation for new enhanced interface - it uses flexible actions
+    if (props.operation && !['create', 'update', 'delete'].includes(props.operation)) {
       return Result.fail<void>('Operation must be create, update, or delete');
     }
 
-    // Validate operation-specific requirements
-    if (props.operation === 'create' && !props.newData) {
-      return Result.fail<void>('Create operation must have new data');
-    }
+    // Validate operation-specific requirements only for legacy interface
+    if (props.operation) {
+      if (props.operation === 'create' && !props.newData) {
+        return Result.fail<void>('Create operation must have new data');
+      }
 
-    if (props.operation === 'delete' && !props.oldData) {
-      return Result.fail<void>('Delete operation must have old data');
-    }
+      if (props.operation === 'delete' && !props.oldData) {
+        return Result.fail<void>('Delete operation must have old data');
+      }
 
-    if (props.operation === 'update' && !props.oldData && !props.newData) {
-      return Result.fail<void>('Update operation must have old data or new data');
+      if (props.operation === 'update' && !props.oldData && !props.newData) {
+        return Result.fail<void>('Update operation must have old data or new data');
+      }
     }
 
     return Result.ok<void>(undefined);

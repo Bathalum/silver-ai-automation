@@ -1,17 +1,22 @@
 export abstract class DomainEvent {
-  public readonly occurredOn: Date;
+  public readonly occurredAt: Date;
   public readonly eventId: string;
 
   constructor(
     public readonly aggregateId: string,
     public readonly eventVersion: number = 1
   ) {
-    this.occurredOn = new Date();
+    this.occurredAt = new Date();
     this.eventId = crypto.randomUUID();
   }
 
   public abstract getEventName(): string;
   public abstract getEventData(): Record<string, any>;
+
+  // Convenience getters for tests and backwards compatibility
+  public get eventType(): string {
+    return this.getEventName();
+  }
 
   public equals(other: DomainEvent): boolean {
     return this.eventId === other.eventId;
@@ -22,7 +27,7 @@ export abstract class DomainEvent {
     eventName: string;
     aggregateId: string;
     eventVersion: number;
-    occurredOn: string;
+    occurredAt: string;
     eventData: Record<string, any>;
   } {
     return {
@@ -30,7 +35,7 @@ export abstract class DomainEvent {
       eventName: this.getEventName(),
       aggregateId: this.aggregateId,
       eventVersion: this.eventVersion,
-      occurredOn: this.occurredOn.toISOString(),
+      occurredAt: this.occurredAt.toISOString(),
       eventData: this.getEventData(),
     };
   }

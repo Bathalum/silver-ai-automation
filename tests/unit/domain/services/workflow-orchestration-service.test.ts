@@ -8,6 +8,7 @@ import { FunctionModel } from '@/lib/domain/entities/function-model';
 import { TetherNode } from '@/lib/domain/entities/tether-node';
 import { KBNode } from '@/lib/domain/entities/kb-node';
 import { FunctionModelContainerNode } from '@/lib/domain/entities/function-model-container-node';
+import { NodeId } from '@/lib/domain/value-objects/node-id';
 import { ActionStatus, ExecutionMode } from '@/lib/domain/enums';
 import { 
   FunctionModelBuilder, 
@@ -503,7 +504,7 @@ describe('WorkflowOrchestrationService', () => {
       
       // Use reflection to create KBNode since builder is complex
       const kbAction = (KBNode as any).create({
-        actionId: { toString: () => 'kb-action-id' },
+        actionId: NodeId.generate().toString(),
         parentNodeId: stageNode.nodeId,
         modelId: model.modelId,
         name: 'Test KB',

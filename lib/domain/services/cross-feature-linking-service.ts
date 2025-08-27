@@ -145,13 +145,13 @@ export class CrossFeatureLinkingService {
     const baseStrength = link.linkStrength;
 
     // Frequency bonus (0-0.2 based on interaction frequency)
-    const frequencyBonus = Math.min(interactionFrequency * 0.002, 0.2);
+    const frequencyBonus = Math.min(Math.max(interactionFrequency * 0.002, 0), 0.2);
 
     // Semantic bonus (0-0.3 based on semantic similarity)
-    const semanticBonus = Math.min(semanticSimilarity * 0.3, 0.3);
+    const semanticBonus = Math.min(Math.max(semanticSimilarity * 0.3, 0), 0.3);
 
     // Context bonus (0-0.2 based on context relevance)
-    const contextBonus = Math.min(contextRelevance * 0.2, 0.2);
+    const contextBonus = Math.min(Math.max(contextRelevance * 0.2, 0), 0.2);
 
     // Calculate final strength (capped at 1.0)
     const finalStrength = Math.min(

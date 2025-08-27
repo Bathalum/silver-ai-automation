@@ -1,9 +1,10 @@
 import { Result } from '../shared/result';
 import { AuditLog } from '../entities/audit-log';
 
-export interface AuditLogRepository {
+export interface IAuditLogRepository {
   save(auditLog: AuditLog): Promise<Result<void>>;
   findById(id: string): Promise<Result<AuditLog>>;
+  findByEntityId(entityId: string): Promise<Result<AuditLog[]>>;
   findByRecordId(recordId: string): Promise<Result<AuditLog[]>>;
   findByTableName(tableName: string): Promise<Result<AuditLog[]>>;
   findByOperation(operation: 'create' | 'update' | 'delete'): Promise<Result<AuditLog[]>>;
@@ -16,4 +17,8 @@ export interface AuditLogRepository {
   countByDateRange(startDate: Date, endDate: Date): Promise<Result<number>>;
   deleteOldEntries(beforeDate: Date): Promise<Result<number>>;
   exists(id: string): Promise<Result<boolean>>;
+  findAll(): Promise<Result<AuditLog[]>>;
 }
+
+// Keep backwards compatibility
+export interface AuditLogRepository extends IAuditLogRepository {}

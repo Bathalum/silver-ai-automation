@@ -158,7 +158,6 @@ export class WorkflowValidationCompleted extends DomainEvent {
 }
 
 export class ContainerNodeOrchestrationStarted extends DomainEvent {
-  public readonly eventType = 'ContainerNodeOrchestrationStarted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ContainerNodeOrchestrationStartedData) {
@@ -167,7 +166,7 @@ export class ContainerNodeOrchestrationStarted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ContainerNodeOrchestrationStarted';
   }
 
   public getEventData(): Record<string, any> {
@@ -184,7 +183,6 @@ export class ContainerNodeOrchestrationStarted extends DomainEvent {
 }
 
 export class ContainerNodeOrchestrationCompleted extends DomainEvent {
-  public readonly eventType = 'ContainerNodeOrchestrationCompleted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ContainerNodeOrchestrationCompletedData) {
@@ -193,7 +191,7 @@ export class ContainerNodeOrchestrationCompleted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ContainerNodeOrchestrationCompleted';
   }
 
   public getEventData(): Record<string, any> {
@@ -211,7 +209,6 @@ export class ContainerNodeOrchestrationCompleted extends DomainEvent {
 }
 
 export class FractalOrchestrationLevelChanged extends DomainEvent {
-  public readonly eventType = 'FractalOrchestrationLevelChanged';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: FractalOrchestrationLevelChangedData) {
@@ -220,7 +217,7 @@ export class FractalOrchestrationLevelChanged extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'FractalOrchestrationLevelChanged';
   }
 
   public getEventData(): Record<string, any> {

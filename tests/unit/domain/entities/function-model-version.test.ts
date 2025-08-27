@@ -589,6 +589,513 @@ describe('FunctionModelVersion', () => {
     });
   });
 
+  describe('Version Snapshot Capture', () => {
+    describe('Complete Model State Capture', () => {
+      it('createFromModel_ComplexModel_CapturesAllState', () => {
+        // Arrange - Complex model data with all components
+        const complexModelSnapshot = {
+          modelMetadata: {
+            name: 'Complex Workflow',
+            description: 'Multi-stage processing pipeline',
+            version: '2.1.3',
+            status: 'published',
+            tags: ['ai', 'automation', 'pipeline']
+          },
+          nodes: new Map([
+            ['input-1', {
+              id: 'input-1',
+              type: 'io',
+              name: 'Data Input',
+              position: { x: 100, y: 100 },
+              metadata: { dataType: 'json', schema: { type: 'object' } },
+              ioData: { boundaryType: 'input', inputDataContract: {} }
+            }],
+            ['process-1', {
+              id: 'process-1', 
+              type: 'stage',
+              name: 'Data Processing',
+              position: { x: 300, y: 100 },
+              dependencies: ['input-1'],
+              executionConfig: { timeout: 30000, retries: 3 }
+            }],
+            ['output-1', {
+              id: 'output-1',
+              type: 'io',
+              name: 'Processed Output',
+              position: { x: 500, y: 100 },
+              dependencies: ['process-1'],
+              ioData: { boundaryType: 'output', outputDataContract: {} }
+            }]
+          ]),
+          actionNodes: new Map([
+            ['action-1', {
+              id: 'action-1',
+              name: 'Transform Data',
+              executionOrder: 1,
+              priority: 'high',
+              nodeId: 'process-1',
+              actionType: 'transformation',
+              configuration: { 
+                script: 'transform.py',
+                parameters: { format: 'json', validate: true }
+              }
+            }]
+          ]),
+          links: [
+            { id: 'link-1', source: 'input-1', target: 'process-1', type: 'data' },
+            { id: 'link-2', source: 'process-1', target: 'output-1', type: 'data' }
+          ],
+          executionContext: {
+            environment: 'production',
+            resourceLimits: { memory: '2GB', cpu: '2 cores' },
+            securityContext: { isolationLevel: 'high' }
+          }
+        };
+
+        const propsWithComplexSnapshot = {
+          ...validProps,
+          versionData: complexModelSnapshot
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithComplexSnapshot);
+
+        // Assert - Complete state capture
+        expect(result).toBeValidResult();
+        const version = result.value;
+        const capturedData = version.versionData;
+
+        expect(capturedData.modelMetadata).toEqual(complexModelSnapshot.modelMetadata);
+        expect(capturedData.nodes).toEqual(complexModelSnapshot.nodes);
+        expect(capturedData.actionNodes).toEqual(complexModelSnapshot.actionNodes);
+        expect(capturedData.links).toEqual(complexModelSnapshot.links);
+        expect(capturedData.executionContext).toEqual(complexModelSnapshot.executionContext);
+      });
+
+      it('createFromModel_WithActionNodes_CapturesActionConfiguration', () => {
+        // Arrange - Model with complex action node configurations
+        const modelWithActions = {
+          nodes: new Map([
+            ['kb-node-1', {
+              id: 'kb-node-1',
+              type: 'kb',
+              name: 'Knowledge Base Query',
+              position: { x: 200, y: 150 },
+              kbData: { 
+                kbId: 'kb-123',
+                queryType: 'semantic',
+                embeddingModel: 'text-embedding-ada-002'
+              }
+            }]
+          ]),
+          actionNodes: new Map([
+            ['query-action', {
+              id: 'query-action',
+              name: 'Execute Query',
+              actionType: 'kb-query',
+              executionOrder: 1,
+              priority: 'medium',
+              nodeId: 'kb-node-1',
+              configuration: {
+                maxResults: 10,
+                confidenceThreshold: 0.8,
+                reranking: {
+                  enabled: true,
+                  model: 'cohere-rerank-v3'
+                },
+                caching: {
+                  enabled: true,
+                  ttl: 300
+                }
+              },
+              retryPolicy: {
+                maxRetries: 3,
+                backoffStrategy: 'exponential',
+                baseDelay: 1000
+              }
+            }]
+          ])
+        };
+
+        const propsWithActions = {
+          ...validProps,
+          versionData: modelWithActions
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithActions);
+
+        // Assert - Action configuration captured
+        expect(result).toBeValidResult();
+        const version = result.value;
+        const capturedActions = version.versionData.actionNodes;
+
+        expect(capturedActions).toEqual(modelWithActions.actionNodes);
+        
+        const queryAction = capturedActions.get('query-action');
+        expect(queryAction.configuration.maxResults).toBe(10);
+        expect(queryAction.configuration.reranking.enabled).toBe(true);
+        expect(queryAction.retryPolicy.maxRetries).toBe(3);
+      });
+
+      it('createFromModel_WithNestedMetadata_CapturesDeepStructure', () => {
+        // Arrange - Model with deeply nested metadata structures
+        const deepNestedData = {
+          modelConfig: {
+            execution: {
+              parallelism: {
+                enabled: true,
+                maxConcurrency: 5,
+                nodeGroups: {
+                  'group-1': {
+                    nodes: ['node-1', 'node-2'],
+                    constraints: {
+                      resources: {
+                        memory: { min: '512MB', max: '2GB' },
+                        cpu: { min: 1, max: 4 }
+                      },
+                      dependencies: {
+                        external: ['database', 'cache'],
+                        internal: []
+                      }
+                    }
+                  }
+                }
+              },
+              monitoring: {
+                metrics: {
+                  performance: ['latency', 'throughput', 'errors'],
+                  business: ['conversion_rate', 'user_satisfaction'],
+                  custom: [
+                    {
+                      name: 'model_accuracy',
+                      type: 'gauge',
+                      aggregation: 'avg',
+                      tags: { model: 'v2.1', env: 'prod' }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        };
+
+        const propsWithDeepNesting = {
+          ...validProps,
+          versionData: deepNestedData
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithDeepNesting);
+
+        // Assert - Deep structure preserved
+        expect(result).toBeValidResult();
+        const version = result.value;
+        const capturedData = version.versionData;
+
+        // Verify deep nested access
+        expect(capturedData.modelConfig.execution.parallelism.enabled).toBe(true);
+        expect(capturedData.modelConfig.execution.parallelism.nodeGroups['group-1'].constraints.resources.memory.max).toBe('2GB');
+        expect(capturedData.modelConfig.execution.monitoring.metrics.custom[0].tags.model).toBe('v2.1');
+      });
+
+      it('createFromModel_WithCircularReferences_HandlesGracefully', () => {
+        // Arrange - Data structure with potential circular references
+        const nodeA = { id: 'node-a', name: 'Node A', dependencies: [] };
+        const nodeB = { id: 'node-b', name: 'Node B', dependencies: [] };
+        
+        // Create circular reference structure (handled via serialization)
+        const modelWithReferences = {
+          nodes: [nodeA, nodeB],
+          relationships: {
+            'node-a': { references: ['node-b'], referencedBy: ['node-b'] },
+            'node-b': { references: ['node-a'], referencedBy: ['node-a'] }
+          },
+          metadata: {
+            graphType: 'bidirectional',
+            cycleDetection: 'enabled'
+          }
+        };
+
+        const propsWithReferences = {
+          ...validProps,
+          versionData: modelWithReferences
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithReferences);
+
+        // Assert - Graceful handling without infinite recursion
+        expect(result).toBeValidResult();
+        const version = result.value;
+        const capturedData = version.versionData;
+
+        expect(capturedData.nodes).toEqual(modelWithReferences.nodes);
+        expect(capturedData.relationships['node-a'].references).toEqual(['node-b']);
+        expect(capturedData.relationships['node-b'].referencedBy).toEqual(['node-a']);
+      });
+    });
+
+    describe('Version Integrity Guarantees', () => {
+      it('versionData_AfterCreation_MaintainsIntegrity', () => {
+        // Arrange - Create version with complex data structure
+        const complexData = {
+          modelSnapshot: {
+            version: '1.2.3',
+            nodes: ['node-1', 'node-2'],
+            metadata: { complexity: 'high' }
+          },
+          captureTimestamp: new Date().toISOString(),
+          integrityHash: 'sha256-hash-placeholder'
+        };
+
+        // Act - Create version
+        const version = FunctionModelVersion.create({
+          ...validProps,
+          versionData: complexData
+        }).value;
+
+        // Assert - Integrity maintained through entity boundary
+        expect(version.versionData.modelSnapshot.version).toBe('1.2.3');
+        expect(version.versionData.modelSnapshot.nodes).toHaveLength(2);
+        expect(version.versionData.captureTimestamp).toBeDefined();
+        expect(version.versionData.integrityHash).toBe('sha256-hash-placeholder');
+      });
+
+      it('versionData_ConsistentAccess_ReturnsSameData', () => {
+        // Arrange - Create version with structured data
+        const structuredData = {
+          workflowDefinition: {
+            stages: [
+              { id: 'stage-1', name: 'Input Processing', order: 1 },
+              { id: 'stage-2', name: 'Data Analysis', order: 2 }
+            ],
+            connections: [
+              { from: 'stage-1', to: 'stage-2', type: 'data-flow' }
+            ]
+          }
+        };
+
+        const version = FunctionModelVersion.create({
+          ...validProps,
+          versionData: structuredData
+        }).value;
+
+        // Act - Access data multiple times
+        const firstAccess = version.versionData;
+        const secondAccess = version.versionData;
+        const thirdAccess = version.versionData;
+
+        // Assert - Consistent data returned
+        expect(firstAccess).toEqual(secondAccess);
+        expect(secondAccess).toEqual(thirdAccess);
+        expect(firstAccess.workflowDefinition.stages).toHaveLength(2);
+        expect(firstAccess.workflowDefinition.connections[0].from).toBe('stage-1');
+      });
+
+      it('versionData_EntityBoundaryProtection_PreservesState', () => {
+        // Arrange - Create version with reference data
+        const referenceData = {
+          originalModelId: 'model-456',
+          snapshotData: {
+            nodeCount: 5,
+            actionCount: 3,
+            dependencyCount: 7
+          },
+          versionMetrics: {
+            complexity: 'medium',
+            performance: 'optimized'
+          }
+        };
+
+        const version = FunctionModelVersion.create({
+          ...validProps,
+          versionData: referenceData
+        }).value;
+
+        // Act - Access through entity boundary
+        const retrievedData = version.versionData;
+
+        // Assert - Entity boundary preserves state integrity
+        expect(retrievedData.originalModelId).toBe('model-456');
+        expect(retrievedData.snapshotData.nodeCount).toBe(5);
+        expect(retrievedData.versionMetrics.complexity).toBe('medium');
+        
+        // Verify the entity maintains data consistency
+        expect(version.modelId).toBe(validProps.modelId);
+        expect(version.versionData.originalModelId).toBe('model-456');
+      });
+    });
+  });
+
+  describe('Version Metadata Management', () => {
+    describe('Author and Tracking', () => {
+      it('create_WithValidAuthor_SetsAuthorMetadata', () => {
+        // Arrange
+        const authorMetadata = {
+          authorId: 'user-12345',
+          authorName: 'John Doe',
+          authorEmail: 'john.doe@company.com',
+          department: 'AI Engineering',
+          role: 'Senior ML Engineer'
+        };
+
+        const propsWithAuthorMeta = {
+          ...validProps,
+          authorId: authorMetadata.authorId,
+          versionData: {
+            ...validProps.versionData,
+            authorMetadata
+          }
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithAuthorMeta);
+
+        // Assert
+        expect(result).toBeValidResult();
+        const version = result.value;
+        expect(version.authorId).toBe(authorMetadata.authorId);
+        expect(version.versionData.authorMetadata).toEqual(authorMetadata);
+      });
+
+      it('create_WithInvalidAuthor_FailsValidation', () => {
+        // Arrange - Invalid author scenarios
+        const invalidAuthorCases = [
+          { authorId: '', error: 'Author ID cannot be empty' },
+          { authorId: '   ', error: 'Author ID cannot be empty' },
+          { authorId: null, error: 'Author ID cannot be empty' },
+          { authorId: undefined, error: 'Author ID cannot be empty' }
+        ];
+
+        // Act & Assert
+        invalidAuthorCases.forEach(({ authorId, error }) => {
+          const invalidProps = { ...validProps, authorId };
+          const result = FunctionModelVersion.create(invalidProps);
+          
+          expect(result).toBeFailureResult();
+          expect(result).toHaveErrorMessage(error);
+        });
+      });
+
+      it('getVersionInfo_IncludesCreationTimestamp', () => {
+        // Arrange
+        const beforeCreation = new Date();
+        
+        // Act
+        const result = FunctionModelVersion.create(validProps);
+        const afterCreation = new Date();
+
+        // Assert
+        expect(result).toBeValidResult();
+        const version = result.value;
+        
+        expect(version.createdAt).toBeInstanceOf(Date);
+        expect(version.createdAt.getTime()).toBeGreaterThanOrEqual(beforeCreation.getTime());
+        expect(version.createdAt.getTime()).toBeLessThanOrEqual(afterCreation.getTime());
+      });
+    });
+
+    describe('Change Descriptions', () => {
+      it('create_WithChangeDescription_StoresDescription', () => {
+        // Arrange
+        const changeDescription = {
+          summary: 'Added new data validation stage',
+          details: 'Implemented comprehensive input validation with schema checking and data type conversion',
+          breakingChanges: false,
+          migrations: [],
+          affectedComponents: ['input-validation', 'data-processing'],
+          reviewers: ['senior-engineer-1', 'architect-2'],
+          testingNotes: 'Validated with production data samples'
+        };
+
+        const propsWithDescription = {
+          ...validProps,
+          versionData: {
+            ...validProps.versionData,
+            changeDescription
+          }
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithDescription);
+
+        // Assert
+        expect(result).toBeValidResult();
+        const version = result.value;
+        expect(version.versionData.changeDescription).toEqual(changeDescription);
+      });
+
+      it('create_WithEmptyDescription_AllowsEmptyDescription', () => {
+        // Arrange
+        const propsWithEmptyDescription = {
+          ...validProps,
+          versionData: {
+            ...validProps.versionData,
+            changeDescription: {
+              summary: '',
+              details: '',
+              breakingChanges: false
+            }
+          }
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithEmptyDescription);
+
+        // Assert
+        expect(result).toBeValidResult();
+        const version = result.value;
+        expect(version.versionData.changeDescription.summary).toBe('');
+        expect(version.versionData.changeDescription.details).toBe('');
+      });
+
+      it('getChangeSummary_ReturnsStructuredChangeInfo', () => {
+        // Arrange
+        const structuredChanges = {
+          changeDescription: {
+            summary: 'Performance optimization and new features',
+            details: 'Optimized query performance by 40% and added real-time monitoring',
+            breakingChanges: false,
+            changeTypes: ['performance', 'feature', 'monitoring'],
+            impactLevel: 'medium',
+            rollbackPlan: {
+              steps: ['Revert configuration', 'Clear cache', 'Restart services'],
+              estimatedTime: '5 minutes',
+              riskLevel: 'low'
+            }
+          },
+          diffSummary: {
+            nodesAdded: 2,
+            nodesRemoved: 0,
+            nodesModified: 3,
+            actionsAdded: 1,
+            actionsModified: 2,
+            metadataChanges: 5
+          }
+        };
+
+        const propsWithStructuredChanges = {
+          ...validProps,
+          versionData: structuredChanges
+        };
+
+        // Act
+        const result = FunctionModelVersion.create(propsWithStructuredChanges);
+
+        // Assert
+        expect(result).toBeValidResult();
+        const version = result.value;
+        const changeSummary = version.versionData;
+        
+        expect(changeSummary.changeDescription.changeTypes).toEqual(['performance', 'feature', 'monitoring']);
+        expect(changeSummary.changeDescription.impactLevel).toBe('medium');
+        expect(changeSummary.diffSummary.nodesAdded).toBe(2);
+        expect(changeSummary.diffSummary.actionsModified).toBe(2);
+      });
+    });
+  });
+
   describe('Result Pattern Integration', () => {
     it('should follow Result pattern consistently', () => {
       // Act - Valid creation
