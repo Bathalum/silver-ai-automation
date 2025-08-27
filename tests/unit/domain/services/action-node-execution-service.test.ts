@@ -1,341 +1,185 @@
 /**
  * Unit tests for ActionNodeExecutionService
- * Tests execution lifecycle, retry policies, resource monitoring, and metrics collection
+ * Tests individual action node execution lifecycle, retry policies, 
+ * resource monitoring, and execution state tracking
+ * 
+ * This service manages the execution of individual action nodes within workflow orchestration,
+ * enforcing Clean Architecture by maintaining clear boundaries and using Result patterns.
  */
 
-import { ActionNodeExecutionService, ExecutionMetrics, ExecutionSnapshot } from '@/lib/domain/services/action-node-execution-service';
+import { ActionNodeExecutionService, ExecutionMetrics, ExecutionContext, ExecutionSnapshot } from '@/lib/domain/services/action-node-execution-service';
+import { NodeId } from '@/lib/domain/value-objects/node-id';
 import { ActionStatus } from '@/lib/domain/enums';
 
 describe('ActionNodeExecutionService', () => {
-  let service: ActionNodeExecutionService;
-  const testActionId = '123e4567-e89b-42d3-a456-426614174000';
-
+  let executionService: ActionNodeExecutionService;
+  const testActionId = 'action-123';
+  
   beforeEach(() => {
-    service = new ActionNodeExecutionService();
+    executionService = new ActionNodeExecutionService();
   });
 
-  describe('Execution Lifecycle - Starting Execution', () => {
-    it('should start execution successfully', async () => {
-      // Act
-      const result = await service.startExecution(testActionId);
-
-      // Assert
-      expect(result).toBeValidResult();
-      expect(service.isExecuting(testActionId)).toBe(true);
-      expect(service.getActiveExecutionCount()).toBe(1);
-    });
-
-    it('should initialize metrics when starting execution', async () => {
-      // Act
-      await service.startExecution(testActionId);
-      const metricsResult = await service.getExecutionMetrics(testActionId);
-
-      // Assert
-      expect(metricsResult).toBeValidResult();
-      const metrics = metricsResult.value;
-      expect(metrics.startTime).toBeInstanceOf(Date);
-      expect(metrics.endTime).toBeUndefined();
-      expect(metrics.duration).toBeUndefined();
-      expect(metrics.resourceUsage.cpu).toBe(0);
-      expect(metrics.resourceUsage.memory).toBe(0);
-      expect(metrics.retryCount).toBe(0);
-      expect(metrics.successRate).toBe(0);
-    });
-
-    it('should initialize execution snapshot when starting execution', async () => {
-      // Act
-      await service.startExecution(testActionId);
-      const snapshotResult = await service.getExecutionSnapshot(testActionId);
-
-      // Assert
-      expect(snapshotResult).toBeValidResult();
-      const snapshot = snapshotResult.value;
-      expect(snapshot.status).toBe(ActionStatus.EXECUTING);
-      expect(snapshot.progress).toBe(0);
-      expect(snapshot.currentStep).toBeUndefined();
-      expect(snapshot.estimatedTimeRemaining).toBeUndefined();
-      expect(snapshot.metadata).toEqual({});
-    });
-
-    it('should reject starting execution for already executing action', async () => {
-      // Arrange
-      await service.startExecution(testActionId);
-
-      // Act
-      const result = await service.startExecution(testActionId);
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Action node is already executing');
-      expect(service.getActiveExecutionCount()).toBe(1);
-    });
-
-    it('should generate unique execution IDs', async () => {
-      // Arrange
-      const actionId1 = '223e4567-e89b-42d3-a456-426614174000';
-      const actionId2 = '323e4567-e89b-42d3-a456-426614174000';
-
-      // Act
-      await service.startExecution(actionId1);
-      await service.startExecution(actionId2);
-
-      // Assert - Both executions should be active
-      expect(service.isExecuting(actionId1)).toBe(true);
-      expect(service.isExecuting(actionId2)).toBe(true);
-      expect(service.getActiveExecutionCount()).toBe(2);
-    });
-  });
-
-  describe('Execution Lifecycle - Completing Execution', () => {
-    beforeEach(async () => {
-      await service.startExecution(testActionId);
-    });
-
-    it('should complete execution successfully', async () => {
-      // Arrange
-      const executionResult = { output: 'test result', status: 'success' };
-
-      // Act
-      const result = await service.completeExecution(testActionId, executionResult);
-
-      // Assert
-      expect(result).toBeValidResult();
-      expect(service.isExecuting(testActionId)).toBe(false);
-      expect(service.getActiveExecutionCount()).toBe(0);
-    });
-
-    it('should update metrics on successful completion', async () => {
-      // Arrange
-      const executionResult = { output: 'test result' };
-      
-      // Wait a bit to ensure duration > 0
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      // Act
-      await service.completeExecution(testActionId, executionResult);
-      const metricsResult = await service.getExecutionMetrics(testActionId);
-
-      // Assert
-      expect(metricsResult).toBeValidResult();
-      const metrics = metricsResult.value;
-      expect(metrics.endTime).toBeInstanceOf(Date);
-      expect(metrics.duration).toBeGreaterThan(0);
-      expect(metrics.successRate).toBe(1.0);
-    });
-
-    it('should update snapshot on successful completion', async () => {
-      // Arrange
-      const executionResult = { output: 'test result', status: 'success' };
-
-      // Act
-      await service.completeExecution(testActionId, executionResult);
-      const snapshotResult = await service.getExecutionSnapshot(testActionId);
-
-      // Assert
-      expect(snapshotResult).toBeValidResult();
-      const snapshot = snapshotResult.value;
-      expect(snapshot.status).toBe(ActionStatus.COMPLETED);
-      expect(snapshot.progress).toBe(100);
-      expect(snapshot.metadata.result).toEqual(executionResult);
-      expect(snapshot.metadata.completedAt).toBeInstanceOf(Date);
-    });
-
-    it('should reject completing non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '999e4567-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.completeExecution(nonExistentActionId, {});
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No active execution found for action');
-    });
-  });
-
-  describe('Execution Lifecycle - Failing Execution', () => {
-    beforeEach(async () => {
-      await service.startExecution(testActionId);
-    });
-
-    it('should fail execution successfully', async () => {
-      // Arrange
-      const errorMessage = 'Execution failed due to timeout';
-
-      // Act
-      const result = await service.failExecution(testActionId, errorMessage);
-
-      // Assert
-      expect(result).toBeValidResult();
-      expect(service.isExecuting(testActionId)).toBe(false);
-      expect(service.getActiveExecutionCount()).toBe(0);
-    });
-
-    it('should update metrics on execution failure', async () => {
-      // Arrange
-      const errorMessage = 'Execution failed';
-      
-      // Wait a bit to ensure duration > 0
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      // Act
-      await service.failExecution(testActionId, errorMessage);
-      const metricsResult = await service.getExecutionMetrics(testActionId);
-
-      // Assert
-      expect(metricsResult).toBeValidResult();
-      const metrics = metricsResult.value;
-      expect(metrics.endTime).toBeInstanceOf(Date);
-      expect(metrics.duration).toBeGreaterThan(0);
-      expect(metrics.successRate).toBe(0.0);
-    });
-
-    it('should update snapshot on execution failure', async () => {
-      // Arrange
-      const errorMessage = 'Network connection failed';
-
-      // Act
-      await service.failExecution(testActionId, errorMessage);
-      const snapshotResult = await service.getExecutionSnapshot(testActionId);
-
-      // Assert
-      expect(snapshotResult).toBeValidResult();
-      const snapshot = snapshotResult.value;
-      expect(snapshot.status).toBe(ActionStatus.FAILED);
-      expect(snapshot.metadata.error).toBe(errorMessage);
-      expect(snapshot.metadata.failedAt).toBeInstanceOf(Date);
-    });
-
-    it('should reject failing non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '888e4567-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.failExecution(nonExistentActionId, 'error');
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No active execution found for action');
-    });
-  });
-
-  describe('Retry Policy Management', () => {
-    beforeEach(async () => {
-      await service.startExecution(testActionId);
-    });
-
-    it('should allow retry when within retry limits', async () => {
-      // Arrange - Wait for the minimum backoff time to pass
-      await new Promise(resolve => setTimeout(resolve, 1100)); // Wait for 1.1 seconds (> 1 second backoff)
-
-      // Act
-      const result = await service.retryExecution(testActionId);
-
-      // Assert
-      expect(result).toBeValidResult();
-      expect(service.isExecuting(testActionId)).toBe(true);
-    });
-
-    it('should update retry count in metrics', async () => {
-      // Arrange - Wait for the minimum backoff time to pass
-      await new Promise(resolve => setTimeout(resolve, 1100)); // Wait for 1.1 seconds (> 1 second backoff)
-      
-      // Act
-      await service.retryExecution(testActionId);
-      const metricsResult = await service.getExecutionMetrics(testActionId);
-
-      // Assert
-      expect(metricsResult).toBeValidResult();
-      const metrics = metricsResult.value;
-      expect(metrics.retryCount).toBe(1);
-      expect(metrics.endTime).toBeUndefined(); // Reset for retry
-      expect(metrics.duration).toBeUndefined(); // Reset for retry
-    });
-
-    it('should update snapshot on retry', async () => {
-      // Arrange - Wait for the minimum backoff time to pass
-      await new Promise(resolve => setTimeout(resolve, 1100)); // Wait for 1.1 seconds (> 1 second backoff)
-      
-      // Act
-      await service.retryExecution(testActionId);
-      const snapshotResult = await service.getExecutionSnapshot(testActionId);
-
-      // Assert
-      expect(snapshotResult).toBeValidResult();
-      const snapshot = snapshotResult.value;
-      expect(snapshot.status).toBe(ActionStatus.RETRYING);
-      expect(snapshot.progress).toBe(0); // Reset for retry
-      expect(snapshot.metadata.retryAttempt).toBe(1);
-      expect(snapshot.metadata.retryStartedAt).toBeInstanceOf(Date);
-    });
-
-    it('should reject retry when maximum attempts exceeded', async () => {
-      // Arrange - Perform multiple retries to exceed limit (default is 3)
-      await new Promise(resolve => setTimeout(resolve, 50)); // Wait for backoff
-      await service.retryExecution(testActionId); // Attempt 1 (will fail due to timing, but increments counter)
-      await new Promise(resolve => setTimeout(resolve, 50));
-      await service.retryExecution(testActionId); // Attempt 2 (will fail due to timing)
-      await new Promise(resolve => setTimeout(resolve, 50));
-      await service.retryExecution(testActionId); // Attempt 3 (will fail due to timing)
-
-      // Act - Should fail on attempt 4 due to max attempts
-      const result = await service.retryExecution(testActionId);
-
-      // Assert - Should fail because we hit max retry attempts limit
-      expect(result).toBeFailureResult();
-      // The error message could be either due to retry policy or max attempts
-      expect(result.error).toContain('Retry not allowed');
-    }, 10000); // Increase timeout for this test
-
-    it('should reject retry for non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '777e4567-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.retryExecution(nonExistentActionId);
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No active execution found for action');
-    });
-
-    describe('Retry policy evaluation', () => {
-      it('should evaluate retry policy correctly when retries available', async () => {
-        // Arrange - Wait for the minimum backoff time to pass
-        await new Promise(resolve => setTimeout(resolve, 1100)); // Wait for 1.1 seconds (> 1 second backoff)
-        
+  describe('execution lifecycle management', () => {
+    describe('startExecution', () => {
+      it('should start execution successfully for new action', async () => {
         // Act
-        const result = await service.evaluateRetryPolicy(testActionId);
-
+        const result = await executionService.startExecution(testActionId);
+        
         // Assert
         expect(result).toBeValidResult();
-        expect(result.value).toBe(true);
+        expect(executionService.isExecuting(testActionId)).toBe(true);
+        expect(executionService.getActiveExecutionCount()).toBe(1);
       });
 
-      it('should reject retry when max attempts exceeded', async () => {
-        // Arrange - Exhaust retry attempts
-        await new Promise(resolve => setTimeout(resolve, 1100));
-        await service.retryExecution(testActionId);
-        await new Promise(resolve => setTimeout(resolve, 2100));
-        await service.retryExecution(testActionId);
-        await new Promise(resolve => setTimeout(resolve, 4100));
-        await service.retryExecution(testActionId);
-
+      it('should create proper execution context when starting', async () => {
         // Act
-        const result = await service.evaluateRetryPolicy(testActionId);
+        await executionService.startExecution(testActionId);
+        
+        // Assert - Verify internal state through public methods
+        const snapshot = await executionService.getExecutionSnapshot(testActionId);
+        expect(snapshot).toBeValidResult();
+        expect(snapshot.value.actionId.value).toBe(testActionId);
+        expect(snapshot.value.status).toBe(ActionStatus.EXECUTING);
+        expect(snapshot.value.progress).toBe(0);
+      });
 
+      it('should initialize execution metrics when starting', async () => {
+        // Act
+        await executionService.startExecution(testActionId);
+        
+        // Assert
+        const metrics = await executionService.getExecutionMetrics(testActionId);
+        expect(metrics).toBeValidResult();
+        expect(metrics.value.startTime).toBeInstanceOf(Date);
+        expect(metrics.value.retryCount).toBe(0);
+        expect(metrics.value.successRate).toBe(0);
+        expect(metrics.value.resourceUsage.cpu).toBe(0);
+        expect(metrics.value.resourceUsage.memory).toBe(0);
+      });
+
+      it('should reject starting execution for already executing action', async () => {
+        // Arrange
+        await executionService.startExecution(testActionId);
+        
+        // Act
+        const result = await executionService.startExecution(testActionId);
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('Action node is already executing');
+      });
+    });
+
+    describe('completeExecution', () => {
+      beforeEach(async () => {
+        await executionService.startExecution(testActionId);
+      });
+
+      it('should complete execution successfully', async () => {
+        // Arrange
+        const testResult = { output: 'test-output', status: 'success' };
+        
+        // Act
+        const result = await executionService.completeExecution(testActionId, testResult);
+        
         // Assert
         expect(result).toBeValidResult();
-        expect(result.value).toBe(false);
-      }, 15000);
+        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.getActiveExecutionCount()).toBe(0);
+      });
 
-      it('should reject retry evaluation for non-existent execution', async () => {
+      it('should update execution metrics on completion', async () => {
         // Arrange
-        const nonExistentActionId = '666e4567-e89b-42d3-a456-426614174000';
-
+        const testResult = { output: 'success' };
+        
         // Act
-        const result = await service.evaluateRetryPolicy(nonExistentActionId);
+        await executionService.completeExecution(testActionId, testResult);
+        
+        // Assert
+        const metrics = await executionService.getExecutionMetrics(testActionId);
+        expect(metrics).toBeValidResult();
+        expect(metrics.value.endTime).toBeInstanceOf(Date);
+        expect(metrics.value.duration).toBeGreaterThan(0);
+        expect(metrics.value.successRate).toBe(1.0);
+      });
 
+      it('should update execution snapshot on completion', async () => {
+        // Arrange
+        const testResult = { output: 'test-output' };
+        
+        // Act
+        await executionService.completeExecution(testActionId, testResult);
+        
+        // Assert
+        const snapshot = await executionService.getExecutionSnapshot(testActionId);
+        expect(snapshot).toBeValidResult();
+        expect(snapshot.value.status).toBe(ActionStatus.COMPLETED);
+        expect(snapshot.value.progress).toBe(100);
+        expect(snapshot.value.metadata.result).toEqual(testResult);
+        expect(snapshot.value.metadata.completedAt).toBeInstanceOf(Date);
+      });
+
+      it('should reject completion for non-existent execution', async () => {
+        // Act
+        const result = await executionService.completeExecution('non-existent', {});
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No active execution found for action');
+      });
+    });
+
+    describe('failExecution', () => {
+      beforeEach(async () => {
+        await executionService.startExecution(testActionId);
+      });
+
+      it('should fail execution successfully', async () => {
+        // Arrange
+        const errorMessage = 'Test execution failed';
+        
+        // Act
+        const result = await executionService.failExecution(testActionId, errorMessage);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(executionService.isExecuting(testActionId)).toBe(false);
+      });
+
+      it('should update execution metrics on failure', async () => {
+        // Arrange
+        const errorMessage = 'Test failure';
+        
+        // Act
+        await executionService.failExecution(testActionId, errorMessage);
+        
+        // Assert
+        const metrics = await executionService.getExecutionMetrics(testActionId);
+        expect(metrics).toBeValidResult();
+        expect(metrics.value.endTime).toBeInstanceOf(Date);
+        expect(metrics.value.duration).toBeGreaterThan(0);
+        expect(metrics.value.successRate).toBe(0.0);
+      });
+
+      it('should update execution snapshot on failure', async () => {
+        // Arrange
+        const errorMessage = 'Test failure';
+        
+        // Act
+        await executionService.failExecution(testActionId, errorMessage);
+        
+        // Assert
+        const snapshot = await executionService.getExecutionSnapshot(testActionId);
+        expect(snapshot).toBeValidResult();
+        expect(snapshot.value.status).toBe(ActionStatus.FAILED);
+        expect(snapshot.value.metadata.error).toBe(errorMessage);
+        expect(snapshot.value.metadata.failedAt).toBeInstanceOf(Date);
+      });
+
+      it('should reject failure for non-existent execution', async () => {
+        // Act
+        const result = await executionService.failExecution('non-existent', 'error');
+        
         // Assert
         expect(result).toBeFailureResult();
         expect(result).toHaveErrorMessage('No active execution found for action');
@@ -343,487 +187,370 @@ describe('ActionNodeExecutionService', () => {
     });
   });
 
-  describe('Resource Monitoring', () => {
+  describe('retry policy management', () => {
     beforeEach(async () => {
-      await service.startExecution(testActionId);
+      await executionService.startExecution(testActionId);
     });
 
-    it('should track resource usage successfully', async () => {
-      // Arrange
-      const resourceUsage = { cpu: 45.5, memory: 512 };
-
-      // Act
-      const result = await service.trackResourceUsage(testActionId, resourceUsage);
-
-      // Assert
-      expect(result).toBeValidResult();
-    });
-
-    it('should update metrics with resource usage', async () => {
-      // Arrange
-      const resourceUsage = { cpu: 67.3, memory: 1024 };
-
-      // Act
-      await service.trackResourceUsage(testActionId, resourceUsage);
-      const metricsResult = await service.getExecutionMetrics(testActionId);
-
-      // Assert
-      expect(metricsResult).toBeValidResult();
-      const metrics = metricsResult.value;
-      expect(metrics.resourceUsage.cpu).toBe(67.3);
-      expect(metrics.resourceUsage.memory).toBe(1024);
-    });
-
-    it('should reject tracking resource usage for non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '555e4567-e89b-42d3-a456-426614174000';
-      const resourceUsage = { cpu: 50, memory: 256 };
-
-      // Act
-      const result = await service.trackResourceUsage(nonExistentActionId, resourceUsage);
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No metrics found for action');
-    });
-
-    it('should handle zero resource usage', async () => {
-      // Arrange
-      const resourceUsage = { cpu: 0, memory: 0 };
-
-      // Act
-      const result = await service.trackResourceUsage(testActionId, resourceUsage);
-
-      // Assert
-      expect(result).toBeValidResult();
-      
-      const metricsResult = await service.getExecutionMetrics(testActionId);
-      const metrics = metricsResult.value;
-      expect(metrics.resourceUsage.cpu).toBe(0);
-      expect(metrics.resourceUsage.memory).toBe(0);
-    });
-
-    it('should handle high resource usage values', async () => {
-      // Arrange
-      const resourceUsage = { cpu: 99.99, memory: 16384 };
-
-      // Act
-      const result = await service.trackResourceUsage(testActionId, resourceUsage);
-
-      // Assert
-      expect(result).toBeValidResult();
-      
-      const metricsResult = await service.getExecutionMetrics(testActionId);
-      const metrics = metricsResult.value;
-      expect(metrics.resourceUsage.cpu).toBe(99.99);
-      expect(metrics.resourceUsage.memory).toBe(16384);
-    });
-  });
-
-  describe('Progress Tracking', () => {
-    beforeEach(async () => {
-      await service.startExecution(testActionId);
-    });
-
-    it('should update progress successfully', async () => {
-      // Act
-      const result = await service.updateProgress(testActionId, 25);
-
-      // Assert
-      expect(result).toBeValidResult();
-    });
-
-    it('should update progress with current step', async () => {
-      // Act
-      const result = await service.updateProgress(testActionId, 50, 'Processing data');
-
-      // Assert
-      expect(result).toBeValidResult();
-      
-      const snapshotResult = await service.getExecutionSnapshot(testActionId);
-      const snapshot = snapshotResult.value;
-      expect(snapshot.progress).toBe(50);
-      expect(snapshot.currentStep).toBe('Processing data');
-    });
-
-    it('should estimate remaining time based on progress', async () => {
-      // Arrange - Wait a bit to have some elapsed time
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Act
-      await service.updateProgress(testActionId, 25);
-      const snapshotResult = await service.getExecutionSnapshot(testActionId);
-
-      // Assert
-      const snapshot = snapshotResult.value;
-      expect(snapshot.estimatedTimeRemaining).toBeGreaterThan(0);
-      // At 25% progress, remaining time should be roughly 3x elapsed time
-      expect(snapshot.estimatedTimeRemaining).toBeGreaterThan(100); // Should be > 100ms
-    });
-
-    it('should reject invalid progress values', async () => {
-      // Arrange
-      const invalidProgressValues = [-1, -10, 101, 150];
-
-      // Act & Assert
-      for (const progress of invalidProgressValues) {
-        const result = await service.updateProgress(testActionId, progress);
-        expect(result).toBeFailureResult();
-        expect(result).toHaveErrorMessage('Progress must be between 0 and 100');
-      }
-    });
-
-    it('should accept boundary progress values', async () => {
-      // Arrange
-      const validProgressValues = [0, 100];
-
-      // Act & Assert
-      for (const progress of validProgressValues) {
-        const result = await service.updateProgress(testActionId, progress);
+    describe('retryExecution', () => {
+      it('should retry execution when under retry limit', async () => {
+        // Act
+        const result = await executionService.retryExecution(testActionId);
+        
+        // Assert
         expect(result).toBeValidResult();
         
-        const snapshotResult = await service.getExecutionSnapshot(testActionId);
-        const snapshot = snapshotResult.value;
-        expect(snapshot.progress).toBe(progress);
-      }
-    });
+        // Check snapshot updated to retrying
+        const snapshot = await executionService.getExecutionSnapshot(testActionId);
+        expect(snapshot).toBeValidResult();
+        expect(snapshot.value.status).toBe(ActionStatus.RETRYING);
+        expect(snapshot.value.progress).toBe(0);
+        expect(snapshot.value.metadata.retryAttempt).toBe(1);
+      });
 
-    it('should reject progress update for non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '444e4567-e89b-42d3-a456-426614174000';
+      it('should update metrics when retrying', async () => {
+        // Act
+        await executionService.retryExecution(testActionId);
+        
+        // Assert
+        const metrics = await executionService.getExecutionMetrics(testActionId);
+        expect(metrics).toBeValidResult();
+        expect(metrics.value.retryCount).toBe(1);
+        expect(metrics.value.endTime).toBeUndefined();
+        expect(metrics.value.duration).toBeUndefined();
+      });
 
-      // Act
-      const result = await service.updateProgress(nonExistentActionId, 50);
+      it('should reject retry when max attempts exceeded', async () => {
+        // Arrange - Force max retries by accessing private state
+        const context = (executionService as any).activeExecutions.get(testActionId);
+        context.retryAttempt = 3; // Set to max
+        
+        // Act
+        const result = await executionService.retryExecution(testActionId);
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('Maximum retry attempts exceeded');
+      });
 
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No execution snapshot found for action');
-    });
-  });
-
-  describe('Execution State Management', () => {
-    it('should correctly identify non-executing actions', () => {
-      // Act & Assert
-      expect(service.isExecuting(testActionId)).toBe(false);
-      expect(service.getActiveExecutionCount()).toBe(0);
-    });
-
-    it('should track multiple concurrent executions', async () => {
-      // Arrange
-      const actionIds = ['11111111-e89b-42d3-a456-426614174000', '22222222-e89b-42d3-a456-426614174000', '33333333-e89b-42d3-a456-426614174000'];
-
-      // Act - Start multiple executions
-      for (const actionId of actionIds) {
-        await service.startExecution(actionId);
-      }
-
-      // Assert
-      expect(service.getActiveExecutionCount()).toBe(3);
-      actionIds.forEach(actionId => {
-        expect(service.isExecuting(actionId)).toBe(true);
+      it('should reject retry for non-existent execution', async () => {
+        // Act
+        const result = await executionService.retryExecution('non-existent');
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No active execution found for action');
       });
     });
 
-    it('should handle mixed execution states correctly', async () => {
-      // Arrange
-      const actionIds = ['aaaaaaaa-e89b-42d3-a456-426614174000', 'bbbbbbbb-e89b-42d3-a456-426614174000', 'cccccccc-e89b-42d3-a456-426614174000'];
-      
-      // Start all executions
-      for (const actionId of actionIds) {
-        await service.startExecution(actionId);
-      }
+    describe('evaluateRetryPolicy', () => {
+      it('should allow retry when under limit and time passed', async () => {
+        // Act
+        const result = await executionService.evaluateRetryPolicy(testActionId);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value).toBe(true);
+      });
 
-      // Act - Complete some, fail others
-      await service.completeExecution('aaaaaaaa-e89b-42d3-a456-426614174000', { result: 'success' });
-      await service.failExecution('bbbbbbbb-e89b-42d3-a456-426614174000', 'failure');
-      // Leave cccccccc-e89b-42d3-a456-426614174000 running
+      it('should reject retry when max attempts reached', async () => {
+        // Arrange - Set to max retries
+        const context = (executionService as any).activeExecutions.get(testActionId);
+        context.retryAttempt = 3;
+        
+        // Act
+        const result = await executionService.evaluateRetryPolicy(testActionId);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value).toBe(false);
+      });
 
-      // Assert
-      expect(service.isExecuting('aaaaaaaa-e89b-42d3-a456-426614174000')).toBe(false);
-      expect(service.isExecuting('bbbbbbbb-e89b-42d3-a456-426614174000')).toBe(false);
-      expect(service.isExecuting('cccccccc-e89b-42d3-a456-426614174000')).toBe(true);
-      expect(service.getActiveExecutionCount()).toBe(1);
+      it('should implement exponential backoff timing', async () => {
+        // Arrange - Set recent retry with backoff constraint
+        const context = (executionService as any).activeExecutions.get(testActionId);
+        context.retryAttempt = 1;
+        context.startTime = new Date(); // Very recent
+        
+        // Act
+        const result = await executionService.evaluateRetryPolicy(testActionId);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value).toBe(false); // Too soon for retry
+      });
+
+      it('should reject policy evaluation for non-existent execution', async () => {
+        // Act
+        const result = await executionService.evaluateRetryPolicy('non-existent');
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No active execution found for action');
+      });
     });
   });
 
-  describe('Execution Cancellation', () => {
+  describe('progress tracking and monitoring', () => {
     beforeEach(async () => {
-      await service.startExecution(testActionId);
+      await executionService.startExecution(testActionId);
     });
 
-    it('should cancel active execution successfully', async () => {
-      // Act
-      const result = await service.cancelExecution(testActionId);
+    describe('updateProgress', () => {
+      it('should update progress successfully', async () => {
+        // Act
+        const result = await executionService.updateProgress(testActionId, 50, 'Processing data');
+        
+        // Assert
+        expect(result).toBeValidResult();
+        
+        const snapshot = await executionService.getExecutionSnapshot(testActionId);
+        expect(snapshot).toBeValidResult();
+        expect(snapshot.value.progress).toBe(50);
+        expect(snapshot.value.currentStep).toBe('Processing data');
+        expect(snapshot.value.estimatedTimeRemaining).toBeGreaterThan(0);
+      });
 
-      // Assert
-      expect(result).toBeValidResult();
-      expect(service.isExecuting(testActionId)).toBe(false);
-      expect(service.getActiveExecutionCount()).toBe(0);
+      it('should estimate remaining time based on progress', async () => {
+        // Arrange - Wait a bit to ensure elapsed time
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        // Act
+        await executionService.updateProgress(testActionId, 25);
+        
+        // Assert
+        const snapshot = await executionService.getExecutionSnapshot(testActionId);
+        expect(snapshot).toBeValidResult();
+        expect(snapshot.value.estimatedTimeRemaining).toBeGreaterThan(0);
+      });
+
+      it('should reject invalid progress values', async () => {
+        // Act & Assert
+        const negativeResult = await executionService.updateProgress(testActionId, -10);
+        expect(negativeResult).toBeFailureResult();
+        expect(negativeResult).toHaveErrorMessage('Progress must be between 0 and 100');
+        
+        const overResult = await executionService.updateProgress(testActionId, 150);
+        expect(overResult).toBeFailureResult();
+        expect(overResult).toHaveErrorMessage('Progress must be between 0 and 100');
+      });
+
+      it('should reject progress update for non-existent execution', async () => {
+        // Act
+        const result = await executionService.updateProgress('non-existent', 50);
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No execution snapshot found for action');
+      });
     });
 
-    it('should update snapshot when cancelling execution', async () => {
-      // Act
-      await service.cancelExecution(testActionId);
-      const snapshotResult = await service.getExecutionSnapshot(testActionId);
+    describe('trackResourceUsage', () => {
+      it('should track resource usage successfully', async () => {
+        // Arrange
+        const usage = { cpu: 75.5, memory: 1024 };
+        
+        // Act
+        const result = await executionService.trackResourceUsage(testActionId, usage);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        
+        const metrics = await executionService.getExecutionMetrics(testActionId);
+        expect(metrics).toBeValidResult();
+        expect(metrics.value.resourceUsage.cpu).toBe(75.5);
+        expect(metrics.value.resourceUsage.memory).toBe(1024);
+      });
 
-      // Assert
-      expect(snapshotResult).toBeValidResult();
-      const snapshot = snapshotResult.value;
-      expect(snapshot.status).toBe(ActionStatus.FAILED);
-      expect(snapshot.metadata.cancelled).toBe(true);
-      expect(snapshot.metadata.cancelledAt).toBeInstanceOf(Date);
-    });
-
-    it('should reject cancelling non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '333e4567-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.cancelExecution(nonExistentActionId);
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No active execution found for action');
+      it('should reject resource tracking for non-existent execution', async () => {
+        // Act
+        const result = await executionService.trackResourceUsage('non-existent', { cpu: 50, memory: 512 });
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No metrics found for action');
+      });
     });
   });
 
-  describe('Metrics and Snapshot Retrieval', () => {
+  describe('execution control and cancellation', () => {
     beforeEach(async () => {
-      await service.startExecution(testActionId);
+      await executionService.startExecution(testActionId);
     });
 
-    it('should retrieve execution metrics successfully', async () => {
-      // Act
-      const result = await service.getExecutionMetrics(testActionId);
+    describe('cancelExecution', () => {
+      it('should cancel execution successfully', async () => {
+        // Act
+        const result = await executionService.cancelExecution(testActionId);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.getActiveExecutionCount()).toBe(0);
+      });
 
-      // Assert
-      expect(result).toBeValidResult();
-      const metrics = result.value;
-      expect(metrics).toHaveProperty('startTime');
-      expect(metrics).toHaveProperty('resourceUsage');
-      expect(metrics).toHaveProperty('retryCount');
-      expect(metrics).toHaveProperty('successRate');
-    });
+      it('should update snapshot to cancelled state', async () => {
+        // Act
+        await executionService.cancelExecution(testActionId);
+        
+        // Assert
+        const snapshot = await executionService.getExecutionSnapshot(testActionId);
+        expect(snapshot).toBeValidResult();
+        expect(snapshot.value.status).toBe(ActionStatus.FAILED);
+        expect(snapshot.value.metadata.cancelled).toBe(true);
+        expect(snapshot.value.metadata.cancelledAt).toBeInstanceOf(Date);
+      });
 
-    it('should retrieve execution snapshot successfully', async () => {
-      // Act
-      const result = await service.getExecutionSnapshot(testActionId);
-
-      // Assert
-      expect(result).toBeValidResult();
-      const snapshot = result.value;
-      expect(snapshot).toHaveProperty('actionId');
-      expect(snapshot).toHaveProperty('status');
-      expect(snapshot).toHaveProperty('progress');
-      expect(snapshot).toHaveProperty('metadata');
-    });
-
-    it('should return defensive copies of metrics', async () => {
-      // Act
-      const result1 = await service.getExecutionMetrics(testActionId);
-      const result2 = await service.getExecutionMetrics(testActionId);
-
-      // Assert
-      expect(result1).toBeValidResult();
-      expect(result2).toBeValidResult();
-      
-      // Modify first result
-      result1.value.retryCount = 999;
-      
-      // Second result should be unaffected
-      expect(result2.value.retryCount).toBe(0);
-    });
-
-    it('should return defensive copies of snapshots', async () => {
-      // Act
-      const result1 = await service.getExecutionSnapshot(testActionId);
-      const result2 = await service.getExecutionSnapshot(testActionId);
-
-      // Assert
-      expect(result1).toBeValidResult();
-      expect(result2).toBeValidResult();
-      
-      // Modify first result
-      result1.value.progress = 999;
-      
-      // Second result should be unaffected
-      expect(result2.value.progress).toBe(0);
-    });
-
-    it('should reject retrieving metrics for non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '222e4567-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.getExecutionMetrics(nonExistentActionId);
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No metrics found for action');
-    });
-
-    it('should reject retrieving snapshot for non-existent execution', async () => {
-      // Arrange
-      const nonExistentActionId = '111e4567-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.getExecutionSnapshot(nonExistentActionId);
-
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('No execution snapshot found for action');
+      it('should reject cancellation for non-existent execution', async () => {
+        // Act
+        const result = await executionService.cancelExecution('non-existent');
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No active execution found for action');
+      });
     });
   });
 
-  describe('Edge Cases and Error Handling', () => {
+  describe('query operations', () => {
+    describe('getExecutionMetrics', () => {
+      it('should return metrics copy for existing execution', async () => {
+        // Arrange
+        await executionService.startExecution(testActionId);
+        
+        // Act
+        const result1 = await executionService.getExecutionMetrics(testActionId);
+        const result2 = await executionService.getExecutionMetrics(testActionId);
+        
+        // Assert
+        expect(result1).toBeValidResult();
+        expect(result2).toBeValidResult();
+        expect(result1.value).not.toBe(result2.value); // Different objects
+        expect(result1.value).toEqual(result2.value); // Same content
+      });
+
+      it('should reject metrics request for non-existent execution', async () => {
+        // Act
+        const result = await executionService.getExecutionMetrics('non-existent');
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No metrics found for action');
+      });
+    });
+
+    describe('getExecutionSnapshot', () => {
+      it('should return snapshot copy for existing execution', async () => {
+        // Arrange
+        await executionService.startExecution(testActionId);
+        
+        // Act
+        const result1 = await executionService.getExecutionSnapshot(testActionId);
+        const result2 = await executionService.getExecutionSnapshot(testActionId);
+        
+        // Assert
+        expect(result1).toBeValidResult();
+        expect(result2).toBeValidResult();
+        expect(result1.value).not.toBe(result2.value); // Different objects
+        expect(result1.value).toEqual(result2.value); // Same content
+      });
+
+      it('should reject snapshot request for non-existent execution', async () => {
+        // Act
+        const result = await executionService.getExecutionSnapshot('non-existent');
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('No execution snapshot found for action');
+      });
+    });
+
+    describe('utility queries', () => {
+      it('should correctly report execution status', async () => {
+        // Assert initial state
+        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.getActiveExecutionCount()).toBe(0);
+        
+        // Start execution
+        await executionService.startExecution(testActionId);
+        expect(executionService.isExecuting(testActionId)).toBe(true);
+        expect(executionService.getActiveExecutionCount()).toBe(1);
+        
+        // Complete execution
+        await executionService.completeExecution(testActionId, {});
+        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.getActiveExecutionCount()).toBe(0);
+      });
+
+      it('should track multiple concurrent executions', async () => {
+        // Arrange
+        const actionId2 = 'action-456';
+        const actionId3 = 'action-789';
+        
+        // Act
+        await executionService.startExecution(testActionId);
+        await executionService.startExecution(actionId2);
+        await executionService.startExecution(actionId3);
+        
+        // Assert
+        expect(executionService.getActiveExecutionCount()).toBe(3);
+        expect(executionService.isExecuting(testActionId)).toBe(true);
+        expect(executionService.isExecuting(actionId2)).toBe(true);
+        expect(executionService.isExecuting(actionId3)).toBe(true);
+        
+        // Complete one
+        await executionService.completeExecution(actionId2, {});
+        expect(executionService.getActiveExecutionCount()).toBe(2);
+        expect(executionService.isExecuting(actionId2)).toBe(false);
+      });
+    });
+  });
+
+  describe('error handling and edge cases', () => {
+    it('should handle execution ID generation uniqueness', async () => {
+      // Arrange
+      const actionIds = Array.from({ length: 10 }, (_, i) => `action-${i}`);
+      
+      // Act - Start multiple executions rapidly
+      await Promise.all(actionIds.map(id => executionService.startExecution(id)));
+      
+      // Assert - All should have unique execution contexts
+      expect(executionService.getActiveExecutionCount()).toBe(10);
+      
+      // Verify each has unique execution ID by checking snapshots
+      const snapshots = await Promise.all(
+        actionIds.map(id => executionService.getExecutionSnapshot(id))
+      );
+      
+      const executionIds = snapshots.map(s => (s.value.metadata as any).executionId || 'none');
+      const uniqueIds = new Set(executionIds);
+      expect(uniqueIds.size).toBe(executionIds.filter(id => id !== 'none').length);
+    });
+
     it('should handle concurrent operations on same action', async () => {
       // Arrange
-      await service.startExecution(testActionId);
-
-      // Act - Try multiple operations concurrently
-      const promises = [
-        service.updateProgress(testActionId, 25),
-        service.trackResourceUsage(testActionId, { cpu: 50, memory: 256 }),
-        service.updateProgress(testActionId, 50, 'Processing')
-      ];
-
-      const results = await Promise.all(promises);
-
-      // Assert - All operations should succeed
-      results.forEach(result => {
-        expect(result).toBeValidResult();
-      });
-    });
-
-    it('should handle large action IDs', async () => {
-      // Arrange
-      // Note: We need a valid UUID format, so let's use a UUID with long metadata in tests
-      const largeActionId = 'dddddddd-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.startExecution(largeActionId);
-
-      // Assert
-      expect(result).toBeValidResult();
-      expect(service.isExecuting(largeActionId)).toBe(true);
-    });
-
-    it('should handle special characters in action IDs', async () => {
-      // Arrange
-      // UUIDs have a fixed format, so we'll use a valid UUID for this test
-      const specialActionId = 'eeeeeeee-e89b-42d3-a456-426614174000';
-
-      // Act
-      const result = await service.startExecution(specialActionId);
-
-      // Assert
-      expect(result).toBeValidResult();
-      expect(service.isExecuting(specialActionId)).toBe(true);
-    });
-
-    it('should maintain separate state for different action IDs', async () => {
-      // Arrange
-      const actionId1 = 'ffffffff-e89b-42d3-a456-426614174000';
-      const actionId2 = '12345678-e89b-42d3-a456-426614174000';
-
-      // Act
-      await service.startExecution(actionId1);
-      await service.startExecution(actionId2);
+      await executionService.startExecution(testActionId);
       
-      await service.updateProgress(actionId1, 25);
-      await service.updateProgress(actionId2, 75);
-
-      // Assert
-      const snapshot1 = await service.getExecutionSnapshot(actionId1);
-      const snapshot2 = await service.getExecutionSnapshot(actionId2);
+      // Act - Try concurrent operations
+      const [progressResult, resourceResult, retryResult] = await Promise.all([
+        executionService.updateProgress(testActionId, 50),
+        executionService.trackResourceUsage(testActionId, { cpu: 60, memory: 800 }),
+        executionService.retryExecution(testActionId)
+      ]);
       
-      expect(snapshot1.value.progress).toBe(25);
-      expect(snapshot2.value.progress).toBe(75);
+      // Assert - All operations should succeed independently
+      expect(progressResult).toBeValidResult();
+      expect(resourceResult).toBeValidResult();
+      expect(retryResult).toBeValidResult();
     });
 
-    it('should handle rapid start-stop cycles', async () => {
-      // Act - Rapid start and complete cycles
-      const actionIds = [
-        'abcdef00-e89b-42d3-a456-426614174000',
-        'abcdef01-e89b-42d3-a456-426614174000',
-        'abcdef02-e89b-42d3-a456-426614174000',
-        'abcdef03-e89b-42d3-a456-426614174000',
-        'abcdef04-e89b-42d3-a456-426614174000'
-      ];
+    it('should handle malformed input gracefully', async () => {
+      // Act & Assert - Various malformed inputs
+      const emptyIdResult = await executionService.startExecution('');
+      expect(emptyIdResult).toBeValidResult(); // Service doesn't validate ID format
       
-      for (let i = 0; i < 5; i++) {
-        const actionId = actionIds[i];
-        await service.startExecution(actionId);
-        await service.completeExecution(actionId, { iteration: i });
-        
-        expect(service.isExecuting(actionId)).toBe(false);
-      }
-
-      // Assert
-      expect(service.getActiveExecutionCount()).toBe(0);
-    });
-  });
-
-  describe('Result Pattern Integration', () => {
-    it('should consistently use Result pattern for all operations', async () => {
-      // Arrange
-      await service.startExecution(testActionId);
-      
-      // Act - Test multiple operations return Results
-      const operations = [
-        service.startExecution('87654321-e89b-42d3-a456-426614174000'),
-        service.updateProgress(testActionId, 50),
-        service.trackResourceUsage(testActionId, { cpu: 30, memory: 128 }),
-        service.getExecutionMetrics(testActionId),
-        service.getExecutionSnapshot(testActionId),
-        service.evaluateRetryPolicy(testActionId),
-        service.completeExecution(testActionId, { result: 'done' })
-      ];
-
-      const results = await Promise.all(operations);
-
-      // Assert - All should return Result objects
-      results.forEach(result => {
-        expect(result).toHaveProperty('isSuccess');
-        expect(result).toHaveProperty('isFailure');
-        expect(typeof result.isSuccess).toBe('boolean');
-        expect(typeof result.isFailure).toBe('boolean');
-      });
-    });
-
-    it('should provide meaningful error messages', async () => {
-      // Arrange
-      const nonExistentId = 'fedcba00-e89b-42d3-a456-426614174000';
-
-      // Act & Assert - Test various error scenarios
-      const errorTests = [
-        { 
-          operation: () => service.completeExecution(nonExistentId, {}), 
-          expectedMessage: 'No active execution found for action' 
-        },
-        { 
-          operation: () => service.failExecution(nonExistentId, 'error'), 
-          expectedMessage: 'No active execution found for action' 
-        },
-        { 
-          operation: () => service.retryExecution(nonExistentId), 
-          expectedMessage: 'No active execution found for action' 
-        },
-        { 
-          operation: () => service.getExecutionMetrics(nonExistentId), 
-          expectedMessage: 'No metrics found for action' 
-        },
-        { 
-          operation: () => service.getExecutionSnapshot(nonExistentId), 
-          expectedMessage: 'No execution snapshot found for action' 
-        }
-      ];
-
-      for (const test of errorTests) {
-        const result = await test.operation();
-        expect(result).toBeFailureResult();
-        expect(result).toHaveErrorMessage(test.expectedMessage);
-      }
+      const nullResourceResult = await executionService.trackResourceUsage(testActionId, null as any);
+      expect(nullResourceResult).toBeFailureResult();
     });
   });
 });

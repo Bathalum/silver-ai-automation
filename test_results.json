@@ -1,0 +1,299 @@
+
+> silver-ai-automation-app@0.1.0 test C:\Users\alant\OneDrive\Desktop\Projects\silver-ai-automation
+> jest "--reporter=json"
+
+PASS tests/unit/domain/entities/action-node-type-specific-rules.test.ts
+PASS tests/unit/domain/events/domain-event-integration.test.ts
+PASS tests/unit/domain/events/domain-events.test.ts
+PASS tests/unit/domain/events/domain-events-fixed.test.ts
+PASS tests/unit/domain/services/node-dependency-service.test.ts
+  ● Console
+
+    console.log
+      Actual node UUIDs:
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:107:15)
+
+    console.log
+      stageA -> 20906767-7712-4620-8878-2114797a2dd8
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:108:15)
+
+    console.log
+      stageB -> 33f2ef67-bcea-4d3a-8870-e78da3f0dd8c
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:109:15)
+
+    console.log
+      merge -> 3995d69c-d8f8-4ad7-881e-9283b5128e81
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:110:15)
+
+    console.log
+      Adding dependencies...
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:112:15)
+
+    console.log
+      stageA.addDependency result: Result { _isSuccess: true, _value: undefined, _error: undefined }
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:114:15)
+
+    console.log
+      stageB.addDependency result: Result { _isSuccess: true, _value: undefined, _error: undefined }
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:116:15)
+
+    console.log
+      mergeStage.addDependency(stageA) result: Result { _isSuccess: true, _value: undefined, _error: undefined }
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:118:15)
+
+    console.log
+      mergeStage.addDependency(stageB) result: Result { _isSuccess: true, _value: undefined, _error: undefined }
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:120:15)
+
+    console.log
+      outputNode.addDependency result: Result { _isSuccess: true, _value: undefined, _error: undefined }
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:122:15)
+
+    console.log
+      All node keys in graph: [
+        '123e4567-e89b-42d3-a456-426614174001',
+        '20906767-7712-4620-8878-2114797a2dd8',
+        '33f2ef67-bcea-4d3a-8870-e78da3f0dd8c',
+        '3995d69c-d8f8-4ad7-881e-9283b5128e81',
+        '123e4567-e89b-42d3-a456-426614174003'
+      ]
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:134:15)
+
+    console.log
+      All reverse dependency keys: [
+        '123e4567-e89b-42d3-a456-426614174001',
+        '20906767-7712-4620-8878-2114797a2dd8',
+        '33f2ef67-bcea-4d3a-8870-e78da3f0dd8c',
+        '3995d69c-d8f8-4ad7-881e-9283b5128e81',
+        '123e4567-e89b-42d3-a456-426614174003'
+      ]
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:135:15)
+
+    console.log
+      stageAUUID: 20906767-7712-4620-8878-2114797a2dd8
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:136:15)
+
+    console.log
+      Reverse deps for stageA: [ '123e4567-e89b-42d3-a456-426614174001' ]
+
+      at Object.log (tests/unit/domain/services/node-dependency-service.test.ts:137:15)
+
+PASS tests/unit/domain/services/hierarchical-context-access.test.ts
+  ● Console
+
+    console.log
+      DEBUG: Setting context for level1Container.actionId: 00000036-0000-4000-8000-000000360000
+
+      at Object.log (tests/unit/domain/services/hierarchical-context-access.test.ts:715:15)
+
+    console.log
+      DEBUG: level2Model.modelId: 00000035-0000-4000-8000-000000350000
+
+      at Object.log (tests/unit/domain/services/hierarchical-context-access.test.ts:716:15)
+
+    console.log
+      DEBUG: level1Context.nestedModelOutputs keys: [ '00000035-0000-4000-8000-000000350000' ]
+
+      at Object.log (tests/unit/domain/services/hierarchical-context-access.test.ts:717:15)
+
+    console.log
+      DEBUG: Service state after setting context:
+
+      at Object.log (tests/unit/domain/services/hierarchical-context-access.test.ts:723:15)
+
+    console.log
+      DEBUG: Node count: 3
+
+      at Object.log (tests/unit/domain/services/hierarchical-context-access.test.ts:724:15)
+
+    console.log
+      DEBUG: Node 00000036-0000-4000-8000-000000360000 (FunctionModelContainer) - hasContext: true, contextKeys: []
+
+      at log (tests/unit/domain/services/hierarchical-context-access.test.ts:726:17)
+          at Array.forEach (<anonymous>)
+
+    console.log
+      DEBUG: Target node context data: {}
+
+      at log (tests/unit/domain/services/hierarchical-context-access.test.ts:728:19)
+          at Array.forEach (<anonymous>)
+
+    console.log
+      DEBUG: Target node context data type: object
+
+      at log (tests/unit/domain/services/hierarchical-context-access.test.ts:729:19)
+          at Array.forEach (<anonymous>)
+
+    console.log
+      DEBUG: Node 0000003a-0000-4000-8000-0000003a0000 (FunctionModelContainer) - hasContext: true, contextKeys: []
+
+      at log (tests/unit/domain/services/hierarchical-context-access.test.ts:726:17)
+          at Array.forEach (<anonymous>)
+
+    console.log
+      DEBUG: Node 0000003e-0000-4000-8000-0000003e0000 (TetherNode) - hasContext: true, contextKeys: []
+
+      at log (tests/unit/domain/services/hierarchical-context-access.test.ts:726:17)
+          at Array.forEach (<anonymous>)
+
+PASS tests/unit/domain/services/fractal-orchestration-service.test.ts
+PASS tests/unit/domain/entities/function-model-comprehensive.test.ts
+PASS tests/unit/domain/entities/node-metadata.test.ts
+PASS tests/unit/domain/entities/nodes/stage-node.test.ts
+PASS tests/unit/domain/aggregates/aggregate-boundary-validation.test.ts
+PASS tests/unit/domain/entities/ai-agent.test.ts
+PASS tests/unit/domain/entities/function-model.test.ts
+PASS tests/unit/domain/entities/node.test.ts
+PASS tests/unit/domain/value-objects/execution-context.test.ts
+PASS tests/unit/domain/entities/node-link.test.ts
+PASS tests/unit/domain/value-objects/position.test.ts
+PASS tests/unit/domain/entities/action-node.test.ts
+PASS tests/unit/domain/entities/nodes/function-model-container-node.test.ts
+PASS tests/unit/domain/services/model-versioning-service.test.ts
+PASS tests/unit/domain/services/cross-feature-linking-service.test.ts
+PASS tests/unit/domain/entities/nodes/kb-node.test.ts
+PASS tests/unit/domain/repositories/repository-contracts.test.ts
+PASS tests/unit/domain/services/node-context-access-service.test.ts
+PASS tests/unit/domain/entities/function-model-version.test.ts
+PASS tests/unit/domain/interfaces/repository-interfaces-comprehensive.test.ts
+PASS tests/unit/domain/entities/cross-feature-link.test.ts
+PASS tests/unit/domain/entities/nodes/tether-node.test.ts
+PASS tests/unit/domain/rules/business-rules-validation.test.ts
+PASS tests/unit/domain/entities/audit-log.test.ts
+PASS tests/unit/domain/events/comprehensive-domain-events.test.ts
+PASS tests/unit/domain/entities/nodes/io-node.test.ts
+PASS tests/unit/domain/value-objects/raci.test.ts
+PASS tests/unit/domain/entities/action-node-configurations.test.ts
+PASS tests/unit/domain/value-objects/version.test.ts
+PASS tests/unit/domain/rules/execution-rules.test.ts
+PASS tests/unit/domain/services/function-model-versioning-service.test.ts
+PASS tests/unit/domain/enums/domain-enums.test.ts
+PASS tests/unit/domain/value-objects/retry-policy.test.ts
+PASS tests/unit/domain/value-objects/node-id.test.ts
+PASS tests/unit/domain/interfaces/repository-interface-contracts.test.ts
+PASS tests/unit/domain/aggregates/function-model-aggregate.test.ts
+PASS tests/unit/domain/value-objects/model-name.test.ts
+PASS tests/unit/domain/services/workflow-orchestration-service.test.ts
+  ● Console
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Test Tether Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+          at async Promise.all (index 0)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+          at async Promise.all (index 1)
+
+    console.log
+      Executing Tether Node: Process Action (test-tether-ref-id-123)
+
+      at WorkflowOrchestrationService.log [as executeTetherNode] (lib/domain/services/workflow-orchestration-service.ts:411:13)
+
+PASS tests/unit/domain/services/action-node-orchestration-service.test.ts (6.214 s)
+PASS tests/unit/domain/services/action-node-execution-service.test.ts (13.218 s)
+PASS tests/unit/domain/services/ai-agent-orchestration-service.test.ts (21.001 s)
+  ● Console
+
+    console.log
+      Agent 00000020-0000-4000-8000-000000200000 failed: Test failure
+
+      at AIAgentOrchestrationService.log [as handleAgentFailure] (lib/domain/services/ai-agent-orchestration-service.ts:277:13)
+
+    console.log
+      Agent 00000021-0000-4000-8000-000000210000 failed: Test failure
+
+      at AIAgentOrchestrationService.log [as handleAgentFailure] (lib/domain/services/ai-agent-orchestration-service.ts:277:13)
+
+    console.log
+      Agent 00000022-0000-4000-8000-000000220000 failed: Test failure
+
+      at AIAgentOrchestrationService.log [as handleAgentFailure] (lib/domain/services/ai-agent-orchestration-service.ts:277:13)
+
+
+Test Suites: 47 passed, 47 total
+Tests:       1661 passed, 1661 total
+Snapshots:   0 total
+Time:        23.406 s
+Ran all test suites.

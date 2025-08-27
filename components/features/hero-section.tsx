@@ -58,27 +58,27 @@ export function HeroSection() {
                 <Zap className="h-6 w-6 text-blue-600" />
               </div>
               <div className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors duration-300">
-                80%
+                {/* 80% */}
               </div>
-              <div className="text-sm text-gray-600">Time Saved</div>
+              <div className="text-sm text-gray-600">Save Time</div>
             </div>
             <div className="text-center group cursor-pointer">
               <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mb-2 mx-auto group-hover:bg-green-200 group-hover:scale-110 transition-all duration-300">
                 <TrendingUp className="h-6 w-6 text-green-600" />
               </div>
               <div className="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-300">
-                300%
+                {/* 300% */}
               </div>
-              <div className="text-sm text-gray-600">ROI Increase</div>
+              <div className="text-sm text-gray-600">Increase Efficiency</div>
             </div>
             <div className="text-center group cursor-pointer">
               <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mb-2 mx-auto group-hover:bg-purple-200 group-hover:scale-110 transition-all duration-300">
                 <Shield className="h-6 w-6 text-purple-600" />
               </div>
               <div className="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors duration-300">
-                99.9%
+                {/* 99.9% */}
               </div>
-              <div className="text-sm text-gray-600">Uptime</div>
+              <div className="text-sm text-gray-600">Reduce Errors</div>
             </div>
           </div>
         </div>

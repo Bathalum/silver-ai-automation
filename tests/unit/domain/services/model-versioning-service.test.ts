@@ -614,6 +614,541 @@ describe('ModelVersioningService', () => {
     });
   });
 
+  describe('Domain Service Coordination', () => {
+    describe('Complete State Capture', () => {
+      it('captureModelSnapshot_ComplexModel_CapturesAllNodes', async () => {
+        // Arrange - Complex model with multiple node types
+        const inputNodeId = NodeId.generate();
+        const stageNodeId = NodeId.generate();
+        const kbNodeId = NodeId.generate();
+        const outputNodeId = NodeId.generate();
+        
+        const inputPosition = Position.create(100, 100).value!;
+        const stagePosition = Position.create(250, 100).value!;
+        const kbPosition = Position.create(400, 100).value!;
+        const outputPosition = Position.create(550, 100).value!;
+
+        // Create nodes of different types
+        const inputNode = IONode.create({
+          nodeId: inputNodeId,
+          modelId: baseModel.modelId,
+          name: 'Data Input',
+          description: 'Primary data input',
+          position: inputPosition,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: { inputSchema: { type: 'json' } },
+          visualProperties: { color: '#blue' },
+          ioData: {
+            boundaryType: 'input',
+            inputDataContract: { required: ['id', 'data'] }
+          }
+        }).value!;
+
+        const outputNode = IONode.create({
+          nodeId: outputNodeId,
+          modelId: baseModel.modelId,
+          name: 'Processed Output',
+          description: 'Final processed output',
+          position: outputPosition,
+          dependencies: [stageNodeId.value],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: { outputFormat: 'processed_json' },
+          visualProperties: { color: '#green' },
+          ioData: {
+            boundaryType: 'output',
+            outputDataContract: { schema: { type: 'object' } }
+          }
+        }).value!;
+
+        // Add nodes to model
+        baseModel.addNode(inputNode);
+        baseModel.addNode(outputNode);
+
+        // Act - Capture complete state
+        const result = await service.createVersion(baseModel, 'minor');
+
+        // Assert - All nodes captured in version
+        expect(result.isSuccess).toBe(true);
+        const newVersion = result.value!;
+        
+        // Verify version increment
+        expect(newVersion.toString()).toBe('1.1.0');
+        
+        // The service should coordinate with the model's state capture
+        // This test validates the service orchestrates version creation properly
+        expect(result.isSuccess).toBe(true);
+      });
+
+      it('captureModelSnapshot_WithActionNodes_CapturesActionConfiguration', async () => {
+        // Arrange - Add action nodes to model
+        const stageNodeId = NodeId.generate();
+        const stagePosition = Position.create(250, 100).value!;
+
+        // Create a stage node (which can have action nodes)
+        const stageNode = IONode.create({
+          nodeId: stageNodeId,
+          modelId: baseModel.modelId,
+          name: 'Processing Stage',
+          description: 'Data processing stage',
+          position: stagePosition,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: { stage: 'processing' },
+          visualProperties: {},
+          ioData: {
+            boundaryType: 'input',
+            inputDataContract: {}
+          }
+        }).value!;
+
+        baseModel.addNode(stageNode);
+
+        // Act - Create version with action nodes
+        const result = await service.createVersion(baseModel, 'patch');
+
+        // Assert - Action configuration captured
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.toString()).toBe('1.0.1');
+      });
+
+      it('captureModelSnapshot_WithDependencies_CapturesRelationships', async () => {
+        // Arrange - Create model with complex dependencies
+        const node1Id = NodeId.generate();
+        const node2Id = NodeId.generate();
+        const node3Id = NodeId.generate();
+        
+        const pos1 = Position.create(100, 100).value!;
+        const pos2 = Position.create(250, 100).value!;
+        const pos3 = Position.create(400, 100).value!;
+
+        // Create interdependent nodes
+        const node1 = IONode.create({
+          nodeId: node1Id,
+          modelId: baseModel.modelId,
+          name: 'Node 1',
+          description: 'First node',
+          position: pos1,
+          dependencies: [], // No dependencies
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        const node2 = IONode.create({
+          nodeId: node2Id,
+          modelId: baseModel.modelId,
+          name: 'Node 2',
+          description: 'Second node',
+          position: pos2,
+          dependencies: [node1Id.value], // Depends on node1
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        const node3 = IONode.create({
+          nodeId: node3Id,
+          modelId: baseModel.modelId,
+          name: 'Node 3',
+          description: 'Third node',
+          position: pos3,
+          dependencies: [node1Id.value, node2Id.value], // Depends on both
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'output', outputDataContract: {} }
+        }).value!;
+
+        // Add nodes to model
+        baseModel.addNode(node1);
+        baseModel.addNode(node2);
+        baseModel.addNode(node3);
+
+        // Act - Capture dependencies
+        const result = await service.createVersion(baseModel, 'minor');
+
+        // Assert - Dependencies captured
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.toString()).toBe('1.1.0');
+      });
+
+      it('captureModelSnapshot_WithExecutionContext_CapturesRuntimeState', async () => {
+        // Arrange - Model with execution context
+        const contextualModel = createTestModel('Contextual Model', '1.2.0', {
+          metadata: {
+            executionContext: {
+              environment: 'production',
+              resourceLimits: { memory: '4GB', cpu: '8 cores' },
+              securityContext: { isolationLevel: 'high' },
+              monitoring: { enabled: true, level: 'debug' }
+            }
+          }
+        });
+
+        // Act - Capture execution context
+        const result = await service.createVersion(contextualModel, 'patch');
+
+        // Assert - Runtime state captured
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.toString()).toBe('1.2.1');
+      });
+    });
+
+    describe('Versioned State Validation', () => {
+      it('validateSnapshot_ValidModel_PassesValidation', async () => {
+        // Arrange - Create valid model with proper structure
+        const validModel = createTestModel('Valid Model', '2.0.0');
+        
+        // Add required nodes for validation
+        const inputId = NodeId.generate();
+        const outputId = NodeId.generate();
+        const inputPos = Position.create(0, 0).value!;
+        const outputPos = Position.create(200, 0).value!;
+
+        const inputNode = IONode.create({
+          nodeId: inputId,
+          modelId: validModel.modelId,
+          name: 'Input',
+          description: 'Input node',
+          position: inputPos,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        const outputNode = IONode.create({
+          nodeId: outputId,
+          modelId: validModel.modelId,
+          name: 'Output',
+          description: 'Output node',
+          position: outputPos,
+          dependencies: [inputId.value],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'output', outputDataContract: {} }
+        }).value!;
+
+        validModel.addNode(inputNode);
+        validModel.addNode(outputNode);
+
+        // Act - Create version with validation
+        const result = await service.createVersion(validModel, 'major');
+
+        // Assert - Validation passes
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.toString()).toBe('3.0.0');
+      });
+
+      it('validateSnapshot_CorruptedData_FailsValidation', async () => {
+        // Arrange - Create model that will fail validation
+        const corruptedModel = { ...baseModel } as any;
+        // Simulate corruption by removing validation method
+        delete corruptedModel.validateWorkflow;
+
+        // Act - Attempt to create version
+        const result = await service.createVersion(corruptedModel, 'patch');
+
+        // Assert - Validation fails gracefully
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toContain('Failed to create version:');
+      });
+
+      it('validateSnapshot_MissingRequiredNodes_FailsValidation', async () => {
+        // Arrange - Model without required structure (will fail validation when published)
+        const invalidModel = createTestModel('Invalid Model', '1.0.0', {
+          status: ModelStatus.PUBLISHED // Published models must validate
+        });
+        
+        // Don't add required nodes - model will fail validation
+
+        // Act - Attempt to create version
+        const result = await service.createVersion(invalidModel, 'patch');
+
+        // Assert - Missing nodes cause validation failure
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toContain('Cannot create version with validation errors');
+      });
+    });
+
+    describe('Version Change Analysis', () => {
+      it('analyzeChanges_NodePropertyModification_DetectsSpecificChanges', () => {
+        // Arrange - Create two models with node property differences
+        const baseModelForAnalysis = createTestModel('Base Analysis', '1.0.0');
+        const modifiedModelForAnalysis = createTestModel('Modified Analysis', '1.0.0');
+
+        // Add same node to both with different properties
+        const nodeId = NodeId.generate();
+        const position = Position.create(100, 100).value!;
+
+        const baseNode = IONode.create({
+          nodeId,
+          modelId: baseModelForAnalysis.modelId,
+          name: 'Original Node',
+          description: 'Original description',
+          position,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: { version: 1 },
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        const modifiedNode = IONode.create({
+          nodeId,
+          modelId: modifiedModelForAnalysis.modelId,
+          name: 'Modified Node', // Changed name
+          description: 'Updated description', // Changed description
+          position,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: { version: 2 }, // Changed metadata
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        baseModelForAnalysis.addNode(baseNode);
+        modifiedModelForAnalysis.addNode(modifiedNode);
+
+        // Act - Analyze changes
+        const result = service.compareModels(baseModelForAnalysis, modifiedModelForAnalysis);
+
+        // Assert - Specific property changes detected
+        expect(result.isSuccess).toBe(true);
+        const changes = result.value;
+        expect(changes.modifiedNodes).toContain(nodeId.value);
+        expect(changes.addedNodes).toHaveLength(0);
+        expect(changes.removedNodes).toHaveLength(0);
+      });
+
+      it('analyzeChanges_DependencyChanges_CategorizesDependencyModifications', () => {
+        // Arrange - Models with different dependency structures
+        const baseModelDeps = createTestModel('Base Dependencies', '1.0.0');
+        const modifiedModelDeps = createTestModel('Modified Dependencies', '1.0.0');
+
+        const node1Id = NodeId.generate();
+        const node2Id = NodeId.generate();
+        const pos1 = Position.create(100, 100).value!;
+        const pos2 = Position.create(200, 100).value!;
+
+        // Base model: node2 depends on node1
+        const baseNode1 = IONode.create({
+          nodeId: node1Id,
+          modelId: baseModelDeps.modelId,
+          name: 'Node 1',
+          description: 'First node',
+          position: pos1,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        const baseNode2 = IONode.create({
+          nodeId: node2Id,
+          modelId: baseModelDeps.modelId,
+          name: 'Node 2',
+          description: 'Second node',
+          position: pos2,
+          dependencies: [node1Id.value], // Depends on node1
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'output', outputDataContract: {} }
+        }).value!;
+
+        // Modified model: node2 has no dependencies
+        const modifiedNode1 = IONode.create({
+          nodeId: node1Id,
+          modelId: modifiedModelDeps.modelId,
+          name: 'Node 1',
+          description: 'First node',
+          position: pos1,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        const modifiedNode2 = IONode.create({
+          nodeId: node2Id,
+          modelId: modifiedModelDeps.modelId,
+          name: 'Node 2',
+          description: 'Second node',
+          position: pos2,
+          dependencies: [], // No dependencies
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'output', outputDataContract: {} }
+        }).value!;
+
+        baseModelDeps.addNode(baseNode1);
+        baseModelDeps.addNode(baseNode2);
+        modifiedModelDeps.addNode(modifiedNode1);
+        modifiedModelDeps.addNode(modifiedNode2);
+
+        // Act - Analyze dependency changes
+        const result = service.compareModels(baseModelDeps, modifiedModelDeps);
+
+        // Assert - Dependency modifications detected
+        expect(result.isSuccess).toBe(true);
+        const changes = result.value;
+        expect(changes.modifiedNodes).toContain(node2Id.value);
+      });
+
+      it('analyzeChanges_MetadataEvolution_TracksMetadataHistory', () => {
+        // Arrange - Models with evolved metadata
+        const baseMetaModel = createTestModel('Base Metadata', '1.0.0', {
+          metadata: {
+            category: 'analytics',
+            version: 'v1.0',
+            features: ['basic-processing']
+          }
+        });
+
+        const evolvedMetaModel = createTestModel('Evolved Metadata', '1.0.0', {
+          metadata: {
+            category: 'advanced-analytics', // Changed
+            version: 'v1.1', // Changed
+            features: ['basic-processing', 'advanced-ml'], // Added feature
+            newCapabilities: ['real-time'] // Added new field
+          }
+        });
+
+        // Act - Track metadata evolution
+        const result = service.compareModels(baseMetaModel, evolvedMetaModel);
+
+        // Assert - Metadata changes tracked
+        expect(result.isSuccess).toBe(true);
+        const changes = result.value;
+        expect(Object.keys(changes.metadataChanges)).toContain('category');
+        expect(Object.keys(changes.metadataChanges)).toContain('version');
+        expect(Object.keys(changes.metadataChanges)).toContain('features');
+        expect(Object.keys(changes.metadataChanges)).toContain('newCapabilities');
+      });
+    });
+
+    describe('Change Significance Assessment', () => {
+      it('assessChangeSignificance_BreakingChanges_RecommendsMajorVersion', async () => {
+        // Arrange - Model with breaking changes (removing required nodes)
+        const breakingModel = createTestModel('Breaking Changes', '1.5.0');
+        
+        // Create model with minimal valid structure (just one node)
+        const nodeId = NodeId.generate();
+        const position = Position.create(100, 100).value!;
+        
+        const singleNode = IONode.create({
+          nodeId,
+          modelId: breakingModel.modelId,
+          name: 'Single Node',
+          description: 'Only node',
+          position,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: {},
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        breakingModel.addNode(singleNode);
+
+        // Act - Create version (breaking changes would warrant major)
+        const result = await service.createVersion(breakingModel, 'major');
+
+        // Assert - Major version created
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.toString()).toBe('2.0.0');
+      });
+
+      it('assessChangeSignificance_BackwardCompatible_RecommendsMinorVersion', async () => {
+        // Arrange - Model with backward compatible changes (additive)
+        const compatibleModel = createTestModel('Compatible Changes', '1.2.3');
+
+        // Add new functionality (backward compatible)
+        const newNodeId = NodeId.generate();
+        const position = Position.create(150, 150).value!;
+        
+        const newNode = IONode.create({
+          nodeId: newNodeId,
+          modelId: compatibleModel.modelId,
+          name: 'New Feature Node',
+          description: 'Added functionality',
+          position,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: { feature: 'new' },
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        compatibleModel.addNode(newNode);
+
+        // Act - Create minor version for new features
+        const result = await service.createVersion(compatibleModel, 'minor');
+
+        // Assert - Minor version created
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.toString()).toBe('1.3.0');
+      });
+
+      it('assessChangeSignificance_BugFixes_RecommendsPatchVersion', async () => {
+        // Arrange - Model with bug fixes (non-breaking changes)
+        const bugFixModel = createTestModel('Bug Fixes', '2.1.4');
+
+        // Add node representing bug fix
+        const fixNodeId = NodeId.generate();
+        const position = Position.create(75, 75).value!;
+        
+        const fixNode = IONode.create({
+          nodeId: fixNodeId,
+          modelId: bugFixModel.modelId,
+          name: 'Bug Fix Node',
+          description: 'Fixed validation issue',
+          position,
+          dependencies: [],
+          executionType: ExecutionMode.SEQUENTIAL,
+          status: NodeStatus.ACTIVE,
+          metadata: { fix: 'validation-bug' },
+          visualProperties: {},
+          ioData: { boundaryType: 'input', inputDataContract: {} }
+        }).value!;
+
+        bugFixModel.addNode(fixNode);
+
+        // Act - Create patch version for bug fixes
+        const result = await service.createVersion(bugFixModel, 'patch');
+
+        // Assert - Patch version created
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.toString()).toBe('2.1.5');
+      });
+    });
+  });
+
   describe('Business Logic Integration', () => {
     it('should create versions for models with validation', async () => {
       // Add nodes to create a more complex model

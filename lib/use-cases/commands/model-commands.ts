@@ -24,7 +24,9 @@ export interface PublishModelCommand {
 export interface ArchiveModelCommand {
   modelId: string;
   userId: string;
-  archiveReason?: string;
+  reason?: string;
+  enforceRiskAssessment?: boolean;
+  cleanupCrossFeatureLinks?: boolean;
 }
 
 export interface DeleteModelCommand {
@@ -45,4 +47,10 @@ export interface CreateVersionCommand {
   versionType: 'major' | 'minor' | 'patch';
   userId: string;
   versionNotes?: string;
+}
+
+export interface ValidateWorkflowCommand {
+  modelId: string;
+  userId: string;
+  validationLevel: 'structural' | 'business-rules' | 'execution-readiness' | 'context' | 'cross-feature' | 'full';
 }

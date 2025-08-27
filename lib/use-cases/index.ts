@@ -6,7 +6,8 @@ export {
   type ArchiveModelCommand,
   type DeleteModelCommand,
   type DuplicateModelCommand,
-  type CreateVersionCommand
+  type CreateVersionCommand,
+  type ValidateWorkflowCommand
 } from './commands/model-commands';
 
 export {
@@ -59,6 +60,45 @@ export {
   PublishFunctionModelUseCase,
   type PublishModelResult
 } from './function-model/publish-function-model-use-case';
+
+export {
+  ValidateWorkflowStructureUseCase,
+  type WorkflowValidationResult,
+  type IWorkflowValidationService,
+  type IBusinessRuleValidationService,
+  type IExecutionReadinessService,
+  type IContextValidationService,
+  type ICrossFeatureValidationService
+} from './function-model/validate-workflow-structure-use-case';
+
+export {
+  CreateModelVersionUseCase,
+  type CreateModelVersionRequest,
+  type CreateModelVersionResponse
+} from './function-model/create-model-version-use-case';
+
+export {
+  ManageHierarchicalContextAccessUseCase,
+  type RegisterNodeRequest,
+  type RegisterNodeResponse,
+  type ValidateContextAccessRequest,
+  type ContextAccessValidationResult,
+  type GetAccessibleContextsRequest,
+  type HierarchicalContextAccessResult,
+  type UpdateContextRequest,
+  type UpdateContextResponse
+} from './function-model/manage-hierarchical-context-access-use-case';
+
+export {
+  ManageFractalOrchestrationUseCase,
+  type ManageFractalOrchestrationCommand
+} from './function-model/manage-fractal-orchestration-use-case';
+
+export {
+  ManageErrorHandlingAndRecoveryUseCase,
+  type ErrorHandlingRequest,
+  type ErrorHandlingResult
+} from './function-model/manage-error-handling-and-recovery-use-case';
 
 // Query Handlers
 export {

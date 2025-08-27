@@ -97,7 +97,7 @@ describe('Domain Events Test Suite - Fixed', () => {
       expect(event.aggregateId).toBe('test-aggregate-123');
       expect(event.eventVersion).toBe(1);
       expect(event.eventId).toBeDefined();
-      expect(event.occurredOn).toBeInstanceOf(Date);
+      expect(event.occurredAt).toBeInstanceOf(Date);
       expect(event.getEventName()).toBe('TestEvent');
       expect(event.getEventData()).toEqual({ testData: 'test-data' });
     });
@@ -134,7 +134,7 @@ describe('Domain Events Test Suite - Fixed', () => {
         eventName: 'TestEvent',
         aggregateId: 'test-aggregate-456',
         eventVersion: 1,
-        occurredOn: event.occurredOn.toISOString(),
+        occurredAt: event.occurredAt.toISOString(),
         eventData: { testData: 'serialization-test' }
       });
     });

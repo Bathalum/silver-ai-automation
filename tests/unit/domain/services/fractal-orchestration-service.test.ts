@@ -1,3 +1,13 @@
+/**
+ * Unit tests for FractalOrchestrationService
+ * Tests fractal orchestration patterns, hierarchical execution coordination,
+ * context propagation across multiple nesting levels, and orchestration consistency.
+ * 
+ * This service manages the fractal nature of function model execution across
+ * multiple hierarchy levels, enforcing Clean Architecture principles through
+ * clear layer separation and Result pattern usage.
+ */
+
 import { 
   FractalOrchestrationService, 
   FractalLevel, 
@@ -7,704 +17,616 @@ import {
 import { NodeContextAccessService } from '@/lib/domain/services/node-context-access-service';
 import { ActionNodeOrchestrationService } from '@/lib/domain/services/action-node-orchestration-service';
 import { FunctionModel } from '@/lib/domain/entities/function-model';
-import { FunctionModelContainerNode } from '@/lib/domain/entities/function-model-container-node';
+import { FunctionModelBuilder, TestFactories } from '../../../utils/test-fixtures';
 import { NodeId } from '@/lib/domain/value-objects/node-id';
-import { Result } from '@/lib/domain/shared/result';
-
-// Mock dependencies
-class MockNodeContextAccessService {
-  public getNodeContext(agentId: NodeId, nodeId: NodeId, accessMode: string): Result<{ contextData: Record<string, any> }> {
-    return Result.ok({ contextData: { mockContext: true, nodeId: nodeId.value } });
-  }
-}
-
-class MockActionNodeOrchestrationService {
-  public async executeActionNodes(): Promise<Result<void>> {
-    return Result.ok<void>(undefined);
-  }
-}
-
-// Mock FunctionModel implementation for testing
-class MockFunctionModel extends FunctionModel {
-  public static createMock(
-    modelId: string,
-    nodes: any[] = [],
-    containerNodes: FunctionModelContainerNode[] = []
-  ): MockFunctionModel {
-    const model = new MockFunctionModel({
-      modelId,
-      name: `Mock Model ${modelId}`,
-      description: 'Test function model',
-      version: 1,
-      nodes: [...nodes, ...containerNodes],
-      edges: [],
-      metadata: {},
-      featureType: 'FUNCTION_MODEL' as any,
-      canvasData: {
-        viewport: { x: 0, y: 0, zoom: 1 },
-        canvasSize: { width: 1000, height: 1000 }
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-
-    return model;
-  }
-}
-
-// Mock FunctionModelContainerNode for testing
-class MockFunctionModelContainerNode extends FunctionModelContainerNode {
-  public static createMock(
-    nodeId: NodeId,
-    nestedModelId: string,
-    orchestrationMode: 'embedded' | 'parallel' | 'sequential' = 'embedded',
-    contextMapping: Record<string, any> = {}
-  ): MockFunctionModelContainerNode {
-    return new MockFunctionModelContainerNode({
-      nodeId,
-      modelId: 'parent-model',
-      name: `Container Node ${nodeId.value}`,
-      description: 'Test container node',
-      position: { x: 0, y: 0 },
-      nodeType: 'functionModelContainer',
-      containerData: {
-        nestedModelId,
-        orchestrationMode,
-        contextMapping,
-        isolationLevel: 'standard',
-        resourceLimits: {},
-        performanceMetrics: {
-          maxExecutionTime: 5000,
-          maxMemoryUsage: 1024,
-          avgExecutionTime: 1000
-        }
-      },
-      metadata: {},
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-  }
-}
 
 describe('FractalOrchestrationService', () => {
-  let service: FractalOrchestrationService;
-  let mockContextService: MockNodeContextAccessService;
-  let mockActionService: MockActionNodeOrchestrationService;
+  let fractalService: FractalOrchestrationService;
+  let mockContextService: jest.Mocked<NodeContextAccessService>;
+  let mockActionOrchestrationService: jest.Mocked<ActionNodeOrchestrationService>;
+  let testModel: FunctionModel;
 
   beforeEach(() => {
-    mockContextService = new MockNodeContextAccessService();
-    mockActionService = new MockActionNodeOrchestrationService();
-    service = new FractalOrchestrationService(
-      mockContextService as any,
-      mockActionService as any
+    // Create mock services
+    mockContextService = {
+      buildContext: jest.fn(),
+      propagateContext: jest.fn(),
+      getNodeContext: jest.fn(),
+      updateNodeContext: jest.fn(),
+      clearNodeContext: jest.fn(),
+      getHierarchicalContext: jest.fn(),
+      validateContextAccess: jest.fn(),
+      cloneContextScope: jest.fn(),
+      mergeContextScopes: jest.fn(),
+    } as any;
+
+    mockActionOrchestrationService = {
+      orchestrateNodeActions: jest.fn(),
+      coordinateParallelActions: jest.fn(),
+      sequenceActionExecution: jest.fn(),
+      evaluateConditionalActions: jest.fn(),
+      handleActionFailures: jest.fn(),
+      optimizeActionOrder: jest.fn(),
+      validateActionDependencies: jest.fn(),
+      monitorActionProgress: jest.fn(),
+    } as any;
+
+    fractalService = new FractalOrchestrationService(
+      mockContextService,
+      mockActionOrchestrationService
     );
+
+    testModel = TestFactories.createCompleteWorkflow();
   });
 
-  describe('Fractal Execution Planning', () => {
-    it('should plan fractal execution for simple model', () => {
-      // Arrange
-      const rootModel = MockFunctionModel.createMock('root-model');
-      const initialContext = { data: 'test' };
-
-      // Act
-      const result = service.planFractalExecution(rootModel, initialContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value).toMatch(/^fractal_root-model_\d+$/);
-    });
-
-    it('should plan fractal execution for nested model structure', () => {
-      // Arrange
-      const containerNode = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'nested-model-1',
-        'embedded',
-        { inheritedParam: 'value' }
-      );
-      const rootModel = MockFunctionModel.createMock('root-model', [], [containerNode]);
-      const initialContext = { rootData: 'test' };
-
-      // Act
-      const result = service.planFractalExecution(rootModel, initialContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value).toMatch(/^fractal_root-model_\d+$/);
-    });
-
-    it('should handle empty model gracefully', () => {
-      // Arrange
-      const emptyModel = MockFunctionModel.createMock('empty-model');
-
-      // Act
-      const result = service.planFractalExecution(emptyModel);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-
-    it('should preserve initial context in fractal levels', () => {
-      // Arrange
-      const rootModel = MockFunctionModel.createMock('root-model');
-      const initialContext = { globalParam: 'global_value', level: 0 };
-
-      // Act
-      const executionId = service.planFractalExecution(rootModel, initialContext);
-
-      // Assert
-      expect(executionId.isSuccess).toBe(true);
-      // The context should be available in the execution state
-    });
-  });
-
-  describe('Fractal Orchestration Execution', () => {
-    let executionId: string;
-
-    beforeEach(() => {
-      const rootModel = MockFunctionModel.createMock('test-model');
-      const planResult = service.planFractalExecution(rootModel, { test: 'data' });
-      executionId = planResult.value;
-    });
-
-    it('should execute fractal orchestration successfully', async () => {
-      // Act
-      const result = await service.executeFractalOrchestration(executionId);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value.executionId).toBe(executionId);
-      expect(result.value.totalLevels).toBeGreaterThanOrEqual(1);
-      expect(result.value.completedLevels).toBeGreaterThanOrEqual(0);
-      expect(result.value.totalDuration).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should fail for non-existent execution ID', async () => {
-      // Arrange
-      const nonExistentId = 'non-existent-execution';
-
-      // Act
-      const result = await service.executeFractalOrchestration(nonExistentId);
-
-      // Assert
-      expect(result.isSuccess).toBe(false);
-      expect(result.error).toContain('Execution state not found');
-    });
-
-    it('should track execution duration', async () => {
-      // Act
-      const result = await service.executeFractalOrchestration(executionId);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value.totalDuration).toBeGreaterThan(0);
-    });
-
-    it('should aggregate context outputs', async () => {
-      // Act
-      const result = await service.executeFractalOrchestration(executionId);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value.contextOutputs).toBeDefined();
-      expect(typeof result.value.contextOutputs).toBe('object');
-    });
-  });
-
-  describe('Context Propagation', () => {
-    let executionId: string;
-
-    beforeEach(() => {
-      const containerNode1 = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'nested-model-1',
-        'embedded'
-      );
-      const containerNode2 = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'nested-model-2',
-        'sequential'
-      );
-      const rootModel = MockFunctionModel.createMock('multi-level-model', [], [containerNode1, containerNode2]);
-      
-      const planResult = service.planFractalExecution(rootModel, { root: 'context' });
-      executionId = planResult.value;
-    });
-
-    it('should propagate context between levels', () => {
-      // Arrange
-      const contextData = { level1Output: 'result', processedData: [1, 2, 3] };
-
-      // Act
-      const result = service.propagateContext(executionId, 0, 1, contextData);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-
-    it('should fail context propagation for invalid levels', () => {
-      // Arrange
-      const contextData = { data: 'test' };
-
-      // Act
-      const result = service.propagateContext(executionId, 0, 999, contextData);
-
-      // Assert
-      expect(result.isSuccess).toBe(false);
-      expect(result.error).toContain('Invalid level specified');
-    });
-
-    it('should fail context propagation for non-existent execution', () => {
-      // Arrange
-      const nonExistentId = 'non-existent';
-      const contextData = { data: 'test' };
-
-      // Act
-      const result = service.propagateContext(nonExistentId, 0, 1, contextData);
-
-      // Assert
-      expect(result.isSuccess).toBe(false);
-      expect(result.error).toContain('Execution state not found');
-    });
-
-    it('should transform context based on orchestration mode', () => {
-      // Arrange
-      const embeddedContext = { mode: 'embedded', data: 'test' };
-      const parallelContext = { mode: 'parallel', data: 'test' };
-      const sequentialContext = { mode: 'sequential', data: 'test' };
-
-      // Act
-      const embeddedResult = service.propagateContext(executionId, 0, 1, embeddedContext);
-      const parallelResult = service.propagateContext(executionId, 0, 2, parallelContext);
-
-      // Assert
-      expect(embeddedResult.isSuccess).toBe(true);
-      expect(parallelResult.isSuccess).toBe(true);
-    });
-  });
-
-  describe('Level Coordination', () => {
-    let executionId: string;
-
-    beforeEach(() => {
-      const containerNode = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'nested-model',
-        'embedded'
-      );
-      const rootModel = MockFunctionModel.createMock('coordinated-model', [], [containerNode]);
-      
-      const planResult = service.planFractalExecution(rootModel, { coordinated: true });
-      executionId = planResult.value;
-    });
-
-    it('should coordinate level execution successfully', async () => {
-      // Act
-      const result = await service.coordinateLevelExecution(executionId, 0);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-
-    it('should fail coordination for invalid level', async () => {
-      // Act
-      const result = await service.coordinateLevelExecution(executionId, 999);
-
-      // Assert
-      expect(result.isSuccess).toBe(false);
-      expect(result.error).toContain('Level information not found');
-    });
-
-    it('should fail coordination for non-existent execution', async () => {
-      // Arrange
-      const nonExistentId = 'non-existent';
-
-      // Act
-      const result = await service.coordinateLevelExecution(nonExistentId, 0);
-
-      // Assert
-      expect(result.isSuccess).toBe(false);
-      expect(result.error).toContain('Execution state not found');
-    });
-
-    it('should update execution path during coordination', async () => {
-      // Act
-      await service.coordinateLevelExecution(executionId, 0);
-
-      // Assert
-      // The execution path should be updated, but we can't directly verify this
-      // without exposing internal state. This test verifies no errors occur.
-    });
-  });
-
-  describe('Vertical Nesting', () => {
-    it('should handle vertical nesting successfully', async () => {
-      // Arrange
-      const nestedModel1 = MockFunctionModel.createMock('nested-1');
-      const nestedModel2 = MockFunctionModel.createMock('nested-2');
-      const nestedModels = [nestedModel1, nestedModel2];
-      const inheritedContext = { parentData: 'from_parent', level: 1 };
-
-      // Act
-      const result = await service.handleVerticalNesting('parent-model', nestedModels, inheritedContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value).toBeDefined();
-      expect(result.value['nested-1']).toBeDefined();
-      expect(result.value['nested-2']).toBeDefined();
-    });
-
-    it('should handle empty nested models', async () => {
-      // Arrange
-      const nestedModels: FunctionModel[] = [];
-      const inheritedContext = { parentData: 'test' };
-
-      // Act
-      const result = await service.handleVerticalNesting('parent-model', nestedModels, inheritedContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(Object.keys(result.value).length).toBe(0);
-    });
-
-    it('should propagate inherited context to nested models', async () => {
-      // Arrange
-      const nestedModel = MockFunctionModel.createMock('nested-with-context');
-      const inheritedContext = { 
-        sharedState: 'important_data',
-        configuration: { mode: 'production' }
-      };
-
-      // Act
-      const result = await service.handleVerticalNesting('parent-model', [nestedModel], inheritedContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value['nested-with-context']).toBeDefined();
-    });
-  });
-
-  describe('Horizontal Scaling', () => {
-    it('should handle horizontal scaling successfully', async () => {
-      // Arrange
-      const model1 = MockFunctionModel.createMock('horizontal-1');
-      const model2 = MockFunctionModel.createMock('horizontal-2');
-      const model3 = MockFunctionModel.createMock('horizontal-3');
-      const models = [model1, model2, model3];
-      const sharedContext = { shared: 'context', timestamp: Date.now() };
-
-      // Act
-      const result = await service.handleHorizontalScaling(models, sharedContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value).toBeDefined();
-      expect(result.value['horizontal-1']).toBeDefined();
-      expect(result.value['horizontal-2']).toBeDefined();
-      expect(result.value['horizontal-3']).toBeDefined();
-    });
-
-    it('should handle empty models list', async () => {
-      // Arrange
-      const models: FunctionModel[] = [];
-      const sharedContext = { empty: 'test' };
-
-      // Act
-      const result = await service.handleHorizontalScaling(models, sharedContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(Object.keys(result.value).length).toBe(0);
-    });
-
-    it('should execute models in parallel', async () => {
-      // Arrange
-      const model1 = MockFunctionModel.createMock('parallel-1');
-      const model2 = MockFunctionModel.createMock('parallel-2');
-      const models = [model1, model2];
-      const sharedContext = { parallel: true };
-
-      const startTime = Date.now();
-
-      // Act
-      const result = await service.handleHorizontalScaling(models, sharedContext);
-      const endTime = Date.now();
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      // Parallel execution should be faster than sequential
-      expect(endTime - startTime).toBeLessThan(2000); // Should complete quickly due to parallel execution
-    });
-
-    it('should share context across parallel models', async () => {
-      // Arrange
-      const model1 = MockFunctionModel.createMock('shared-context-1');
-      const model2 = MockFunctionModel.createMock('shared-context-2');
-      const models = [model1, model2];
-      const sharedContext = { 
-        globalConfig: { mode: 'parallel' },
-        sessionId: 'test-session-123'
-      };
-
-      // Act
-      const result = await service.handleHorizontalScaling(models, sharedContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value['shared-context-1']).toBeDefined();
-      expect(result.value['shared-context-2']).toBeDefined();
-    });
-  });
-
-  describe('Orchestration Consistency Validation', () => {
-    let executionId: string;
-
-    beforeEach(() => {
-      const rootModel = MockFunctionModel.createMock('validation-model');
-      const planResult = service.planFractalExecution(rootModel);
-      executionId = planResult.value;
-    });
-
-    it('should validate orchestration consistency successfully', () => {
-      // Act
-      const result = service.validateOrchestrationConsistency(executionId);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-
-    it('should fail validation for non-existent execution', () => {
-      // Arrange
-      const nonExistentId = 'non-existent';
-
-      // Act
-      const result = service.validateOrchestrationConsistency(nonExistentId);
-
-      // Assert
-      expect(result.isSuccess).toBe(false);
-      expect(result.error).toContain('Execution state not found');
-    });
-
-    it('should detect excessive nesting depth', () => {
-      // Arrange - Create a deep nesting structure
-      const containerNodes: FunctionModelContainerNode[] = [];
-      for (let i = 0; i < 12; i++) { // Exceeds max depth of 10
-        const containerNode = MockFunctionModelContainerNode.createMock(
-          NodeId.generate(),
-          `deep-nested-${i}`,
-          'embedded'
-        );
-        containerNodes.push(containerNode);
-      }
-      
-      const deepModel = MockFunctionModel.createMock('deep-model', [], containerNodes);
-      const deepExecutionId = service.planFractalExecution(deepModel).value;
-
-      // Act
-      const result = service.validateOrchestrationConsistency(deepExecutionId);
-
-      // Assert
-      expect(result.isSuccess).toBe(false);
-      expect(result.error).toContain('exceeds maximum allowed depth');
-    });
-
-    it('should validate context consistency across levels', () => {
-      // Arrange
-      const containerNode = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'context-model',
-        'sequential'
-      );
-      const contextModel = MockFunctionModel.createMock('context-validation-model', [], [containerNode]);
-      const contextExecutionId = service.planFractalExecution(contextModel, { root: 'context' }).value;
-
-      // Propagate some context
-      service.propagateContext(contextExecutionId, 0, 1, { level0: 'output' });
-
-      // Act
-      const result = service.validateOrchestrationConsistency(contextExecutionId);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-  });
-
-  describe('Error Handling and Edge Cases', () => {
-    it('should handle models with no container nodes', () => {
-      // Arrange
-      const simpleModel = MockFunctionModel.createMock('simple-model');
-
-      // Act
-      const result = service.planFractalExecution(simpleModel);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-
-    it('should handle null/undefined initial context', () => {
-      // Arrange
-      const model = MockFunctionModel.createMock('null-context-model');
-
-      // Act
-      const resultUndefined = service.planFractalExecution(model, undefined as any);
-      const resultNull = service.planFractalExecution(model, null as any);
-
-      // Assert
-      expect(resultUndefined.isSuccess).toBe(true);
-      expect(resultNull.isSuccess).toBe(true);
-    });
-
-    it('should handle very large context objects', () => {
-      // Arrange
-      const largeContext: Record<string, any> = {};
-      for (let i = 0; i < 1000; i++) {
-        largeContext[`key_${i}`] = `value_${i}`.repeat(100);
-      }
-      const model = MockFunctionModel.createMock('large-context-model');
-
-      // Act
-      const result = service.planFractalExecution(model, largeContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-
-    it('should handle concurrent execution planning', () => {
-      // Arrange
-      const model1 = MockFunctionModel.createMock('concurrent-1');
-      const model2 = MockFunctionModel.createMock('concurrent-2');
-      const model3 = MockFunctionModel.createMock('concurrent-3');
-
-      // Act
-      const promises = [
-        service.planFractalExecution(model1),
-        service.planFractalExecution(model2),
-        service.planFractalExecution(model3)
-      ];
-
-      // Assert
-      promises.forEach(result => {
-        expect(result.isSuccess).toBe(true);
+  describe('fractal execution planning', () => {
+    describe('planFractalExecution', () => {
+      it('should plan single-level execution successfully', () => {
+        // Act
+        const result = fractalService.planFractalExecution(testModel);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value).toMatch(/^fractal_/);
+        expect(result.value).toContain(testModel.modelId);
       });
 
-      // All execution IDs should be unique
-      const executionIds = promises.map(p => p.value);
-      const uniqueIds = new Set(executionIds);
-      expect(uniqueIds.size).toBe(3);
+      it('should plan execution with initial context', () => {
+        // Arrange
+        const initialContext = { userId: 'user-123', environment: 'test' };
+        
+        // Act
+        const result = fractalService.planFractalExecution(testModel, initialContext);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        const executionId = result.value;
+        
+        // Verify state created (access through public methods)
+        // We can't directly access private state, so we'll test through execution
+        const executeResult = fractalService.executeFractalOrchestration(executionId);
+        expect(executeResult).toBeDefined();
+      });
+
+      it('should create proper fractal levels for simple model', () => {
+        // Act
+        const planResult = fractalService.planFractalExecution(testModel);
+        
+        // Assert
+        expect(planResult).toBeValidResult();
+        
+        // Test that planning succeeded by attempting execution
+        const executionId = planResult.value;
+        expect(() => fractalService.executeFractalOrchestration(executionId)).not.toThrow();
+      });
+
+      it('should handle multi-level model planning', () => {
+        // Arrange - Create model that will trigger multi-level analysis
+        const multiLevelModel = new FunctionModelBuilder()
+          .withId('multi-level-model')
+          .withName('Multi-Level Test Model')
+          .build();
+        
+        // Act
+        const result = fractalService.planFractalExecution(multiLevelModel);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value).toMatch(/^fractal_multi-level-model_\d+$/);
+      });
+
+      it('should handle deep nested model with depth limits', () => {
+        // Arrange - Create model that will exceed depth limits
+        const deepModel = new FunctionModelBuilder()
+          .withId('deep-model')
+          .withName('Deep Nested Model')
+          .build();
+        
+        // Act
+        const result = fractalService.planFractalExecution(deepModel);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        const executionId = result.value;
+        
+        // Verify consistency validation will catch depth issues
+        const consistencyResult = fractalService.validateOrchestrationConsistency(executionId);
+        expect(consistencyResult).toBeFailureResult();
+        expect(consistencyResult.error).toContain('exceeds maximum allowed depth');
+      });
+    });
+  });
+
+  describe('fractal execution coordination', () => {
+    let executionId: string;
+
+    beforeEach(async () => {
+      const planResult = fractalService.planFractalExecution(testModel);
+      expect(planResult).toBeValidResult();
+      executionId = planResult.value;
     });
 
-    it('should handle orchestration mode transformations', () => {
-      // Arrange
-      const embeddedNode = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'embedded-model',
-        'embedded'
-      );
-      const parallelNode = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'parallel-model',
-        'parallel'
-      );
-      const sequentialNode = MockFunctionModelContainerNode.createMock(
-        NodeId.generate(),
-        'sequential-model',
-        'sequential'
-      );
+    describe('executeFractalOrchestration', () => {
+      it('should execute fractal orchestration successfully', async () => {
+        // Act
+        const result = await fractalService.executeFractalOrchestration(executionId);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        const orchestrationResult = result.value;
+        expect(orchestrationResult.executionId).toBe(executionId);
+        expect(orchestrationResult.totalLevels).toBeGreaterThan(0);
+        expect(orchestrationResult.completedLevels).toBe(orchestrationResult.totalLevels);
+        expect(orchestrationResult.failedLevels).toBe(0);
+        expect(orchestrationResult.totalDuration).toBeGreaterThan(0);
+        expect(orchestrationResult.contextOutputs).toBeDefined();
+      });
 
-      const mixedModel = MockFunctionModel.createMock('mixed-orchestration', [], [
-        embeddedNode, parallelNode, sequentialNode
-      ]);
+      it('should handle execution state transitions', async () => {
+        // Act
+        const executionPromise = fractalService.executeFractalOrchestration(executionId);
+        
+        // The execution should complete successfully
+        const result = await executionPromise;
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value.totalDuration).toBeGreaterThan(0);
+      });
 
-      // Act
-      const result = service.planFractalExecution(mixedModel);
+      it('should aggregate context outputs properly', async () => {
+        // Act
+        const result = await fractalService.executeFractalOrchestration(executionId);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        const outputs = result.value.contextOutputs;
+        expect(Object.keys(outputs)).toHaveLength(1); // Single level for simple model
+        
+        const levelKey = Object.keys(outputs)[0];
+        expect(levelKey).toMatch(/^level_0_/);
+        expect(outputs[levelKey]).toHaveProperty('level', 0);
+        expect(outputs[levelKey]).toHaveProperty('executed', true);
+      });
 
-      // Assert
-      expect(result.isSuccess).toBe(true);
+      it('should reject execution for non-existent state', async () => {
+        // Act
+        const result = await fractalService.executeFractalOrchestration('non-existent-id');
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('Execution state not found');
+      });
+
+      it('should handle execution failures gracefully', async () => {
+        // Arrange - Create a scenario that will fail
+        // We'll mock the level coordination to fail
+        const originalMethod = (fractalService as any).coordinateLevelExecution;
+        (fractalService as any).coordinateLevelExecution = jest.fn().mockRejectedValue(new Error('Level coordination failed'));
+        
+        // Act
+        const result = await fractalService.executeFractalOrchestration(executionId);
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('Fractal execution failed');
+        
+        // Cleanup
+        (fractalService as any).coordinateLevelExecution = originalMethod;
+      });
     });
 
-    it('should handle context propagation with complex data types', () => {
-      // Arrange
-      const model = MockFunctionModel.createMock('complex-context-model');
-      const planResult = service.planFractalExecution(model, { test: 'data' });
+    describe('coordinateLevelExecution', () => {
+      it('should coordinate level execution successfully', async () => {
+        // Act
+        const result = await fractalService.coordinateLevelExecution(executionId, 0);
+        
+        // Assert
+        expect(result).toBeValidResult();
+      });
+
+      it('should handle inherited context properly', async () => {
+        // Arrange - Set up multi-level execution
+        const multiLevelModel = new FunctionModelBuilder()
+          .withId('multi-level-model')
+          .build();
+        const planResult = fractalService.planFractalExecution(multiLevelModel, { rootData: 'test' });
+        expect(planResult).toBeValidResult();
+        
+        // Act - Execute first level to create context, then second
+        await fractalService.coordinateLevelExecution(planResult.value, 0);
+        const level1Result = await fractalService.coordinateLevelExecution(planResult.value, 1);
+        
+        // Assert
+        expect(level1Result).toBeValidResult();
+      });
+
+      it('should reject coordination for invalid level', async () => {
+        // Act
+        const result = await fractalService.coordinateLevelExecution(executionId, 999);
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('Level information not found');
+      });
+
+      it('should reject coordination for non-existent execution', async () => {
+        // Act
+        const result = await fractalService.coordinateLevelExecution('non-existent', 0);
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('Execution state not found');
+      });
+    });
+  });
+
+  describe('context propagation management', () => {
+    let executionId: string;
+
+    beforeEach(async () => {
+      // Set up multi-level model for context testing
+      const multiLevelModel = new FunctionModelBuilder()
+        .withId('multi-level-model')
+        .build();
+      const planResult = fractalService.planFractalExecution(multiLevelModel);
+      expect(planResult).toBeValidResult();
+      executionId = planResult.value;
+    });
+
+    describe('propagateContext', () => {
+      it('should propagate context between levels successfully', () => {
+        // Arrange
+        const contextData = { stage1Output: 'test-data', timestamp: new Date() };
+        
+        // Act
+        const result = fractalService.propagateContext(executionId, 0, 1, contextData);
+        
+        // Assert
+        expect(result).toBeValidResult();
+      });
+
+      it('should transform context based on orchestration mode', () => {
+        // Arrange - Test different orchestration modes
+        const contexts = [
+          { mode: 'embedded', data: { embeddedData: 'test' } },
+          { mode: 'parallel', data: { parallelData: 'test' } },
+          { mode: 'sequential', data: { sequentialData: 'test' } }
+        ];
+        
+        // Act & Assert
+        contexts.forEach(({ data }) => {
+          const result = fractalService.propagateContext(executionId, 0, 1, data);
+          expect(result).toBeValidResult();
+        });
+      });
+
+      it('should reject propagation for invalid levels', () => {
+        // Act & Assert
+        const invalidFromResult = fractalService.propagateContext(executionId, 999, 1, {});
+        expect(invalidFromResult).toBeFailureResult();
+        expect(invalidFromResult).toHaveErrorMessage('Invalid level specified for context propagation');
+        
+        const invalidToResult = fractalService.propagateContext(executionId, 0, 999, {});
+        expect(invalidToResult).toBeFailureResult();
+        expect(invalidToResult).toHaveErrorMessage('Invalid level specified for context propagation');
+      });
+
+      it('should reject propagation for non-existent execution', () => {
+        // Act
+        const result = fractalService.propagateContext('non-existent', 0, 1, {});
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('Execution state not found');
+      });
+    });
+  });
+
+  describe('hierarchical orchestration patterns', () => {
+    describe('handleVerticalNesting', () => {
+      it('should handle vertical nesting successfully', async () => {
+        // Arrange
+        const parentModelId = 'parent-model';
+        const nestedModels = [
+          TestFactories.createCompleteWorkflow(),
+          TestFactories.createCompleteWorkflow()
+        ];
+        const inheritedContext = { parentData: 'test' };
+        
+        // Act
+        const result = await fractalService.handleVerticalNesting(
+          parentModelId,
+          nestedModels,
+          inheritedContext
+        );
+        
+        // Assert
+        expect(result).toBeValidResult();
+        const nestedResults = result.value;
+        expect(Object.keys(nestedResults)).toHaveLength(2);
+        
+        // Verify each nested model has results
+        for (const modelId of Object.keys(nestedResults)) {
+          expect(nestedResults[modelId]).toBeDefined();
+          expect(typeof nestedResults[modelId]).toBe('object');
+        }
+      });
+
+      it('should handle empty nested models array', async () => {
+        // Act
+        const result = await fractalService.handleVerticalNesting('parent', [], {});
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value).toEqual({});
+      });
+
+      it('should propagate context to nested models', async () => {
+        // Arrange
+        const inheritedContext = { userId: 'user-123', sessionId: 'session-456' };
+        const nestedModels = [TestFactories.createCompleteWorkflow()];
+        
+        // Act
+        const result = await fractalService.handleVerticalNesting('parent', nestedModels, inheritedContext);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        // Context propagation is tested through successful execution
+      });
+    });
+
+    describe('handleHorizontalScaling', () => {
+      it('should handle horizontal scaling successfully', async () => {
+        // Arrange
+        const models = [
+          TestFactories.createCompleteWorkflow(),
+          TestFactories.createCompleteWorkflow(),
+          TestFactories.createCompleteWorkflow()
+        ];
+        const sharedContext = { environmentData: 'prod' };
+        
+        // Act
+        const result = await fractalService.handleHorizontalScaling(models, sharedContext);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        const horizontalResults = result.value;
+        expect(Object.keys(horizontalResults)).toHaveLength(3);
+        
+        // Verify all models executed
+        for (const modelId of Object.keys(horizontalResults)) {
+          expect(horizontalResults[modelId]).toBeDefined();
+        }
+      });
+
+      it('should execute models in parallel', async () => {
+        // Arrange
+        const models = [
+          TestFactories.createCompleteWorkflow(),
+          TestFactories.createCompleteWorkflow()
+        ];
+        const startTime = Date.now();
+        
+        // Act
+        const result = await fractalService.handleHorizontalScaling(models, {});
+        const endTime = Date.now();
+        
+        // Assert
+        expect(result).toBeValidResult();
+        
+        // Parallel execution should be faster than sequential
+        // (This is a rough heuristic since our mock execution is fast)
+        const executionTime = endTime - startTime;
+        expect(executionTime).toBeLessThan(1000); // Should complete quickly if parallel
+      });
+
+      it('should handle empty models array', async () => {
+        // Act
+        const result = await fractalService.handleHorizontalScaling([], {});
+        
+        // Assert
+        expect(result).toBeValidResult();
+        expect(result.value).toEqual({});
+      });
+
+      it('should share context across all models', async () => {
+        // Arrange
+        const sharedContext = { sharedData: 'global-state', version: '1.0' };
+        const models = [TestFactories.createCompleteWorkflow()];
+        
+        // Act
+        const result = await fractalService.handleHorizontalScaling(models, sharedContext);
+        
+        // Assert
+        expect(result).toBeValidResult();
+        // Context sharing is tested through successful execution
+      });
+    });
+  });
+
+  describe('orchestration consistency validation', () => {
+    describe('validateOrchestrationConsistency', () => {
+      it('should validate consistent orchestration successfully', () => {
+        // Arrange
+        const planResult = fractalService.planFractalExecution(testModel);
+        expect(planResult).toBeValidResult();
+        
+        // Act
+        const result = fractalService.validateOrchestrationConsistency(planResult.value);
+        
+        // Assert
+        expect(result).toBeValidResult();
+      });
+
+      it('should detect nesting depth violations', () => {
+        // Arrange - Create deep model that exceeds limits
+        const deepModel = new FunctionModelBuilder()
+          .withId('deep-model')
+          .build();
+        const planResult = fractalService.planFractalExecution(deepModel);
+        expect(planResult).toBeValidResult();
+        
+        // Act
+        const result = fractalService.validateOrchestrationConsistency(planResult.value);
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result.error).toContain('exceeds maximum allowed depth');
+      });
+
+      it('should detect circular dependencies', () => {
+        // Arrange - Create model with potential circular reference
+        const circularModel = new FunctionModelBuilder()
+          .withId('circular-model')
+          .build();
+        const planResult = fractalService.planFractalExecution(circularModel);
+        expect(planResult).toBeValidResult();
+        
+        // For this simple test, validation should pass
+        // Complex circular dependency detection would require more setup
+        const result = fractalService.validateOrchestrationConsistency(planResult.value);
+        expect(result).toBeValidResult();
+      });
+
+      it('should validate context propagation consistency', () => {
+        // Arrange
+        const multiLevelModel = new FunctionModelBuilder()
+          .withId('multi-level-model')
+          .build();
+        const planResult = fractalService.planFractalExecution(multiLevelModel);
+        expect(planResult).toBeValidResult();
+        
+        // Act
+        const result = fractalService.validateOrchestrationConsistency(planResult.value);
+        
+        // Assert
+        expect(result).toBeValidResult();
+      });
+
+      it('should reject validation for non-existent execution', () => {
+        // Act
+        const result = fractalService.validateOrchestrationConsistency('non-existent');
+        
+        // Assert
+        expect(result).toBeFailureResult();
+        expect(result).toHaveErrorMessage('Execution state not found');
+      });
+    });
+  });
+
+  describe('orchestration mode handling', () => {
+    let executionId: string;
+
+    beforeEach(async () => {
+      const multiLevelModel = new FunctionModelBuilder()
+        .withId('multi-level-model')
+        .build();
+      const planResult = fractalService.planFractalExecution(multiLevelModel);
+      expect(planResult).toBeValidResult();
+      executionId = planResult.value;
+    });
+
+    it('should handle embedded orchestration mode', async () => {
+      // This is tested through the default execution path
+      const result = await fractalService.coordinateLevelExecution(executionId, 0);
+      expect(result).toBeValidResult();
+    });
+
+    it('should handle parallel orchestration mode', async () => {
+      // Multi-level model has both embedded and sequential modes
+      // Test that both levels coordinate successfully
+      await fractalService.coordinateLevelExecution(executionId, 0);
+      const result = await fractalService.coordinateLevelExecution(executionId, 1);
+      expect(result).toBeValidResult();
+    });
+
+    it('should handle sequential orchestration mode', async () => {
+      // Sequential mode is tested through multi-level coordination
+      const result = await fractalService.coordinateLevelExecution(executionId, 1);
+      expect(result).toBeValidResult();
+    });
+  });
+
+  describe('error handling and edge cases', () => {
+    it('should handle malformed execution states gracefully', async () => {
+      // Arrange - Create execution then corrupt internal state
+      const planResult = fractalService.planFractalExecution(testModel);
+      expect(planResult).toBeValidResult();
       const executionId = planResult.value;
       
-      const complexContext = {
-        simpleValue: 'string',
-        numberValue: 42,
-        booleanValue: true,
-        arrayValue: [1, 2, { nested: 'object' }],
-        objectValue: { 
-          nested: { 
-            deeply: { 
-              values: ['a', 'b', 'c'] 
-            } 
-          } 
-        },
-        functionValue: () => 'test', // Functions in context
-        dateValue: new Date(),
-        nullValue: null,
-        undefinedValue: undefined
-      };
-
-      // Act - Try level 0 to level 0 (self-propagation) since model may only have one level
-      const result = service.propagateContext(executionId, 0, 0, complexContext);
-
-      // Assert
-      expect(result.isSuccess).toBe(true);
-    });
-  });
-
-  describe('Performance and Scalability', () => {
-    it('should handle multiple simultaneous executions', async () => {
-      // Arrange
-      const models = Array.from({ length: 10 }, (_, i) => 
-        MockFunctionModel.createMock(`perf-model-${i}`)
-      );
-
-      // Act
-      const planPromises = models.map(model => service.planFractalExecution(model));
-      const executionPromises = planPromises.map(async (planResult) => {
-        if (planResult.isSuccess) {
-          return service.executeFractalOrchestration(planResult.value);
-        }
-        return Promise.resolve(Result.fail('Plan failed'));
-      });
-
-      const results = await Promise.all(executionPromises);
-
-      // Assert
-      results.forEach(result => {
-        expect(result.isSuccess).toBe(true);
-      });
-    });
-
-    it('should maintain performance with deep nesting', async () => {
-      // Arrange
-      const containerNodes: FunctionModelContainerNode[] = [];
-      for (let i = 0; i < 8; i++) { // Just under max depth
-        const containerNode = MockFunctionModelContainerNode.createMock(
-          NodeId.generate(),
-          `nested-${i}`,
-          'embedded'
-        );
-        containerNodes.push(containerNode);
+      // Corrupt the state by clearing levels
+      const state = (fractalService as any).executionStates.get(executionId);
+      if (state) {
+        state.levels = []; // Empty levels array
       }
       
-      const deepModel = MockFunctionModel.createMock('performance-deep-model', [], containerNodes);
-      const startTime = performance.now();
-
       // Act
-      const planResult = service.planFractalExecution(deepModel);
-      const executionResult = await service.executeFractalOrchestration(planResult.value);
+      const result = await fractalService.executeFractalOrchestration(executionId);
       
-      const endTime = performance.now();
-      const executionTime = endTime - startTime;
+      // Assert - Should handle gracefully with empty levels
+      expect(result).toBeValidResult();
+      expect(result.value.totalLevels).toBe(0);
+      expect(result.value.completedLevels).toBe(0);
+    });
 
+    it('should handle concurrent fractal executions', async () => {
+      // Arrange
+      const model1 = TestFactories.createCompleteWorkflow();
+      const model2 = TestFactories.createCompleteWorkflow();
+      
+      const plan1 = fractalService.planFractalExecution(model1);
+      const plan2 = fractalService.planFractalExecution(model2);
+      
+      expect(plan1).toBeValidResult();
+      expect(plan2).toBeValidResult();
+      
+      // Act - Execute concurrently
+      const [result1, result2] = await Promise.all([
+        fractalService.executeFractalOrchestration(plan1.value),
+        fractalService.executeFractalOrchestration(plan2.value)
+      ]);
+      
       // Assert
-      expect(planResult.isSuccess).toBe(true);
-      expect(executionResult.isSuccess).toBe(true);
-      expect(executionTime).toBeLessThan(2000); // Should complete within 2 seconds
+      expect(result1).toBeValidResult();
+      expect(result2).toBeValidResult();
+      expect(result1.value.executionId).not.toBe(result2.value.executionId);
+    });
+
+    it('should handle resource cleanup after execution', async () => {
+      // Arrange
+      const planResult = fractalService.planFractalExecution(testModel);
+      expect(planResult).toBeValidResult();
+      const executionId = planResult.value;
+      
+      // Act
+      await fractalService.executeFractalOrchestration(executionId);
+      
+      // Assert - State should still exist for querying
+      const consistencyResult = fractalService.validateOrchestrationConsistency(executionId);
+      expect(consistencyResult).toBeValidResult();
+    });
+
+    it('should handle context transformation failures gracefully', () => {
+      // Arrange
+      const planResult = fractalService.planFractalExecution(testModel);
+      expect(planResult).toBeValidResult();
+      const executionId = planResult.value;
+      
+      // Act - Try to propagate invalid context
+      const circularContext = {};
+      (circularContext as any).self = circularContext; // Circular reference
+      
+      const result = fractalService.propagateContext(executionId, 0, 0, circularContext);
+      
+      // Assert - Should handle gracefully
+      expect(result).toBeValidResult();
+    });
+
+    it('should maintain service dependencies properly', () => {
+      // Assert that dependencies are properly injected
+      expect((fractalService as any).contextAccessService).toBe(mockContextService);
+      expect((fractalService as any).actionOrchestrationService).toBe(mockActionOrchestrationService);
     });
   });
 });

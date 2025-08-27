@@ -218,4 +218,42 @@ export class ModelVersioningService implements IModelVersioningService {
 
     return changes;
   }
+
+  // Methods required by ModelRecoveryService
+  public async validateVersionCompatibility(model: FunctionModel): Promise<Result<any>> {
+    try {
+      // In a real implementation, this would validate version compatibility
+      const compatibility = {
+        compatible: true,
+        conflicts: [] as any[],
+        deprecatedFeatures: [] as string[],
+        migrationRequired: false,
+      };
+
+      return Result.ok<any>(compatibility);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      return Result.fail<any>(`Failed to validate version compatibility: ${errorMessage}`);
+    }
+  }
+
+  public async createRestorationVersion(
+    model: FunctionModel,
+    options: { reason: string }
+  ): Promise<Result<any>> {
+    try {
+      // In a real implementation, this would create a new version for restoration
+      const restorationVersion = {
+        versionCreated: true,
+        newVersion: model.version.toString() + '-restored',
+        reason: options.reason,
+        timestamp: new Date(),
+      };
+
+      return Result.ok<any>(restorationVersion);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      return Result.fail<any>(`Failed to create restoration version: ${errorMessage}`);
+    }
+  }
 }

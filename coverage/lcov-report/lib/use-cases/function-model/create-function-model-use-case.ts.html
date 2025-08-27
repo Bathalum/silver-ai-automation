@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/39</span>
+                <span class='fraction'>0/41</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/39</span>
+                <span class='fraction'>0/41</span>
             </div>
         
             
@@ -227,7 +227,12 @@
 <a name='L162'></a><a href='#L162'>162</a>
 <a name='L163'></a><a href='#L163'>163</a>
 <a name='L164'></a><a href='#L164'>164</a>
-<a name='L165'></a><a href='#L165'>165</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -342,6 +347,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -354,6 +360,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -504,21 +514,26 @@ export class <span class="cstat-no" title="statement not covered" >CreateFunctio
 <span class="cstat-no" title="statement not covered" >        return Result.fail&lt;CreateModelResult&gt;(`Failed to save model: ${saveResult.error}`);</span>
       }
 &nbsp;
-      // Publish domain event
-<span class="cstat-no" title="statement not covered" >      await this.eventBus.publish({</span>
-        eventType: 'FunctionModelCreated',
-        aggregateId: modelId,
-        eventData: {
-          modelId,
-          name: command.name,
-          description: command.description,
-          templateId: command.templateId,
-          organizationId: command.organizationId,
-          createdBy: command.userId
-        },
-        userId: command.userId,
-        timestamp: new Date()
-      });
+      // Publish domain event (failure should not fail the primary operation)
+<span class="cstat-no" title="statement not covered" >      try {</span>
+<span class="cstat-no" title="statement not covered" >        await this.eventBus.publish({</span>
+          eventType: 'FunctionModelCreated',
+          aggregateId: modelId,
+          eventData: {
+            modelId,
+            name: command.name,
+            description: command.description,
+            templateId: command.templateId,
+            organizationId: command.organizationId,
+            createdBy: command.userId
+          },
+          userId: command.userId,
+          timestamp: new Date()
+        });
+      } catch (eventError) {
+        // Log event publishing failure but don't fail the operation
+<span class="cstat-no" title="statement not covered" >        console.warn('Failed to publish FunctionModelCreated event:', eventError);</span>
+      }
 &nbsp;
       // Return success result
 <span class="cstat-no" title="statement not covered" >      return Result.ok&lt;CreateModelResult&gt;({</span>
@@ -549,7 +564,7 @@ export class <span class="cstat-no" title="statement not covered" >CreateFunctio
 <span class="cstat-no" title="statement not covered" >      return Result.fail&lt;void&gt;('Model description cannot exceed 5000 characters');</span>
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (command.templateId &amp;&amp; command.templateId.trim().length === 0) {</span>
+<span class="cstat-no" title="statement not covered" >    if (command.templateId !== undefined &amp;&amp; command.templateId.trim().length === 0) {</span>
 <span class="cstat-no" title="statement not covered" >      return Result.fail&lt;void&gt;('Template ID cannot be empty if provided');</span>
     }
 &nbsp;
@@ -562,7 +577,7 @@ export class <span class="cstat-no" title="statement not covered" >CreateFunctio
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-23T05:52:26.079Z
+                at 2025-08-27T00:35:44.758Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
