@@ -1,8 +1,11 @@
 import { ArchiveFunctionModelUseCase } from '../../../../lib/use-cases/function-model/archive-function-model-use-case';
 import { FunctionModel } from '../../../../lib/domain/entities/function-model';
+import { IONode } from '../../../../lib/domain/entities/io-node';
 import { ModelName } from '../../../../lib/domain/value-objects/model-name';
 import { Version } from '../../../../lib/domain/value-objects/version';
-import { ModelStatus } from '../../../../lib/domain/enums';
+import { NodeId } from '../../../../lib/domain/value-objects/node-id';
+import { Position } from '../../../../lib/domain/value-objects/position';
+import { ModelStatus, ExecutionMode, NodeStatus } from '../../../../lib/domain/enums';
 import { ArchiveModelCommand } from '../../../../lib/use-cases/commands/model-commands';
 import { NodeDependencyService } from '../../../../lib/domain/services/node-dependency-service';
 import { CrossFeatureLinkingService } from '../../../../lib/domain/services/cross-feature-linking-service';
@@ -74,13 +77,58 @@ describe('ArchiveFunctionModelUseCase - UC-008', () => {
     expect(modelNameResult.isSuccess).toBe(true);
     expect(versionResult.isSuccess).toBe(true);
 
+    // Create nodes map with required input and output nodes for validation
+    const nodes = new Map();
+    
+    // Create input node
+    const inputNodeId = NodeId.generate();
+    const inputPosition = Position.create(100, 100).value;
+    const inputNode = IONode.create({
+      nodeId: inputNodeId,
+      modelId: 'test-archive-model-id',
+      name: 'Input Node',
+      description: 'Test input node',
+      position: inputPosition,
+      dependencies: [],
+      executionType: ExecutionMode.SEQUENTIAL,
+      status: NodeStatus.ACTIVE,
+      metadata: {},
+      visualProperties: {},
+      ioData: {
+        boundaryType: 'input',
+        inputDataContract: { schema: {} }
+      }
+    }).value;
+    nodes.set(inputNodeId.value, inputNode);
+
+    // Create output node
+    const outputNodeId = NodeId.generate();
+    const outputPosition = Position.create(300, 100).value;
+    const outputNode = IONode.create({
+      nodeId: outputNodeId,
+      modelId: 'test-archive-model-id',
+      name: 'Output Node',
+      description: 'Test output node',
+      position: outputPosition,
+      dependencies: [],
+      executionType: ExecutionMode.SEQUENTIAL,
+      status: NodeStatus.ACTIVE,
+      metadata: {},
+      visualProperties: {},
+      ioData: {
+        boundaryType: 'output',
+        outputDataContract: { schema: {} }
+      }
+    }).value;
+    nodes.set(outputNodeId.value, outputNode);
+
     const modelResult = FunctionModel.create({
       modelId: 'test-archive-model-id',
       name: modelNameResult.value,
       version: versionResult.value,
       status: ModelStatus.DRAFT,
       currentVersion: versionResult.value,
-      nodes: new Map(),
+      nodes,
       actionNodes: new Map(),
       metadata: { featureType: 'function-model', createdBy: 'test-user' },
       permissions: { owner: 'test-user', editors: [], viewers: [] }

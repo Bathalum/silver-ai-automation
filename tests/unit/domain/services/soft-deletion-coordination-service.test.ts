@@ -579,6 +579,7 @@ describe('SoftDeletionCoordinationService', () => {
           modelId: 'test-model-123',
           deletedBy: 'user-123',
           reason: 'Test deletion',
+          checkDependencies: true, // This will trigger the dependency service call
         };
 
         // Mock dependency service failure

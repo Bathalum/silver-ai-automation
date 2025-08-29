@@ -264,6 +264,42 @@ The system supports complex relationships between different features:
 
 ## Business Rules
 
+### Assumed Domain Logic (Added January 2025)
+*These assumptions were made to complete test implementation where business logic was unclear:*
+
+#### Version Comparison and Management
+- **Semantic Versioning**: Follows semver (major.minor.patch) with numeric comparison
+- **Breaking Changes**: Major version increments indicate breaking changes
+- **Compatible Changes**: Minor/patch increments are backwards compatible
+- **Version Dependencies**: Use exact version matching for function model containers
+- **Version Ordering**: Lexicographic comparison of version strings after semver parsing
+
+#### Node Dependency Resolution
+- **Circular Dependency Detection**: Use depth-first search with visited node tracking
+- **Execution Path Optimization**: Topological sort with priority-based tie-breaking
+- **Parallel Execution Conflicts**: Resolved by execution priority (1-10 scale)
+- **Dependency Validation**: Must form a Directed Acyclic Graph (DAG)
+
+#### Context Access and Propagation
+- **Sibling Context**: Read-only access to execution results and metadata
+- **Uncle/Aunt Access**: Limited to status information and completion results
+- **Context Inheritance**: Parent contexts include child execution summaries
+- **Conflict Resolution**: Parent context takes precedence in naming conflicts
+- **Context Scope**: Three levels - node-local, container-shared, model-global
+
+#### Archive and Recovery Policies
+- **Blocking Dependencies**: Active references from published models prevent archival
+- **High-Risk Archival**: Models with >10 dependencies or production status
+- **Recovery Window**: 30 days for soft-deleted models, 7 days for archived models
+- **Recovery Eligibility**: Based on deletion timestamp and dependency state
+- **Cascade Deletion**: Archive operations cascade to dependent draft models only
+
+#### Model State Validation
+- **Status Transitions**: draft → published → archived (one-way progression)
+- **Concurrent Modifications**: Last-write-wins with optimistic locking
+- **Referential Integrity**: Foreign key constraints prevent orphaned references
+- **Data Consistency**: All aggregate operations are atomic within boundaries
+
 ### Function Model Rules
 
 1. **Version Management**:

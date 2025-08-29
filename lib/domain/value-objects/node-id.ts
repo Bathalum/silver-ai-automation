@@ -2,6 +2,7 @@ import { Result } from '../shared/result';
 
 export class NodeId {
   private static readonly UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  private static testCounter = 1;
 
   private readonly _value: string;
 
@@ -36,6 +37,13 @@ export class NodeId {
   }
 
   public static generate(): NodeId {
+    // For testing environments, use a counter-based deterministic approach
+    if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+      // Fallback for test environments - generate deterministic UUIDs
+      const counter = (NodeId.testCounter++).toString().padStart(8, '0');
+      const uuid = `${counter}-0000-4000-8000-${counter}0000`;
+      return new NodeId(uuid);
+    }
     const uuid = crypto.randomUUID();
     return new NodeId(uuid);
   }

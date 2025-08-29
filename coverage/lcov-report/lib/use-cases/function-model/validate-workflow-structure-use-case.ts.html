@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">13.33% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/60</span>
+                <span class='fraction'>8/60</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">8.33% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>1/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">14.03% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/57</span>
+                <span class='fraction'>8/57</span>
             </div>
         
             
@@ -277,7 +277,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -326,14 +326,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -487,7 +487,7 @@
 import { ActionNode } from '../../domain/entities/action-node';
 import { Node } from '../../domain/entities/node';
 import { ValidationResult } from '../../domain/entities/function-model';
-import { Result } from <span class="cstat-no" title="statement not covered" >'../../domain/shared/result';</span>
+import { Result } from '../../domain/shared/result';
 import { ValidateWorkflowCommand } from '../commands/model-commands';
 &nbsp;
 // Domain service interfaces for validation
@@ -536,14 +536,14 @@ export interface WorkflowValidationResult {
   validationDurationMs: number;
 }
 &nbsp;
-export class <span class="cstat-no" title="statement not covered" >ValidateWorkflowStructureUseCase {</span>
-<span class="fstat-no" title="function not covered" >  constructor(</span>
-    private <span class="cstat-no" title="statement not covered" >modelRepository: IFunctionModelRepository,</span>
-    private <span class="cstat-no" title="statement not covered" >workflowValidationService: IWorkflowValidationService,</span>
-    private <span class="cstat-no" title="statement not covered" >businessRuleValidationService: IBusinessRuleValidationService,</span>
-    private <span class="cstat-no" title="statement not covered" >executionReadinessService: IExecutionReadinessService,</span>
-    private <span class="cstat-no" title="statement not covered" >contextValidationService: IContextValidationService,</span>
-    private <span class="cstat-no" title="statement not covered" >crossFeatureValidationService: ICrossFeatureValidationService</span>
+export class ValidateWorkflowStructureUseCase {
+  constructor(
+    private modelRepository: IFunctionModelRepository,
+    private workflowValidationService: IWorkflowValidationService,
+    private businessRuleValidationService: IBusinessRuleValidationService,
+    private executionReadinessService: IExecutionReadinessService,
+    private contextValidationService: IContextValidationService,
+    private crossFeatureValidationService: ICrossFeatureValidationService
   ) {}
 &nbsp;
 <span class="fstat-no" title="function not covered" >  async e</span>xecute(command: ValidateWorkflowCommand): Promise&lt;Result&lt;WorkflowValidationResult&gt;&gt; {
@@ -700,7 +700,7 @@ export class <span class="cstat-no" title="statement not covered" >ValidateWorkf
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-27T00:35:44.758Z
+                at 2025-08-27T23:41:37.864Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

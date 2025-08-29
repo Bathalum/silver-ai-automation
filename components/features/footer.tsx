@@ -26,8 +26,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-gray-400 leading-relaxed">
-              Transforming businesses through intelligent automation solutions. Scale your operations with cutting-edge
-              AI technology.
+              Transforming businesses through intelligent automation solutions. Scale your operations with proper automation design.
             </p>
             <div className="flex space-x-4">
               <a
@@ -56,11 +55,12 @@ export function Footer() {
             <h3 className="text-lg font-semibold mb-4 text-white">Solutions</h3>
             <ul className="space-y-2">
               {[
-                "Process Automation",
-                "Data Analytics",
-                "Customer Service AI",
-                "Custom Development",
-                "Integration Services",
+                "Done For You GHL System",
+                "Done With You GHL System",
+                "Custom Tool Development",
+                "External Tool Integration",
+                "Custom Workflow Automation",
+                "Data Driven Function Model",
               ].map((item) => (
                 <li key={item}>
                   <Link
@@ -98,19 +98,19 @@ export function Footer() {
               <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-all duration-300">
                 <Mail className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
                 <span className="text-gray-400 group-hover:text-white transition-colors duration-300">
-                  contact@silveraiautomation.com
+                  info@silveraiautomation.com
                 </span>
               </div>
-              <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-all duration-300">
+              {/* <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-all duration-300">
                 <Phone className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
                 <span className="text-gray-400 group-hover:text-white transition-colors duration-300">
-                  +1 (555) 123-4567
+                  +63 917 334 2104
                 </span>
-              </div>
+              </div> */}
               <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-all duration-300">
                 <MapPin className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
                 <span className="text-gray-400 group-hover:text-white transition-colors duration-300">
-                  San Francisco, CA
+                  Quezon City, Philippines
                 </span>
               </div>
             </div>

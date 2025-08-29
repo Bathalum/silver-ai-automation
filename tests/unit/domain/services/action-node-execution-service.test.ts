@@ -27,7 +27,7 @@ describe('ActionNodeExecutionService', () => {
         
         // Assert
         expect(result).toBeValidResult();
-        expect(executionService.isExecuting(testActionId)).toBe(true);
+        expect(executionService.isActionExecuting(testActionId)).toBe(true);
         expect(executionService.getActiveExecutionCount()).toBe(1);
       });
 
@@ -84,7 +84,7 @@ describe('ActionNodeExecutionService', () => {
         
         // Assert
         expect(result).toBeValidResult();
-        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.isActionExecuting(testActionId)).toBe(false);
         expect(executionService.getActiveExecutionCount()).toBe(0);
       });
 
@@ -143,7 +143,7 @@ describe('ActionNodeExecutionService', () => {
         
         // Assert
         expect(result).toBeValidResult();
-        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.isActionExecuting(testActionId)).toBe(false);
       });
 
       it('should update execution metrics on failure', async () => {
@@ -243,10 +243,10 @@ describe('ActionNodeExecutionService', () => {
       });
     });
 
-    describe('evaluateRetryPolicy', () => {
+    describe('retryPolicyEvaluation', () => {
       it('should allow retry when under limit and time passed', async () => {
         // Act
-        const result = await executionService.evaluateRetryPolicy(testActionId);
+        const result = await executionService.retryPolicyEvaluation(testActionId);
         
         // Assert
         expect(result).toBeValidResult();
@@ -259,7 +259,7 @@ describe('ActionNodeExecutionService', () => {
         context.retryAttempt = 3;
         
         // Act
-        const result = await executionService.evaluateRetryPolicy(testActionId);
+        const result = await executionService.retryPolicyEvaluation(testActionId);
         
         // Assert
         expect(result).toBeValidResult();
@@ -273,7 +273,7 @@ describe('ActionNodeExecutionService', () => {
         context.startTime = new Date(); // Very recent
         
         // Act
-        const result = await executionService.evaluateRetryPolicy(testActionId);
+        const result = await executionService.retryPolicyEvaluation(testActionId);
         
         // Assert
         expect(result).toBeValidResult();
@@ -282,7 +282,7 @@ describe('ActionNodeExecutionService', () => {
 
       it('should reject policy evaluation for non-existent execution', async () => {
         // Act
-        const result = await executionService.evaluateRetryPolicy('non-existent');
+        const result = await executionService.retryPolicyEvaluation('non-existent');
         
         // Assert
         expect(result).toBeFailureResult();
@@ -296,10 +296,10 @@ describe('ActionNodeExecutionService', () => {
       await executionService.startExecution(testActionId);
     });
 
-    describe('updateProgress', () => {
+    describe('updateExecutionProgress', () => {
       it('should update progress successfully', async () => {
         // Act
-        const result = await executionService.updateProgress(testActionId, 50, 'Processing data');
+        const result = await executionService.updateExecutionProgress(testActionId, 50, 'Processing data');
         
         // Assert
         expect(result).toBeValidResult();
@@ -316,7 +316,7 @@ describe('ActionNodeExecutionService', () => {
         await new Promise(resolve => setTimeout(resolve, 10));
         
         // Act
-        await executionService.updateProgress(testActionId, 25);
+        await executionService.updateExecutionProgress(testActionId, 25);
         
         // Assert
         const snapshot = await executionService.getExecutionSnapshot(testActionId);
@@ -326,18 +326,18 @@ describe('ActionNodeExecutionService', () => {
 
       it('should reject invalid progress values', async () => {
         // Act & Assert
-        const negativeResult = await executionService.updateProgress(testActionId, -10);
+        const negativeResult = await executionService.updateExecutionProgress(testActionId, -10);
         expect(negativeResult).toBeFailureResult();
         expect(negativeResult).toHaveErrorMessage('Progress must be between 0 and 100');
         
-        const overResult = await executionService.updateProgress(testActionId, 150);
+        const overResult = await executionService.updateExecutionProgress(testActionId, 150);
         expect(overResult).toBeFailureResult();
         expect(overResult).toHaveErrorMessage('Progress must be between 0 and 100');
       });
 
       it('should reject progress update for non-existent execution', async () => {
         // Act
-        const result = await executionService.updateProgress('non-existent', 50);
+        const result = await executionService.updateExecutionProgress('non-existent', 50);
         
         // Assert
         expect(result).toBeFailureResult();
@@ -345,13 +345,13 @@ describe('ActionNodeExecutionService', () => {
       });
     });
 
-    describe('trackResourceUsage', () => {
+    describe('trackExecutionResourceUsage', () => {
       it('should track resource usage successfully', async () => {
         // Arrange
         const usage = { cpu: 75.5, memory: 1024 };
         
         // Act
-        const result = await executionService.trackResourceUsage(testActionId, usage);
+        const result = await executionService.trackExecutionResourceUsage(testActionId, usage);
         
         // Assert
         expect(result).toBeValidResult();
@@ -364,7 +364,7 @@ describe('ActionNodeExecutionService', () => {
 
       it('should reject resource tracking for non-existent execution', async () => {
         // Act
-        const result = await executionService.trackResourceUsage('non-existent', { cpu: 50, memory: 512 });
+        const result = await executionService.trackExecutionResourceUsage('non-existent', { cpu: 50, memory: 512 });
         
         // Assert
         expect(result).toBeFailureResult();
@@ -385,7 +385,7 @@ describe('ActionNodeExecutionService', () => {
         
         // Assert
         expect(result).toBeValidResult();
-        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.isActionExecuting(testActionId)).toBe(false);
         expect(executionService.getActiveExecutionCount()).toBe(0);
       });
 
@@ -468,17 +468,17 @@ describe('ActionNodeExecutionService', () => {
     describe('utility queries', () => {
       it('should correctly report execution status', async () => {
         // Assert initial state
-        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.isActionExecuting(testActionId)).toBe(false);
         expect(executionService.getActiveExecutionCount()).toBe(0);
         
         // Start execution
         await executionService.startExecution(testActionId);
-        expect(executionService.isExecuting(testActionId)).toBe(true);
+        expect(executionService.isActionExecuting(testActionId)).toBe(true);
         expect(executionService.getActiveExecutionCount()).toBe(1);
         
         // Complete execution
         await executionService.completeExecution(testActionId, {});
-        expect(executionService.isExecuting(testActionId)).toBe(false);
+        expect(executionService.isActionExecuting(testActionId)).toBe(false);
         expect(executionService.getActiveExecutionCount()).toBe(0);
       });
 
@@ -494,14 +494,14 @@ describe('ActionNodeExecutionService', () => {
         
         // Assert
         expect(executionService.getActiveExecutionCount()).toBe(3);
-        expect(executionService.isExecuting(testActionId)).toBe(true);
-        expect(executionService.isExecuting(actionId2)).toBe(true);
-        expect(executionService.isExecuting(actionId3)).toBe(true);
+        expect(executionService.isActionExecuting(testActionId)).toBe(true);
+        expect(executionService.isActionExecuting(actionId2)).toBe(true);
+        expect(executionService.isActionExecuting(actionId3)).toBe(true);
         
         // Complete one
         await executionService.completeExecution(actionId2, {});
         expect(executionService.getActiveExecutionCount()).toBe(2);
-        expect(executionService.isExecuting(actionId2)).toBe(false);
+        expect(executionService.isActionExecuting(actionId2)).toBe(false);
       });
     });
   });
@@ -533,8 +533,8 @@ describe('ActionNodeExecutionService', () => {
       
       // Act - Try concurrent operations
       const [progressResult, resourceResult, retryResult] = await Promise.all([
-        executionService.updateProgress(testActionId, 50),
-        executionService.trackResourceUsage(testActionId, { cpu: 60, memory: 800 }),
+        executionService.updateExecutionProgress(testActionId, 50),
+        executionService.trackExecutionResourceUsage(testActionId, { cpu: 60, memory: 800 }),
         executionService.retryExecution(testActionId)
       ]);
       
@@ -549,7 +549,7 @@ describe('ActionNodeExecutionService', () => {
       const emptyIdResult = await executionService.startExecution('');
       expect(emptyIdResult).toBeValidResult(); // Service doesn't validate ID format
       
-      const nullResourceResult = await executionService.trackResourceUsage(testActionId, null as any);
+      const nullResourceResult = await executionService.trackExecutionResourceUsage(testActionId, null as any);
       expect(nullResourceResult).toBeFailureResult();
     });
   });

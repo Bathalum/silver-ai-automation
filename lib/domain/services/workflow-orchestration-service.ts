@@ -408,7 +408,7 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
   private async executeTetherNode(node: TetherNode, context: ExecutionContext): Promise<any> {
     // Simulate tether execution
     // In real implementation, this would call the actual Spindle tether
-    console.log(`Executing Tether Node: ${node.name} (${node.tetherData.tetherReferenceId})`);
+    console.log(`Executing Tether Node: ${node.name}`);
     
     // Simulate processing time
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -422,7 +422,7 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
 
   private async executeKBNode(node: KBNode, context: ExecutionContext): Promise<any> {
     // Simulate KB node processing
-    console.log(`Processing KB Node: ${node.name} (${node.kbData.kbReferenceId})`);
+    console.log(`Processing KB Node: ${node.name}`);
     
     return {
       kbReferenceId: node.kbData.kbReferenceId,
@@ -434,7 +434,7 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
 
   private async executeFunctionModelContainer(node: FunctionModelContainerNode, context: ExecutionContext): Promise<any> {
     // Simulate nested function model execution
-    console.log(`Executing Nested Function Model: ${node.name} (${node.containerData.nestedModelId})`);
+    // Execute nested function model
     
     // In real implementation, this would recursively call executeWorkflow
     await new Promise(resolve => setTimeout(resolve, 200));

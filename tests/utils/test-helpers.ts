@@ -356,3 +356,95 @@ export class ErrorHelpers {
     });
   }
 }
+
+/**
+ * Domain Object Testing Utilities
+ * Safe helpers for creating domain objects in tests
+ */
+export class DomainTestHelpers {
+  /**
+   * Safely create a Position object for tests.
+   * Throws a clear error if the position cannot be created.
+   */
+  static createPosition(x: number, y: number): import('@/lib/domain/value-objects/position').Position {
+    const { Position } = require('@/lib/domain/value-objects/position');
+    const result = Position.create(x, y);
+    
+    if (result.isFailure) {
+      throw new Error(`Failed to create test Position(${x}, ${y}): ${result.error}`);
+    }
+    
+    return result.value;
+  }
+
+  /**
+   * Safely create a NodeId object for tests.
+   * Uses generate() for new IDs or create() for specific IDs.
+   */
+  static createNodeId(id?: string): import('@/lib/domain/value-objects/node-id').NodeId {
+    const { NodeId } = require('@/lib/domain/value-objects/node-id');
+    
+    if (id === undefined) {
+      return NodeId.generate();
+    }
+    
+    const result = NodeId.create(id);
+    if (result.isFailure) {
+      throw new Error(`Failed to create test NodeId(${id}): ${result.error}`);
+    }
+    
+    return result.value;
+  }
+
+  /**
+   * Safely create a ModelName object for tests.
+   */
+  static createModelName(name: string): import('@/lib/domain/value-objects/model-name').ModelName {
+    const { ModelName } = require('@/lib/domain/value-objects/model-name');
+    const result = ModelName.create(name);
+    
+    if (result.isFailure) {
+      throw new Error(`Failed to create test ModelName(${name}): ${result.error}`);
+    }
+    
+    return result.value;
+  }
+
+  /**
+   * Safely create a Version object for tests.
+   */
+  static createVersion(version: string): import('@/lib/domain/value-objects/version').Version {
+    const { Version } = require('@/lib/domain/value-objects/version');
+    const result = Version.create(version);
+    
+    if (result.isFailure) {
+      throw new Error(`Failed to create test Version(${version}): ${result.error}`);
+    }
+    
+    return result.value;
+  }
+
+  /**
+   * Safely unwrap a Result in tests with clear error reporting.
+   * Use this when you expect a Result to succeed in test setup.
+   */
+  static unwrapResult<T>(result: Result<T>, context: string = 'Result'): T {
+    if (result.isFailure) {
+      throw new Error(`${context} failed: ${result.error}`);
+    }
+    return result.value;
+  }
+
+  /**
+   * Create safe test data that ensures all domain objects are valid.
+   * This prevents the "Cannot get value from failed result" errors.
+   */
+  static createSafeTestData() {
+    return {
+      position: (x: number = 100, y: number = 100) => this.createPosition(x, y),
+      nodeId: (id?: string) => this.createNodeId(id),
+      modelName: (name: string = 'Test Model') => this.createModelName(name),
+      version: (version: string = '1.0.0') => this.createVersion(version),
+    };
+  }
+}

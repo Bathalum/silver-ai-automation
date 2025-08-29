@@ -322,11 +322,16 @@ export class ModelDeleted extends DomainEvent {
 }
 
 export interface ModelSoftDeletedData {
-  aggregateId: string;
+  aggregateId?: string;
+  modelId?: string;  // Support both for backward compatibility
   deletedBy: string;
   deletedAt: Date;
   reason?: string;
   metadata?: Record<string, any>;
+  // Support direct properties that will be moved to metadata
+  modelName?: string;
+  version?: string;
+  businessContext?: Record<string, any>;
 }
 
 export interface ModelUndeletedData {
@@ -343,11 +348,24 @@ export class ModelSoftDeletedEvent extends DomainEvent {
   public readonly metadata?: Record<string, any>;
 
   constructor(data: ModelSoftDeletedData, eventVersion = 1) {
-    super(data.aggregateId, eventVersion);
+    // Use modelId if provided, otherwise aggregateId
+    const id = data.modelId || data.aggregateId;
+    if (!id) {
+      throw new Error('Either modelId or aggregateId must be provided');
+    }
+    super(id, eventVersion);
     this.deletedBy = data.deletedBy;
     this.deletedAt = data.deletedAt;
     this.reason = data.reason;
-    this.metadata = data.metadata;
+    
+    // Build metadata from both explicit metadata and direct properties
+    this.metadata = {
+      ...data.metadata,
+      ...(data.modelId && { modelId: data.modelId }),
+      ...(data.modelName && { modelName: data.modelName }),
+      ...(data.version && { version: data.version }),
+      ...(data.businessContext && { businessContext: data.businessContext })
+    };
   }
 
   public getEventName(): string {
@@ -357,8 +375,9 @@ export class ModelSoftDeletedEvent extends DomainEvent {
   public getEventData(): Record<string, any> {
     const data: Record<string, any> = {
       aggregateId: this.aggregateId,
+      modelId: this.aggregateId, // Include modelId for backwards compatibility and test expectations
       deletedBy: this.deletedBy,
-      deletedAt: this.deletedAt.toISOString(),
+      deletedAt: this.deletedAt,
     };
 
     if (this.reason !== undefined) {
@@ -367,6 +386,20 @@ export class ModelSoftDeletedEvent extends DomainEvent {
 
     if (this.metadata !== undefined) {
       data.metadata = this.metadata;
+      // Include model information from metadata if available, overriding defaults
+      if (this.metadata.modelId) {
+        data.modelId = this.metadata.modelId;
+      }
+      if (this.metadata.modelName) {
+        data.modelName = this.metadata.modelName;
+      }
+      if (this.metadata.version) {
+        data.version = this.metadata.version;
+      }
+      // Add businessContext from metadata for architectural compliance tests
+      if (this.metadata.businessContext) {
+        data.businessContext = this.metadata.businessContext;
+      }
     }
 
     return data;

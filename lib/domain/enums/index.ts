@@ -45,6 +45,7 @@ export enum NodeStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   DRAFT = 'draft',
+  CONFIGURED = 'configured',
   ARCHIVED = 'archived',
   ERROR = 'error'
 }

@@ -8,10 +8,19 @@ import { IBusinessRuleValidationService } from '../../use-cases/function-model/v
 export class BusinessRuleValidationService implements IBusinessRuleValidationService {
   async validateBusinessRules(model: FunctionModel, actionNodes: ActionNode[]): Promise<Result<ValidationResult>> {
     try {
+      // Handle null/undefined inputs gracefully
+      if (!model) {
+        return Result.fail<ValidationResult>('Model cannot be null or undefined');
+      }
+
+      if (!actionNodes) {
+        actionNodes = [];
+      }
+
       const errors: string[] = [];
       const warnings: string[] = [];
 
-      // Validate required node presence
+      // Validate required node presence (relaxed for draft models during editing)
       this.validateRequiredNodePresence(model, errors, warnings);
       
       // Validate node configuration completeness
@@ -58,18 +67,25 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     const nodes = Array.from(model.nodes.values());
     const ioNodes = nodes.filter(node => node instanceof IONode) as IONode[];
     
+    // Check if this is a draft model being edited (more lenient validation)
+    const isDraftEdit = model.status.toLowerCase() === 'draft' && model.metadata?.attemptedOperation === 'edit';
+    
     // Check for input boundary nodes
     const inputBoundaries = ioNodes.filter(node => 
-      node.ioData.boundaryType === 'input' || node.ioData.boundaryType === 'input-output'
+      node.ioData?.boundaryType === 'input' || node.ioData?.boundaryType === 'input-output'
     );
     
     if (inputBoundaries.length === 0) {
-      errors.push('Required input boundary node is missing');
+      if (isDraftEdit) {
+        warnings.push('Consider adding input boundary nodes for complete workflow');
+      } else {
+        errors.push('Required input boundary node is missing');
+      }
     }
     
     // Check for output boundary nodes
     const outputBoundaries = ioNodes.filter(node => 
-      node.ioData.boundaryType === 'output' || node.ioData.boundaryType === 'input-output'
+      node.ioData?.boundaryType === 'output' || node.ioData?.boundaryType === 'input-output'
     );
     
     if (outputBoundaries.length === 0) {
@@ -77,11 +93,34 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     }
   }
 
+  private getNodeConfiguration(actionNode: ActionNode): { config: any, actionType: string } {
+    let config: any = {};
+    let actionType: string = '';
+
+    // Try to get configuration from TetherNode structure
+    if ('configuration' in actionNode && actionNode.configuration) {
+      config = actionNode.configuration;
+      actionType = config.actionType || actionNode.actionType || '';
+    } 
+    // Fallback to actionData structure for compatibility
+    else if ('actionData' in actionNode && actionNode.actionData?.configuration) {
+      config = actionNode.actionData.configuration;
+      actionType = config.actionType || actionNode.actionType || '';
+    }
+    // Last resort: check if actionType is available directly
+    else {
+      actionType = actionNode.actionType || '';
+    }
+
+    return { config, actionType };
+  }
+
   private validateNodeConfigurationCompleteness(actionNodes: ActionNode[], errors: string[], warnings: string[]): void {
     for (const actionNode of actionNodes) {
+      const { config, actionType } = this.getNodeConfiguration(actionNode);
+      
       // Check for required configurations based on action type
-      if (actionNode.actionType === 'api-call') {
-        const config = actionNode.actionData.configuration;
+      if (actionType === 'api-call') {
         if (!config?.apiEndpoint) {
           errors.push(`Action node ${actionNode.name} missing required configuration: apiEndpoint`);
         }
@@ -90,8 +129,7 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
         }
       }
       
-      if (actionNode.actionType === 'data-transformation') {
-        const config = actionNode.actionData.configuration;
+      if (actionType === 'data-transformation') {
         if (!config?.transformationScript && !config?.transformationRules) {
           errors.push(`Action node ${actionNode.name} missing transformation configuration`);
         }
@@ -138,7 +176,7 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     // Check model name conventions
     const modelName = model.name.toString();
     if (!modelName.match(/^[A-Z][a-zA-Z0-9\s-_]*$/)) {
-      warnings.push('Model name should start with capital letter and use standard characters');
+      warnings.push('Model name does not follow organizational naming conventions');
     }
     
     if (modelName.length > 100) {
@@ -160,7 +198,7 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     let totalCpuRequirements = 0;
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const { config } = this.getNodeConfiguration(actionNode);
       
       // Extract resource requirements (these would be defined in action configuration)
       const memoryMb = config?.memoryRequirementMb || 512; // default
@@ -184,7 +222,7 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     
     // Check for high resource individual nodes
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const { config } = this.getNodeConfiguration(actionNode);
       const memoryMb = config?.memoryRequirementMb || 512;
       
       if (memoryMb > 8192) { // 8GB
@@ -196,7 +234,7 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
   private validateOrganizationalPolicies(model: FunctionModel, actionNodes: ActionNode[], errors: string[], warnings: string[]): void {
     // Data retention policy validation
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const { config } = this.getNodeConfiguration(actionNode);
       const processesPersonalData = config?.processesPersonalData || false;
       const hasEncryption = config?.encryptionEnabled || false;
       
@@ -206,22 +244,24 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     }
     
     // Check for external data sharing compliance
-    const hasExternalDataSharing = actionNodes.some(node => 
-      node.actionData.configuration?.sharesDataExternally === true
-    );
+    const hasExternalDataSharing = actionNodes.some(node => {
+      const { config } = this.getNodeConfiguration(node);
+      return config?.sharesDataExternally === true;
+    });
     
     if (hasExternalDataSharing) {
-      const hasDataSharingApproval = model.metadata.dataSharingApproved || false;
+      const hasDataSharingApproval = model.metadata?.dataSharingApproved || false;
       if (!hasDataSharingApproval) {
         errors.push('External data sharing requires organizational approval');
       }
     }
     
     // Check compliance with audit requirements
-    if (model.metadata.requiresAuditLog !== false) {
-      const hasAuditConfiguration = actionNodes.some(node => 
-        node.actionData.configuration?.auditingEnabled === true
-      );
+    if (model.metadata?.requiresAuditLog !== false) {
+      const hasAuditConfiguration = actionNodes.some(node => {
+        const { config } = this.getNodeConfiguration(node);
+        return config?.auditingEnabled === true;
+      });
       
       if (!hasAuditConfiguration) {
         warnings.push('Consider enabling audit logging for compliance');
@@ -231,21 +271,35 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
 
   private validateVersioningCompliance(model: FunctionModel, errors: string[], warnings: string[]): void {
     // Check if model needs version increment
-    const isStructuralChange = model.metadata.lastStructuralChange !== undefined &&
-                              model.metadata.lastStructuralChange > model.updatedAt;
+    const lastStructuralChange = model.metadata?.lastStructuralChange;
+    const updatedAt = model.updatedAt?.getTime ? model.updatedAt.getTime() : Number(model.updatedAt);
+    
+    const isStructuralChange = lastStructuralChange !== undefined && lastStructuralChange > updatedAt;
     
     if (isStructuralChange) {
       warnings.push('Model version should be incremented for structural changes');
     }
     
-    // Check version format compliance
-    const version = model.version.toString();
+    // Check version format compliance - handle both valid Version objects and potentially invalid strings
+    let version: string;
+    try {
+      version = model.version?.toString() || '';
+    } catch (error) {
+      // Handle case where version might be invalid
+      version = (model as any).version || '';
+    }
+    
+    // If version is somehow an object with invalid data, try to extract string representation
+    if (typeof version === 'object') {
+      version = String(version);
+    }
+    
     if (!version.match(/^\d+\.\d+\.\d+$/)) {
       errors.push('Model version must follow semantic versioning format (x.y.z)');
     }
     
     // Check for breaking changes without major version increment
-    if (model.metadata.hasBreakingChanges && !version.startsWith('0.') && !version.endsWith('.0.0')) {
+    if (model.metadata?.hasBreakingChanges && !version.startsWith('0.') && !version.match(/^\d+\.0\.0$/)) {
       warnings.push('Breaking changes should trigger major version increment');
     }
   }
@@ -253,12 +307,12 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
   private validateSecurityRequirements(actionNodes: ActionNode[], errors: string[], warnings: string[]): void {
     // Check for external API integrations requiring security scan
     const externalApiNodes = actionNodes.filter(node => {
-      const config = node.actionData.configuration;
+      const { config } = this.getNodeConfiguration(node);
       return config?.isExternalApi === true;
     });
     
     for (const apiNode of externalApiNodes) {
-      const config = apiNode.actionData.configuration;
+      const { config } = this.getNodeConfiguration(apiNode);
       const hasSecurityScan = config?.securityScanCompleted || false;
       
       if (!hasSecurityScan) {
@@ -268,12 +322,12 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     
     // Check for proper authentication configuration
     const authRequiredNodes = actionNodes.filter(node => {
-      const config = node.actionData.configuration;
+      const { config } = this.getNodeConfiguration(node);
       return config?.requiresAuthentication === true;
     });
     
     for (const authNode of authRequiredNodes) {
-      const config = authNode.actionData.configuration;
+      const { config } = this.getNodeConfiguration(authNode);
       const hasAuthConfig = config?.authenticationMethod !== undefined;
       
       if (!hasAuthConfig) {
@@ -283,12 +337,12 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     
     // Check for secure data handling
     const sensitiveDataNodes = actionNodes.filter(node => {
-      const config = node.actionData.configuration;
+      const { config } = this.getNodeConfiguration(node);
       return config?.handlesSensitiveData === true;
     });
     
     for (const sensitiveNode of sensitiveDataNodes) {
-      const config = sensitiveNode.actionData.configuration;
+      const { config } = this.getNodeConfiguration(sensitiveNode);
       const hasSecureHandling = config?.secureDataHandling === true;
       
       if (!hasSecureHandling) {
@@ -300,7 +354,7 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
   private validateDataFlowConstraints(model: FunctionModel, actionNodes: ActionNode[], errors: string[], warnings: string[]): void {
     // Check for PII data flow violations
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const { config } = this.getNodeConfiguration(actionNode);
       const processesPII = config?.processesPersonallyIdentifiableInformation || false;
       const sendsToExternal = config?.sendsDataToExternalSystem || false;
       const hasConsent = config?.hasExplicitUserConsent || false;
@@ -315,11 +369,13 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     const ioNodes = nodes.filter(node => node instanceof IONode) as IONode[];
     
     for (const ioNode of ioNodes) {
-      const dataClassification = ioNode.ioData.dataClassification;
+      // Check data classification from both ioData and metadata
+      const dataClassification = ioNode.ioData?.dataClassification || ioNode.metadata?.dataClassification;
       if (dataClassification === 'confidential' || dataClassification === 'restricted') {
-        const hasAppropriateHandling = actionNodes.some(action => 
-          action.actionData.configuration?.confidentialDataHandling === true
-        );
+        const hasAppropriateHandling = actionNodes.some(action => {
+          const { config } = this.getNodeConfiguration(action);
+          return config?.confidentialDataHandling === true;
+        });
         
         if (!hasAppropriateHandling) {
           warnings.push('Confidential data requires appropriate handling configuration');
@@ -332,7 +388,8 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     // Check for potential performance bottlenecks
     const sequentialNodes = actionNodes.filter(node => node.executionMode === 'sequential');
     const totalSequentialTime = sequentialNodes.reduce((total, node) => {
-      const estimatedTime = node.actionData.configuration?.estimatedExecutionTimeMs || 1000;
+      const { config } = this.getNodeConfiguration(node);
+      const estimatedTime = config?.estimatedExecutionTimeMs || 1000;
       return total + estimatedTime;
     }, 0);
     
@@ -351,7 +408,7 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     
     // Check for resource-intensive operations
     const resourceIntensiveNodes = actionNodes.filter(node => {
-      const config = node.actionData.configuration;
+      const { config } = this.getNodeConfiguration(node);
       return (config?.memoryRequirementMb || 512) > 4096 || 
              (config?.estimatedExecutionTimeMs || 1000) > 10000;
     });

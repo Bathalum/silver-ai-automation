@@ -3,12 +3,43 @@ import { Result } from '../shared/result';
 export class Version {
   private static readonly VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)*))?$/;
 
-  private constructor(
-    private readonly _major: number,
-    private readonly _minor: number,
-    private readonly _patch: number,
-    private readonly _prerelease?: string
-  ) {}
+  private readonly _major: number;
+  private readonly _minor: number;
+  private readonly _patch: number;
+  private readonly _prerelease?: string;
+
+  private constructor(major: number, minor: number, patch: number, prerelease?: string) {
+    // Use Object.defineProperty to make properties truly immutable
+    Object.defineProperty(this, '_major', {
+      value: major,
+      writable: false,
+      enumerable: false,
+      configurable: false
+    });
+    Object.defineProperty(this, '_minor', {
+      value: minor,
+      writable: false,
+      enumerable: false,
+      configurable: false
+    });
+    Object.defineProperty(this, '_patch', {
+      value: patch,
+      writable: false,
+      enumerable: false,
+      configurable: false
+    });
+    if (prerelease !== undefined) {
+      Object.defineProperty(this, '_prerelease', {
+        value: prerelease,
+        writable: false,
+        enumerable: false,
+        configurable: false
+      });
+    }
+    
+    // Freeze the object to prevent any modifications
+    Object.freeze(this);
+  }
 
   public get major(): number {
     return this._major;
@@ -66,6 +97,11 @@ export class Version {
   }
 
   public compare(other: Version): number {
+    // Type guard to ensure other is a Version instance
+    if (!other || typeof other !== 'object' || !(other instanceof Version)) {
+      throw new Error('Cannot compare with non-Version object');
+    }
+    
     if (this._major !== other._major) {
       return this._major - other._major;
     }
@@ -91,14 +127,37 @@ export class Version {
   }
 
   public equals(other: Version): boolean {
+    // Type guard to ensure other is a Version instance with required methods
+    if (!other || typeof other !== 'object') {
+      return false;
+    }
+    
+    // Check if other is actually a Version instance
+    if (!(other instanceof Version)) {
+      return false;
+    }
+    
+    // Additional check to ensure other has the compare method
+    if (typeof other.compare !== 'function') {
+      return false;
+    }
+    
     return this.compare(other) === 0;
   }
 
   public isGreaterThan(other: Version): boolean {
+    // Type guard - if other is invalid, consider this as not greater
+    if (!other || typeof other !== 'object' || !(other instanceof Version)) {
+      return false;
+    }
     return this.compare(other) > 0;
   }
 
   public isLessThan(other: Version): boolean {
+    // Type guard - if other is invalid, consider this as not less
+    if (!other || typeof other !== 'object' || !(other instanceof Version)) {
+      return false;
+    }
     return this.compare(other) < 0;
   }
 
