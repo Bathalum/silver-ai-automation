@@ -163,8 +163,9 @@ export class NodeDependencyService {
         .filter(([_, nodeLevel]) => nodeLevel === level)
         .map(([id, _]) => id);
       
-      const canExecuteInParallel = nodesAtSameLevel.length > 1 && 
-        !this.hasSharedDependencies(nodeId, nodesAtSameLevel, graph);
+      // Nodes at level 0 cannot execute in parallel (root nodes)
+      // Nodes at levels > 0 can execute in parallel with others at the same level
+      const canExecuteInParallel = level > 0 && nodesAtSameLevel.length > 1;
 
       paths.push({
         nodeId,
@@ -311,6 +312,15 @@ export class NodeDependencyService {
   }
 
   private buildDependencyGraphInternal(nodes: Node[]): DependencyGraph {
+    // Handle edge case where nodes array is empty or undefined
+    if (!nodes || nodes.length === 0) {
+      return {
+        nodes: new Map(),
+        adjacencyList: new Map(),
+        reverseDependencies: new Map()
+      };
+    }
+
     const nodeMap = new Map(nodes.map(node => [node.nodeId.toString(), node]));
     const adjacencyList = new Map<string, string[]>();
     const reverseDependencies = new Map<string, string[]>();
@@ -325,10 +335,14 @@ export class NodeDependencyService {
     // Build adjacency lists
     nodes.forEach(node => {
       const nodeId = node.nodeId.toString();
-      const dependencies = node.dependencies.map(dep => dep.toString());
+      // Handle case where dependencies might be undefined or null
+      const nodeDependencies = node.dependencies || [];
+      const dependencies = nodeDependencies.map(dep => dep.toString());
       
+      // Store the dependencies of this node (what it depends on)
       reverseDependencies.set(nodeId, dependencies);
       
+      // For each dependency this node has, add this node to that dependency's adjacency list
       dependencies.forEach(depId => {
         const dependents = adjacencyList.get(depId) || [];
         dependents.push(nodeId);

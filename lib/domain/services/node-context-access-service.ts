@@ -5,6 +5,44 @@ import { KBNode } from '../entities/kb-node';
 import { FunctionModelContainerNode } from '../entities/function-model-container-node';
 import { Result } from '../shared/result';
 
+// Type definitions for context service
+export type ContextScope = 'execution' | 'session' | 'global' | 'isolated';
+export type ContextAccessLevel = 'read' | 'write' | 'read-write' | 'execute';
+
+export interface ContextInheritanceRule {
+  propertyName: string;
+  inheritanceType: 'inherit' | 'override' | 'merge';
+  defaultValue?: any;
+}
+
+export interface ContextValidationResult {
+  isValid: boolean;
+  reason: string;
+  accessLevel: ContextAccessLevel;
+}
+
+export interface HierarchicalContext {
+  contextId: string;
+  nodeId: NodeId;
+  scope: ContextScope;
+  data: Record<string, any>;
+  inheritedData?: Record<string, any>;
+  accessLevel: ContextAccessLevel;
+  parentContextId: string | null;
+  childContextIds: string[];
+  timestamp: string;
+}
+
+export interface BuiltContext {
+  contextId: string;
+  nodeId: NodeId;
+  scope: ContextScope;
+  data: Record<string, any>;
+  inheritedData?: Record<string, any>;
+  accessLevel: ContextAccessLevel;
+  parentContextId: string | null;
+}
+
 export interface NodeContext {
   nodeId: NodeId;
   nodeType: string;
@@ -36,6 +74,8 @@ export class NodeContextAccessService {
   private nodeHierarchy: Map<string, NodeContext> = new Map();
   private parentChildRelations: Map<string, string[]> = new Map();
   private siblingGroups: Map<string, string[]> = new Map();
+  private contexts: Map<string, BuiltContext> = new Map();
+  private contextCounter: number = 0;
 
   /**
    * Register a node in the context access system
@@ -114,9 +154,21 @@ export class NodeContextAccessService {
   }
 
   /**
+   * Get context for a node by nodeId (for testing and simple access)
+   */
+  public getNodeContext(nodeId: NodeId): Result<BuiltContext> {
+    for (const context of this.contexts.values()) {
+      if (context.nodeId.equals(nodeId)) {
+        return Result.ok(context);
+      }
+    }
+    return Result.fail('Context not found for node');
+  }
+
+  /**
    * Get specific context data for a node with access validation
    */
-  public getNodeContext(
+  public getNodeContextWithAccess(
     requestingNodeId: NodeId, 
     targetNodeId: NodeId, 
     requestedAccess: 'read' | 'write' | 'execute' = 'read'
@@ -483,25 +535,21 @@ export class NodeContextAccessService {
     // Find nodes related to the source model that might have nested contexts
     const nestedContexts: any[] = [];
     
-    console.log('getDeepNestedContext: looking for targetModelId:', targetModelId);
-    console.log('getDeepNestedContext: sourceModelId:', sourceModelId);
-    console.log('getDeepNestedContext: total nodes in hierarchy:', this.nodeHierarchy.size);
+    // Search through node hierarchy for contexts referencing target model
     
     for (const [nodeId, nodeContext] of this.nodeHierarchy.entries()) {
-      console.log('getDeepNestedContext: checking node', nodeId, 'contextData keys:', Object.keys(nodeContext.contextData || {}));
-      console.log('getDeepNestedContext: node contextData type:', typeof nodeContext.contextData);
-      console.log('getDeepNestedContext: node contextData:', nodeContext.contextData);
+      // Check if this node's context references the target model
       
       // Check if this node's context data has references to the target model
       if (nodeContext.contextData && this.hasNestedModelReferences(nodeContext.contextData, targetModelId)) {
-        console.log('getDeepNestedContext: FOUND match in node', nodeId);
+        // Found matching context
         nestedContexts.push(nodeContext.contextData);
       } else if (nodeContext.contextData) {
-        console.log('getDeepNestedContext: hasNestedModelReferences returned false for node', nodeId);
+        // No match in this node's context
       }
     }
     
-    console.log('getDeepNestedContext: returning', nestedContexts.length, 'contexts');
+    // Return all found contexts
     return nestedContexts;
   }
 
@@ -534,8 +582,7 @@ export class NodeContextAccessService {
     const existing = this.nodeHierarchy.get(nodeId);
     if (!existing) return false;
     
-    console.log('debugForceSetContext: existing context keys before:', Object.keys(existing.contextData || {}));
-    console.log('debugForceSetContext: setting contextData with keys:', Object.keys(contextData));
+    // Force set context data for testing purposes
     
     // Completely replace the object in the map
     this.nodeHierarchy.delete(nodeId);
@@ -543,28 +590,360 @@ export class NodeContextAccessService {
       ...existing,
       contextData: contextData
     };
-    console.log('debugForceSetContext: new context created with keys:', Object.keys(newContext.contextData));
+    // Context created successfully
     this.nodeHierarchy.set(nodeId, newContext);
     
     // Verify it was set
     const verify = this.nodeHierarchy.get(nodeId);
-    console.log('debugForceSetContext: verified context keys:', Object.keys(verify?.contextData || {}));
+    // Context verification complete
     
     return true;
+  }
+
+  /**
+   * Build context for a node with optional parent context inheritance
+   */
+  public buildContext(
+    nodeId: NodeId,
+    data: Record<string, any>,
+    scope: ContextScope,
+    parentContextId?: string
+  ): Result<BuiltContext> {
+    try {
+      // Validate input data
+      if (data === null || data === undefined) {
+        return Result.fail('Invalid context data: data cannot be null or undefined');
+      }
+      
+      if (typeof data !== 'object') {
+        return Result.fail('Invalid context data: data must be an object');
+      }
+
+      const contextId = `ctx-${++this.contextCounter}-${nodeId.value.slice(-8)}`;
+      
+      let inheritedData: Record<string, any> = {};
+      if (parentContextId) {
+        const parentContext = this.contexts.get(parentContextId);
+        if (parentContext) {
+          inheritedData = { ...parentContext.data };
+        }
+      }
+
+      const accessLevel: ContextAccessLevel = scope === 'isolated' ? 'read' : 'read-write';
+      
+      const context: BuiltContext = {
+        contextId,
+        nodeId,
+        scope,
+        data: { ...data },
+        inheritedData: Object.keys(inheritedData).length > 0 ? inheritedData : undefined,
+        accessLevel,
+        parentContextId: parentContextId || null
+      };
+
+      this.contexts.set(contextId, context);
+      return Result.ok(context);
+    } catch (error) {
+      return Result.fail(`Failed to build context: ${error}`);
+    }
+  }
+
+  /**
+   * Update context data for the specified context ID
+   */
+  public updateNodeContext(
+    contextId: string,
+    updateData: Record<string, any>,
+    mergeMode: 'replace' | 'merge' = 'merge'
+  ): Result<BuiltContext> {
+    const context = this.contexts.get(contextId);
+    if (!context) {
+      return Result.fail('Context not found');
+    }
+
+    let updatedData: Record<string, any>;
+    if (mergeMode === 'merge') {
+      updatedData = { ...context.data, ...updateData };
+    } else {
+      updatedData = { ...updateData };
+    }
+
+    const updatedContext: BuiltContext = {
+      ...context,
+      data: updatedData
+    };
+
+    this.contexts.set(contextId, updatedContext);
+    return Result.ok(updatedContext);
+  }
+
+  /**
+   * Clear node context and all child contexts
+   */
+  public clearNodeContext(nodeId: NodeId): Result<void> {
+    const contextsToRemove: string[] = [];
+    
+    // Find contexts for this node
+    for (const [contextId, context] of this.contexts.entries()) {
+      if (context.nodeId.equals(nodeId)) {
+        contextsToRemove.push(contextId);
+        // Also find child contexts
+        for (const [childId, childContext] of this.contexts.entries()) {
+          if (childContext.parentContextId === contextId) {
+            contextsToRemove.push(childId);
+          }
+        }
+      }
+    }
+
+    // Remove contexts
+    contextsToRemove.forEach(id => this.contexts.delete(id));
+    
+    return Result.ok(undefined);
+  }
+
+  /**
+   * Propagate context from source to target with inheritance rules
+   */
+  public propagateContext(
+    sourceContextId: string,
+    targetNodeId: NodeId,
+    inheritanceRules: ContextInheritanceRule[]
+  ): Result<BuiltContext> {
+    const sourceContext = this.contexts.get(sourceContextId);
+    if (!sourceContext) {
+      return Result.fail('Source context not found');
+    }
+
+    const propagatedData: Record<string, any> = {};
+    
+    for (const rule of inheritanceRules) {
+      const sourceValue = sourceContext.data[rule.propertyName];
+      if (sourceValue !== undefined) {
+        switch (rule.inheritanceType) {
+          case 'inherit':
+            propagatedData[rule.propertyName] = sourceValue;
+            break;
+          case 'override':
+            propagatedData[rule.propertyName] = rule.defaultValue ?? sourceValue;
+            break;
+          case 'merge':
+            if (typeof sourceValue === 'object' && sourceValue !== null) {
+              propagatedData[rule.propertyName] = { 
+                ...sourceValue, 
+                ...(rule.defaultValue || {}) 
+              };
+            } else {
+              propagatedData[rule.propertyName] = rule.defaultValue ?? sourceValue;
+            }
+            break;
+        }
+      } else if (rule.defaultValue !== undefined) {
+        propagatedData[rule.propertyName] = rule.defaultValue;
+      }
+    }
+
+    return this.buildContext(targetNodeId, propagatedData, sourceContext.scope, sourceContextId);
+  }
+
+  /**
+   * Get hierarchical context including parent chain
+   */
+  public getHierarchicalContext(nodeId: NodeId): Result<HierarchicalContext> {
+    // Find context for this node
+    let nodeContext: BuiltContext | undefined;
+    for (const context of this.contexts.values()) {
+      if (context.nodeId.equals(nodeId)) {
+        nodeContext = context;
+        break;
+      }
+    }
+
+    if (!nodeContext) {
+      return Result.fail('Node context not found');
+    }
+
+    // Find child contexts
+    const childContextIds: string[] = [];
+    for (const [contextId, context] of this.contexts.entries()) {
+      if (context.parentContextId === nodeContext.contextId) {
+        childContextIds.push(contextId);
+      }
+    }
+
+    const hierarchicalContext: HierarchicalContext = {
+      ...nodeContext,
+      childContextIds,
+      timestamp: new Date().toISOString()
+    };
+
+    return Result.ok(hierarchicalContext);
+  }
+
+  /**
+   * Validate context access permissions (overloaded method)
+   */
+  public validateContextAccess(
+    requestingNodeId: NodeId,
+    targetNodeId: NodeId,
+    requestedAccess: ContextAccessLevel,
+    accessibleProperties?: string[]
+  ): Result<{ granted: boolean; level: string; accessibleProperties: string[] }>;
+  public validateContextAccess(
+    requestingNodeId: NodeId,
+    targetContextId: string,
+    requestedAccess: ContextAccessLevel
+  ): Result<ContextValidationResult>;
+  public validateContextAccess(
+    requestingNodeId: NodeId,
+    targetContextIdOrNodeId: string | NodeId,
+    requestedAccess: ContextAccessLevel,
+    accessibleProperties?: string[]
+  ): Result<ContextValidationResult | { granted: boolean; level: string; accessibleProperties: string[] }> {
+    // Handle overloaded method - check if it's the node-to-node validation
+    if (targetContextIdOrNodeId instanceof NodeId && accessibleProperties) {
+      // Node-to-node validation with property access control
+      const hasAccess = this.checkHierarchicalAccess(requestingNodeId, { nodeId: targetContextIdOrNodeId, data: {} } as BuiltContext);
+      const accessLevel = hasAccess ? requestedAccess : 'read';
+      const granted = hasAccess && this.validateAccessLevel(requestedAccess, accessLevel);
+      
+      return Result.ok({
+        granted,
+        level: accessLevel,
+        accessibleProperties: granted ? accessibleProperties : []
+      });
+    }
+    
+    // Original method implementation for context ID
+    const targetContextId = typeof targetContextIdOrNodeId === 'string' ? targetContextIdOrNodeId : targetContextIdOrNodeId.value;
+    const targetContext = this.contexts.get(targetContextId);
+    if (!targetContext) {
+      return Result.ok({
+        isValid: false,
+        reason: 'Target context not found',
+        accessLevel: 'read'
+      });
+    }
+
+    // Self-access is always allowed
+    if (targetContext.nodeId.equals(requestingNodeId)) {
+      return Result.ok({
+        isValid: true,
+        reason: 'Self-access granted',
+        accessLevel: targetContext.accessLevel
+      });
+    }
+
+    // Check if requesting node has access based on hierarchy
+    const hasAccess = this.checkHierarchicalAccess(requestingNodeId, targetContext);
+    const accessLevel = hasAccess ? targetContext.accessLevel : 'read';
+    const canAccess = this.validateAccessLevel(requestedAccess, accessLevel);
+
+    return Result.ok({
+      isValid: canAccess,
+      reason: canAccess ? 'Hierarchical access granted' : 'Insufficient permissions',
+      accessLevel
+    });
+  }
+
+  /**
+   * Clone context scope to new node
+   */
+  public cloneContextScope(
+    sourceContextId: string,
+    targetNodeId: NodeId,
+    newScope: ContextScope,
+    transformationRules?: ContextInheritanceRule[]
+  ): Result<BuiltContext> {
+    const sourceContext = this.contexts.get(sourceContextId);
+    if (!sourceContext) {
+      return Result.fail('Source context not found');
+    }
+
+    let clonedData = { ...sourceContext.data };
+
+    // Apply transformation rules if provided
+    if (transformationRules) {
+      for (const rule of transformationRules) {
+        if (rule.inheritanceType === 'override' && rule.defaultValue !== undefined) {
+          clonedData[rule.propertyName] = rule.defaultValue;
+        }
+      }
+    }
+
+    return this.buildContext(targetNodeId, clonedData, newScope);
+  }
+
+  /**
+   * Merge multiple context scopes
+   */
+  public mergeContextScopes(
+    sourceContextIds: string[],
+    targetNodeId: NodeId,
+    targetScope: ContextScope,
+    precedenceRules?: { contextId: string; priority: number }[]
+  ): Result<BuiltContext> {
+    if (sourceContextIds.length === 0) {
+      return this.buildContext(targetNodeId, {}, targetScope);
+    }
+
+    const sourceContexts = sourceContextIds
+      .map(id => this.contexts.get(id))
+      .filter(ctx => ctx !== undefined) as BuiltContext[];
+
+    if (sourceContexts.length === 0) {
+      return Result.fail('No valid source contexts found');
+    }
+
+    // Merge data with precedence rules
+    const mergedData: Record<string, any> = {};
+    
+    if (precedenceRules) {
+      const priorityMap = new Map(precedenceRules.map(rule => [rule.contextId, rule.priority]));
+      const sortedContexts = sourceContexts.sort((a, b) => {
+        const priorityA = priorityMap.get(a.contextId) ?? 0;
+        const priorityB = priorityMap.get(b.contextId) ?? 0;
+        return priorityB - priorityA; // Higher priority first
+      });
+      
+      for (const context of sortedContexts.reverse()) { // Apply in reverse order so higher priority overwrites
+        Object.assign(mergedData, context.data);
+      }
+    } else {
+      // Simple merge without precedence
+      for (const context of sourceContexts) {
+        Object.assign(mergedData, context.data);
+      }
+    }
+
+    return this.buildContext(targetNodeId, mergedData, targetScope);
+  }
+
+  private checkHierarchicalAccess(requestingNodeId: NodeId, targetContext: BuiltContext): boolean {
+    // Check parent-child relationships
+    const accessibleContexts = this.getAccessibleContexts(requestingNodeId);
+    if (accessibleContexts.isFailure) return false;
+
+    return accessibleContexts.value.some(access => 
+      access.context.nodeId.equals(targetContext.nodeId) && access.accessGranted
+    );
+  }
+
+  private validateAccessLevel(requested: ContextAccessLevel, available: ContextAccessLevel): boolean {
+    const levels = { 'read': 1, 'write': 2, 'read-write': 2, 'execute': 3 };
+    return levels[requested] <= levels[available];
   }
 
   /**
    * Check if context data contains references to a nested model
    */
   private hasNestedModelReferences(contextData: any, targetModelId: string): boolean {
-    console.log('hasNestedModelReferences: checking for targetModelId:', targetModelId);
-    console.log('hasNestedModelReferences: contextData keys:', Object.keys(contextData));
+    // Check various possible locations where nested model references might exist
     
     // Check various possible locations where nested model references might exist
     
     // Check direct nestedModelId reference
     if (contextData.nestedModelId === targetModelId) {
-      console.log('hasNestedModelReferences: MATCH in nestedModelId');
       return true;
     }
     
@@ -572,16 +951,13 @@ export class NodeContextAccessService {
     if (contextData.executionMemory && contextData.executionMemory.parentModels) {
       if (Array.isArray(contextData.executionMemory.parentModels) && 
           contextData.executionMemory.parentModels.includes(targetModelId)) {
-        console.log('hasNestedModelReferences: MATCH in executionMemory.parentModels');
         return true;
       }
     }
     
     // Check in nested model outputs (for FunctionModelContainerContext)
     if (contextData.nestedModelOutputs) {
-      console.log('hasNestedModelReferences: checking nestedModelOutputs keys:', Object.keys(contextData.nestedModelOutputs));
       if (contextData.nestedModelOutputs[targetModelId]) {
-        console.log('hasNestedModelReferences: MATCH in nestedModelOutputs');
         return true;
       }
     }
@@ -590,12 +966,10 @@ export class NodeContextAccessService {
     if (contextData.orchestrationState && contextData.orchestrationState.nestedModels) {
       if (Array.isArray(contextData.orchestrationState.nestedModels) &&
           contextData.orchestrationState.nestedModels.includes(targetModelId)) {
-        console.log('hasNestedModelReferences: MATCH in orchestrationState.nestedModels');
         return true;
       }
     }
     
-    console.log('hasNestedModelReferences: NO MATCH found');
     return false;
   }
 }

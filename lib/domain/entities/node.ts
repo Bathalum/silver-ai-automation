@@ -26,6 +26,14 @@ export abstract class Node {
     return this.props.nodeId;
   }
 
+  public get id(): string {
+    return this.props.nodeId.toString();
+  }
+
+  public get type(): string {
+    return this.getNodeType();
+  }
+
   public get modelId(): string {
     return this.props.modelId;
   }
@@ -230,7 +238,9 @@ export abstract class Node {
     
     switch (currentStatus) {
       case NodeStatus.DRAFT:
-        return [NodeStatus.ACTIVE, NodeStatus.ARCHIVED].includes(newStatus);
+        return [NodeStatus.CONFIGURED, NodeStatus.ACTIVE, NodeStatus.ARCHIVED].includes(newStatus);
+      case NodeStatus.CONFIGURED:
+        return [NodeStatus.ACTIVE, NodeStatus.INACTIVE, NodeStatus.ARCHIVED].includes(newStatus);
       case NodeStatus.ACTIVE:
         return [NodeStatus.INACTIVE, NodeStatus.ARCHIVED, NodeStatus.ERROR].includes(newStatus);
       case NodeStatus.INACTIVE:

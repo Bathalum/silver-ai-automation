@@ -136,23 +136,23 @@ export function ContactSection() {
                   <Mail className="h-5 w-5 text-blue-600" />
                 </div>
                 <span className="text-gray-700 group-hover:text-blue-600 transition-colors duration-300">
-                  contact@silveraiautomation.com
+                  info@silveraiautomation.com
                 </span>
               </div>
-              <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/50 p-3 rounded-lg transition-all duration-300">
+              {/* <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/50 p-3 rounded-lg transition-all duration-300">
                 <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-lg group-hover:bg-green-200 group-hover:scale-110 transition-all duration-300">
                   <Phone className="h-5 w-5 text-green-600" />
                 </div>
                 <span className="text-gray-700 group-hover:text-green-600 transition-colors duration-300">
-                  +1 (555) 123-4567
+                  +63 917 334 2104
                 </span>
-              </div>
+              </div> */}
               <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/50 p-3 rounded-lg transition-all duration-300">
                 <div className="flex items-center justify-center w-10 h-10 bg-purple-100 rounded-lg group-hover:bg-purple-200 group-hover:scale-110 transition-all duration-300">
                   <MapPin className="h-5 w-5 text-purple-600" />
                 </div>
                 <span className="text-gray-700 group-hover:text-purple-600 transition-colors duration-300">
-                  San Francisco, CA
+                  Quezon City, Philippines
                 </span>
               </div>
             </div>

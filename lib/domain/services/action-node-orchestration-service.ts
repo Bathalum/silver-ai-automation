@@ -30,6 +30,22 @@ export interface ExecutionResult {
   startTime: Date; // For tests that check execution order
 }
 
+export interface ParallelExecutionResult {
+  executedActions: number;
+  concurrencyRespected: boolean;
+  results: ExecutionResult[];
+  totalDuration: number;
+}
+
+export interface SequentialExecutionResult {
+  executedActions: number;
+  orderRespected: boolean;
+  completedSequence: boolean;
+  executionOrder: string[];
+  results: ExecutionResult[];
+  totalDuration: number;
+}
+
 export interface OrchestrationState {
   containerId: NodeId;
   status: 'planning' | 'executing' | 'paused' | 'completed' | 'failed';
@@ -88,8 +104,8 @@ export class ActionNodeOrchestrationService {
   private orchestrationStates: Map<string, OrchestrationState> = new Map();
   private contextAccessService: NodeContextAccessService;
 
-  constructor(contextAccessService?: NodeContextAccessService) {
-    this.contextAccessService = contextAccessService || new NodeContextAccessService();
+  constructor(contextAccessService: NodeContextAccessService) {
+    this.contextAccessService = contextAccessService;
   }
 
   /**
@@ -158,6 +174,12 @@ export class ActionNodeOrchestrationService {
 
       const totalDuration = new Date().getTime() - startTime.getTime();
 
+      // Build context propagation map using executionId as key
+      const contextPropagation: Record<string, any> = {};
+      if (context.executionId) {
+        contextPropagation[context.executionId] = context;
+      }
+
       return Result.ok<ActionOrchestrationResult>({
         totalActions: actions.length,
         executedActions,
@@ -167,7 +189,7 @@ export class ActionNodeOrchestrationService {
         executionTime: totalDuration,
         executionResults,
         actionResults: executionResults, // Same data, different name for compatibility
-        contextPropagation: context,
+        contextPropagation,
         resourcesReleased: true
       });
 
@@ -180,7 +202,7 @@ export class ActionNodeOrchestrationService {
    * Optimize the execution order of actions based on dependencies
    */
   public optimizeActionOrder(actions: ActionNode[]): Result<ActionNode[]> {
-    if (actions.length === 0) {
+    if (!actions || actions.length === 0) {
       return Result.ok<ActionNode[]>([]);
     }
 
@@ -205,9 +227,16 @@ export class ActionNodeOrchestrationService {
   public async coordinateParallelActions(
     parallelGroup: ParallelExecutionGroup,
     context: Record<string, any>
-  ): Promise<Result<ExecutionResult[]>> {
+  ): Promise<Result<ParallelExecutionResult>> {
+    const startTime = Date.now();
+    
     if (parallelGroup.actions.length === 0) {
-      return Result.ok<ExecutionResult[]>([]);
+      return Result.ok<ParallelExecutionResult>({
+        executedActions: 0,
+        concurrencyRespected: true,
+        results: [],
+        totalDuration: 0
+      });
     }
 
     try {
@@ -247,9 +276,17 @@ export class ActionNodeOrchestrationService {
         results.push(...batchResults);
       }
 
-      return Result.ok<ExecutionResult[]>(results);
+      const totalDuration = Date.now() - startTime;
+      const concurrencyRespected = maxConcurrency <= parallelGroup.maxConcurrency;
+      
+      return Result.ok<ParallelExecutionResult>({
+        executedActions: results.length,
+        concurrencyRespected,
+        results,
+        totalDuration
+      });
     } catch (error) {
-      return Result.fail<ExecutionResult[]>(`Parallel coordination failed: ${error}`);
+      return Result.fail<ParallelExecutionResult>(`Parallel coordination failed: ${error}`);
     }
   }
 
@@ -259,9 +296,18 @@ export class ActionNodeOrchestrationService {
   public async sequenceActionExecution(
     actions: ActionNode[],
     context: Record<string, any>
-  ): Promise<Result<ExecutionResult[]>> {
+  ): Promise<Result<SequentialExecutionResult>> {
+    const startTime = Date.now();
+    
     if (actions.length === 0) {
-      return Result.ok<ExecutionResult[]>([]);
+      return Result.ok<SequentialExecutionResult>({
+        executedActions: 0,
+        orderRespected: true,
+        completedSequence: true,
+        executionOrder: [],
+        results: [],
+        totalDuration: 0
+      });
     }
 
     try {
@@ -301,9 +347,21 @@ export class ActionNodeOrchestrationService {
         }
       }
 
-      return Result.ok<ExecutionResult[]>(results);
+      const totalDuration = Date.now() - startTime;
+      const orderRespected = true; // Sequential execution always respects order
+      const completedSequence = results.every(r => r.success);
+      const executionOrder = results.map(r => r.actionId.value);
+      
+      return Result.ok<SequentialExecutionResult>({
+        executedActions: results.length,
+        orderRespected,
+        completedSequence,
+        executionOrder,
+        results,
+        totalDuration
+      });
     } catch (error) {
-      return Result.fail<ExecutionResult[]>(`Sequential execution failed: ${error}`);
+      return Result.fail<SequentialExecutionResult>(`Sequential execution failed: ${error}`);
     }
   }
 

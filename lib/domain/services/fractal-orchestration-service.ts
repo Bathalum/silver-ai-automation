@@ -377,7 +377,7 @@ export class FractalOrchestrationService {
       levels.push(nestedLevel);
 
       // Recursively discover deeper levels (if we had access to nested models)
-      // This would require a repository to fetch the nested model
+      // This would require a repository to retrieve the nested model
     }
   }
 

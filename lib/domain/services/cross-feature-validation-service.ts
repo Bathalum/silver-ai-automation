@@ -270,7 +270,7 @@ export class CrossFeatureValidationService implements ICrossFeatureValidationSer
   }
 
   private async getServiceApiContract(serviceName: string): Promise<any> {
-    // Mock implementation - would fetch actual API contract
+    // Mock implementation - would retrieve actual API contract
     const mockContracts: Record<string, any> = {
       'PaymentService': {
         version: '2.1',

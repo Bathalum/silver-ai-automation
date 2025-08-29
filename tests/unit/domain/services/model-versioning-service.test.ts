@@ -890,6 +890,17 @@ describe('ModelVersioningService', () => {
         const baseModelForAnalysis = createTestModel('Base Analysis', '1.0.0');
         const modifiedModelForAnalysis = createTestModel('Modified Analysis', '1.0.0');
 
+        // Clear existing factory nodes first to get clean comparison
+        const baseFactoryNodes = Array.from(baseModelForAnalysis.nodes.keys());
+        const comparisonFactoryNodes = Array.from(modifiedModelForAnalysis.nodes.keys());
+        
+        for (const nodeIdStr of baseFactoryNodes) {
+          baseModelForAnalysis.removeNode(NodeId.create(nodeIdStr).value!);
+        }
+        for (const nodeIdStr of comparisonFactoryNodes) {
+          modifiedModelForAnalysis.removeNode(NodeId.create(nodeIdStr).value!);
+        }
+
         // Add same node to both with different properties
         const nodeId = NodeId.generate();
         const position = Position.create(100, 100).value!;
@@ -940,6 +951,17 @@ describe('ModelVersioningService', () => {
         // Arrange - Models with different dependency structures
         const baseModelDeps = createTestModel('Base Dependencies', '1.0.0');
         const modifiedModelDeps = createTestModel('Modified Dependencies', '1.0.0');
+
+        // Clear existing factory nodes first to get clean comparison
+        const baseFactoryNodes = Array.from(baseModelDeps.nodes.keys());
+        const comparisonFactoryNodes = Array.from(modifiedModelDeps.nodes.keys());
+        
+        for (const nodeIdStr of baseFactoryNodes) {
+          baseModelDeps.removeNode(NodeId.create(nodeIdStr).value!);
+        }
+        for (const nodeIdStr of comparisonFactoryNodes) {
+          modifiedModelDeps.removeNode(NodeId.create(nodeIdStr).value!);
+        }
 
         const node1Id = NodeId.generate();
         const node2Id = NodeId.generate();

@@ -27,6 +27,12 @@ export {
   ActionNodeUpdated
 } from './node-events';
 
+// Backward compatibility aliases
+export { ContainerNodeAdded as NodeAddedEvent } from './node-events';
+export { ContainerNodeRemoved as NodeRemovedEvent } from './node-events';
+export { ModelCreated as ModelCreatedEvent } from './model-events';
+export { ModelUpdated as ModelUpdatedEvent } from './model-events';
+
 // Action execution events
 export {
   ActionNodeExecutionStarted,

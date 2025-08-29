@@ -62,8 +62,9 @@ export class ArchiveFunctionModelUseCase {
 
       // Perform comprehensive pre-archive validation
       const preArchiveValidation = await this.validatePreArchiveConditions(model);
-      if (preArchiveValidation.isFailure) {
-        return Result.fail<ArchiveModelResult>(preArchiveValidation.error);
+      if (!preArchiveValidation || preArchiveValidation.isFailure) {
+        const error = preArchiveValidation?.error || 'Pre-archive validation failed';
+        return Result.fail<ArchiveModelResult>(error);
       }
 
       const validation = preArchiveValidation.value;
@@ -90,7 +91,7 @@ export class ArchiveFunctionModelUseCase {
       }
 
       // Calculate dependency impact for audit
-      const dependencyImpact = await this.calculateDependencyImpact(model);
+      const dependencyImpact = await this.calculateDependencyImpact(model, previousStatus);
 
       // Handle cross-feature link cleanup if requested
       if (command.cleanupCrossFeatureLinks) {
@@ -119,7 +120,7 @@ export class ArchiveFunctionModelUseCase {
         await this.eventBus.publish({
           eventType: 'ModelArchived',
           aggregateId: model.modelId,
-          eventData: archiveEvent.toPrimitives(),
+          eventData: archiveEvent.getEventData(),
           userId: command.userId,
           timestamp: new Date()
         });
@@ -201,8 +202,18 @@ export class ArchiveFunctionModelUseCase {
         const dependencyValidation = this.nodeDependencyService.validateAcyclicity(nodes);
         if (dependencyValidation.isFailure) {
           blockingDependencies.push(`Internal dependency validation failed: ${dependencyValidation.error}`);
-        } else if (!dependencyValidation.value.isValid) {
-          blockingDependencies.push(...dependencyValidation.value.errors.map(e => `Internal dependency error: ${e}`));
+        } else {
+          const validation = dependencyValidation.value;
+          if (!validation.isValid) {
+            // Safely handle errors array
+            const errors = validation.errors || [];
+            blockingDependencies.push(...errors.map(e => `Internal dependency error: ${e}`));
+          }
+          // Add any warnings to the warnings array
+          const validationWarnings = validation.warnings || [];
+          if (validationWarnings.length > 0) {
+            warnings.push(...validationWarnings);
+          }
         }
       }
 
@@ -214,12 +225,14 @@ export class ArchiveFunctionModelUseCase {
       }
 
       // 3. Validate cross-feature dependencies
-      const crossFeatureLinks = this.crossFeatureLinkingService.getFeatureLinks(model.metadata.featureType || 'function-model' as any);
+      const crossFeatureLinks = this.crossFeatureLinkingService.getFeatureLinks(model.metadata.featureType || 'function-model' as any) || [];
       if (crossFeatureLinks.length > 0) {
         const criticalLinks = crossFeatureLinks.filter(link => 
-          link.linkStrength > 0.7 || 
-          link.linkType === 'implements' || 
-          link.linkType === 'triggers'
+          link && (
+            link.linkStrength > 0.7 || 
+            link.linkType === 'implements' || 
+            link.linkType === 'triggers'
+          )
         );
 
         if (criticalLinks.length > 0) {
@@ -267,7 +280,7 @@ export class ArchiveFunctionModelUseCase {
     }
   }
 
-  private async calculateDependencyImpact(model: FunctionModel): Promise<{
+  private async calculateDependencyImpact(model: FunctionModel, previousStatus?: ModelStatus): Promise<{
     internalNodesAffected: number;
     externalLinksAffected: number;
     riskLevel: 'low' | 'medium' | 'high';
@@ -277,6 +290,13 @@ export class ArchiveFunctionModelUseCase {
     const externalLinksAffected = crossFeatureLinks.length;
 
     let riskLevel: 'low' | 'medium' | 'high' = 'low';
+    
+    // Published models are always at least medium risk (check previous status since model is already archived)
+    if (previousStatus === ModelStatus.PUBLISHED) {
+      riskLevel = 'medium';
+    }
+    
+    // Size-based risk assessment
     if (internalNodesAffected > 20 || externalLinksAffected > 5) {
       riskLevel = 'medium';
     }

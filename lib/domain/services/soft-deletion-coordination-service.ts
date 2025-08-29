@@ -108,11 +108,11 @@ export class SoftDeletionCoordinationService {
     request: SoftDeletionRequest
   ): Promise<Result<SoftDeletionResult>> {
     try {
-      // Analyze dependencies if requested
+      // Analyze dependencies if requested or if referential integrity is enforced or cascading is allowed
       let dependencyAnalysis: any = {};
       let cascadingDeletions: string[] = [];
       
-      if (request.checkDependencies) {
+      if (request.checkDependencies || request.enforceReferentialIntegrity || request.allowCascading) {
         const dependentModelsResult = await this.nodeDependencyService.findDependentModels(request.modelId);
         if (dependentModelsResult.isFailure) {
           return Result.fail<SoftDeletionResult>(dependentModelsResult.error);
@@ -170,7 +170,12 @@ export class SoftDeletionCoordinationService {
         deletedBy: request.deletedBy,
         deletedAt: new Date(),
         reason: request.reason,
-        metadata: request.metadata,
+        metadata: {
+          ...request.metadata,
+          modelId: request.modelId,
+          modelName: model.name.toString(),
+          version: model.version.toString(),
+        },
       }));
 
       // Events for cascading deletions
@@ -346,19 +351,19 @@ export class SoftDeletionCoordinationService {
 
       // Check if restoration is blocked
       if (!dependencyValidation.integrityMaintained) {
-        const repairActions = dependencyValidation.brokenReferences.map((ref: string) => ({
-          action: 'REPAIR_BROKEN_REFERENCE',
-          target: ref,
-          complexity: 'LOW',
-        }));
-
-        if (dependencyValidation.missingDependencies) {
-          repairActions.push(...dependencyValidation.missingDependencies.map((dep: string) => ({
+        // Use repair actions from dependency service if available, otherwise generate them
+        const repairActions = dependencyValidation.repairActions || [
+          ...dependencyValidation.brokenReferences.map((ref: string) => ({
+            action: 'REPAIR_BROKEN_REFERENCE',
+            target: ref,
+            complexity: 'LOW',
+          })),
+          ...(dependencyValidation.missingDependencies || []).map((dep: string) => ({
             action: 'RESTORE_MISSING_DEPENDENCY',
             target: dep,
             complexity: 'MEDIUM',
-          })));
-        }
+          })),
+        ];
 
         return Result.ok<RestorationResult>({
           canRestore: false,

@@ -44,7 +44,7 @@ export class ActionNodeExecutionService {
 
   public async startExecution(actionId: string): Promise<Result<void>> {
     try {
-      if (this.isExecuting(actionId)) {
+      if (this.isActionExecuting(actionId)) {
         return Result.fail<void>('Action node is already executing');
       }
 
@@ -175,7 +175,7 @@ export class ActionNodeExecutionService {
       }
 
       // Check if retry is allowed by policy
-      const retryAllowed = await this.evaluateRetryPolicy(actionId);
+      const retryAllowed = await this.retryPolicyEvaluation(actionId);
       if (retryAllowed.isFailure || !retryAllowed.value) {
         return Result.fail<void>('Retry not allowed by policy');
       }
@@ -208,7 +208,7 @@ export class ActionNodeExecutionService {
     }
   }
 
-  public async evaluateRetryPolicy(actionId: string): Promise<Result<boolean>> {
+  public async retryPolicyEvaluation(actionId: string): Promise<Result<boolean>> {
     try {
       const context = this.activeExecutions.get(actionId);
       if (!context) {
@@ -253,7 +253,7 @@ export class ActionNodeExecutionService {
     }
   }
 
-  public async trackResourceUsage(actionId: string, usage: { cpu: number; memory: number }): Promise<Result<void>> {
+  public async trackExecutionResourceUsage(actionId: string, usage: { cpu: number; memory: number }): Promise<Result<void>> {
     try {
       const metrics = this.executionMetrics.get(actionId);
       if (!metrics) {
@@ -283,7 +283,7 @@ export class ActionNodeExecutionService {
     }
   }
 
-  public async updateProgress(actionId: string, progress: number, currentStep?: string): Promise<Result<void>> {
+  public async updateExecutionProgress(actionId: string, progress: number, currentStep?: string): Promise<Result<void>> {
     try {
       const snapshot = this.executionSnapshots.get(actionId);
       if (!snapshot) {
@@ -313,7 +313,7 @@ export class ActionNodeExecutionService {
     }
   }
 
-  public isExecuting(actionId: string): boolean {
+  public isActionExecuting(actionId: string): boolean {
     return this.activeExecutions.has(actionId);
   }
 
@@ -341,6 +341,27 @@ export class ActionNodeExecutionService {
       return Result.ok<void>(undefined);
     } catch (error) {
       return Result.fail<void>(`Failed to cancel execution: ${error}`);
+    }
+  }
+
+  /**
+   * Pause an active action execution
+   */
+  public async pauseActionExecution(actionId: string): Promise<Result<void>> {
+    try {
+      if (!this.activeExecutions.has(actionId)) {
+        return Result.fail<void>('No active execution found to pause');
+      }
+
+      const snapshot = this.executionSnapshots.get(actionId);
+      if (snapshot) {
+        snapshot.status = ActionStatus.PAUSED;
+        snapshot.metadata.pausedAt = new Date();
+        this.executionSnapshots.set(actionId, snapshot);
+      }
+      return Result.ok<void>(undefined);
+    } catch (error) {
+      return Result.fail<void>(`Failed to pause action execution: ${error}`);
     }
   }
 

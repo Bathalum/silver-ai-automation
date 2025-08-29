@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">5.88% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/136</span>
+                <span class='fraction'>8/136</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">6.25% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>1/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">5.92% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/135</span>
+                <span class='fraction'>8/135</span>
             </div>
         
             
@@ -662,10 +662,10 @@
 <a name='L597'></a><a href='#L597'>597</a>
 <a name='L598'></a><a href='#L598'>598</a>
 <a name='L599'></a><a href='#L599'>599</a>
-<a name='L600'></a><a href='#L600'>600</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L600'></a><a href='#L600'>600</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -729,12 +729,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1261,10 +1261,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Result } from <span class="cstat-no" title="statement not covered" >'../../domain/shared/result';</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Result } from '../../domain/shared/result';
 import { NodeId } from '../../domain/value-objects/node-id';
-import { RetryPolicy, RetryPolicyConfig } from <span class="cstat-no" title="statement not covered" >'../../domain/value-objects/retry-policy';</span>
-import { ActionStatus } from <span class="cstat-no" title="statement not covered" >'../../domain/enums';</span>
+import { RetryPolicy, RetryPolicyConfig } from '../../domain/value-objects/retry-policy';
+import { ActionStatus } from '../../domain/enums';
 import { ActionNodeExecutionService } from '../../domain/services/action-node-execution-service';
 import { AIAgentOrchestrationService } from '../../domain/services/ai-agent-orchestration-service';
 import { BusinessRuleValidationService } from '../../domain/services/business-rule-validation-service';
@@ -1328,12 +1328,12 @@ export interface ErrorHandlingResult {
  * 5. Cascading failure management
  * 6. Recovery coordination and state management
  */
-export class <span class="cstat-no" title="statement not covered" >ManageErrorHandlingAndRecoveryUseCase {</span>
-<span class="fstat-no" title="function not covered" >  constructor(</span>
-    private readonly <span class="cstat-no" title="statement not covered" >actionExecutionService: ActionNodeExecutionService,</span>
-    private readonly <span class="cstat-no" title="statement not covered" >agentOrchestrationService: AIAgentOrchestrationService,</span>
-    private readonly <span class="cstat-no" title="statement not covered" >businessRuleValidationService: BusinessRuleValidationService,</span>
-    private readonly <span class="cstat-no" title="statement not covered" >contextAccessService: NodeContextAccessService</span>
+export class ManageErrorHandlingAndRecoveryUseCase {
+  constructor(
+    private readonly actionExecutionService: ActionNodeExecutionService,
+    private readonly agentOrchestrationService: AIAgentOrchestrationService,
+    private readonly businessRuleValidationService: BusinessRuleValidationService,
+    private readonly contextAccessService: NodeContextAccessService
   ) {}
 &nbsp;
   /**
@@ -1867,7 +1867,7 @@ export class <span class="cstat-no" title="statement not covered" >ManageErrorHa
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-27T00:35:44.758Z
+                at 2025-08-27T23:41:37.864Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
