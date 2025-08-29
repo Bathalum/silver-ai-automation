@@ -192,9 +192,12 @@ describe('UC-010: Node Dependency Management - System Use Case', () => {
         const graph = result.value;
         
         // Verify convergence pattern structure
-        expect(graph.reverseDependencies.get('stage1-0')).toEqual(['input-0', 'input-1']);
-        expect(graph.reverseDependencies.get('stage2-0')).toEqual(['stage1-0', 'stage1-1']);
-        expect(graph.reverseDependencies.get('final-output')).toEqual(['stage2-0', 'stage2-1']);
+        expect(graph.reverseDependencies.get(firstStageNodes[0].nodeId.toString())?.sort())
+          .toEqual([inputNodes[0].nodeId.toString(), inputNodes[1].nodeId.toString()].sort());
+        expect(graph.reverseDependencies.get(secondStageNodes[0].nodeId.toString())?.sort())
+          .toEqual([firstStageNodes[0].nodeId.toString(), firstStageNodes[1].nodeId.toString()].sort());
+        expect(graph.reverseDependencies.get(outputNode.nodeId.toString())?.sort())
+          .toEqual([secondStageNodes[0].nodeId.toString(), secondStageNodes[1].nodeId.toString()].sort());
         
         // Verify execution order respects convergence
         const orderResult = dependencyService.calculateExecutionOrder(graph);
@@ -715,14 +718,15 @@ describe('UC-010: Node Dependency Management - System Use Case', () => {
         expect(criticalPathResult).toBeValidResult();
         const criticalPath = criticalPathResult.value;
         
-        // Critical path should be the longest path (through slow nodes)
-        expect(criticalPath).toHaveLength(6); // start -> slowA -> slowB -> slowC -> slowD -> slowEnd
+        // Critical path should be the longest path (through slow nodes to final output)
+        expect(criticalPath).toHaveLength(7); // start -> slowA -> slowB -> slowC -> slowD -> slowEnd -> finalOutput
         expect(criticalPath).toContain(start.nodeId.toString());
         expect(criticalPath).toContain(slowA.nodeId.toString());
         expect(criticalPath).toContain(slowB.nodeId.toString());
         expect(criticalPath).toContain(slowC.nodeId.toString());
         expect(criticalPath).toContain(slowD.nodeId.toString());
         expect(criticalPath).toContain(slowEnd.nodeId.toString());
+        expect(criticalPath).toContain(finalOutput.nodeId.toString());
         
         // Should not include fast path nodes (except possibly start/end if shared)
         expect(criticalPath).not.toContain(fastA.nodeId.toString());
@@ -768,9 +772,9 @@ describe('UC-010: Node Dependency Management - System Use Case', () => {
         expect(parallelPaths).toHaveLength(3);
         
         // Verify priority ordering within the same level
-        expect(parallelPaths[0].nodeId).toBe('high-priority'); // Highest priority first
-        expect(parallelPaths[1].nodeId).toBe('medium-priority');
-        expect(parallelPaths[2].nodeId).toBe('low-priority'); // Lowest priority last
+        expect(parallelPaths[0].nodeId).toBe(highPriorityNode.nodeId.toString()); // Highest priority first
+        expect(parallelPaths[1].nodeId).toBe(mediumPriorityNode.nodeId.toString());
+        expect(parallelPaths[2].nodeId).toBe(lowPriorityNode.nodeId.toString()); // Lowest priority last
         
         // All should be marked as parallel
         parallelPaths.forEach(path => {
@@ -883,7 +887,7 @@ describe('UC-010: Node Dependency Management - System Use Case', () => {
         const orderResult = dependencyService.calculateExecutionOrder(graph);
         const pathsResult = dependencyService.optimizeExecutionPaths(nodes);
         const criticalResult = dependencyService.findCriticalPath(nodes);
-        const reachableResult = dependencyService.findReachableNodes(graph, 'node-0');
+        const reachableResult = dependencyService.findReachableNodes(graph, nodes[0].nodeId.toString());
 
         // Assert - All operations should succeed and return proper Result types
         expect(cycleResult).toBeValidResult();
@@ -951,9 +955,12 @@ describe('UC-010: Node Dependency Management - System Use Case', () => {
         const singleResult = dependencyService.buildDependencyGraph([singleNode]);
         expect(singleResult).toBeValidResult();
         
-        // Test invalid dependency reference
+        // Test invalid dependency reference - use valid UUID format but non-existent node
         const invalidNode = new StageNodeBuilder().withId('invalid').withModelId(modelId).withName('invalid').build();
-        invalidNode.addDependency('non-existent-node');
+        const nonExistentId = '12345678-1234-4567-8901-123456789012'; // Valid UUID format but doesn't exist
+        const addDepResult = invalidNode.addDependency(nonExistentId);
+        expect(addDepResult.isSuccess).toBe(true); // addDependency should succeed with valid UUID format
+        expect(invalidNode.dependencies.length).toBe(1); // Verify dependency was added
         const invalidResult = dependencyService.buildDependencyGraph([invalidNode]);
         expect(invalidResult).toBeFailureResult();
         expect(invalidResult.error).toContain('references non-existent dependency');

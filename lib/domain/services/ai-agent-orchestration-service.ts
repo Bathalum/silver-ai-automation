@@ -274,7 +274,7 @@ export class AIAgentOrchestrationService {
       return Result.fail<void>('Agent not found');
     }
 
-    console.log(`Agent ${agentId.value} failed: ${failureReason}`);
+    // Agent execution failed - failure details available in result
 
     switch (recoveryAction) {
       case 'disable':

@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { FunctionModel } from '../../../../lib/domain/entities/function-model';
 import { ModelName } from '../../../../lib/domain/value-objects/model-name';
 import { Version } from '../../../../lib/domain/value-objects/version';
-import { ModelStatus } from '../../../../lib/domain/enums';
+import { ModelStatus, IOType, ExecutionMode, NodeStatus } from '../../../../lib/domain/enums';
 import { IONode } from '../../../../lib/domain/entities/io-node';
 import { StageNode } from '../../../../lib/domain/entities/stage-node';
-import { NodeType } from '../../../../lib/domain/enums';
 import { Position } from '../../../../lib/domain/value-objects/position';
 import { NodeId } from '../../../../lib/domain/value-objects/node-id';
+import { DomainTestHelpers, ResultTestHelpers } from '../../../utils/test-helpers';
 
 /**
  * UC-009: Soft Delete Function Model - Entity State Management Tests
@@ -28,53 +28,91 @@ describe('FunctionModel - Soft Deletion State Management', () => {
 
   beforeEach(() => {
     // Create test model with nodes
-    const nameResult = ModelName.create('Test Model');
-    const versionResult = Version.create('1.0.0');
+    // Use safe Result access patterns
+    const testName = DomainTestHelpers.unwrapResult(
+      ModelName.create('Test Model'),
+      'ModelName creation for test'
+    );
+    const testVersion = DomainTestHelpers.unwrapResult(
+      Version.create('1.0.0'),
+      'Version creation for test'
+    );
+
+    nodeId1 = NodeId.generate();
+    nodeId2 = NodeId.generate();
+
+    // Create model as DRAFT initially so we can add nodes
+    testModel = DomainTestHelpers.unwrapResult(
+      FunctionModel.create({
+        modelId: 'test-model-123',
+        name: testName,
+        version: testVersion,
+        status: ModelStatus.DRAFT,
+        currentVersion: testVersion,
+        nodes: new Map(),
+        actionNodes: new Map(),
+        metadata: { 
+          projectId: 'proj-456',
+          createdBy: 'user-123',
+          lastModifiedBy: 'user-123',
+        },
+        permissions: { 'user-123': 'owner', 'user-456': 'collaborator' },
+      }),
+      'FunctionModel creation for test'
+    );
+
+    // Add some nodes for testing - nodes need to have matching modelId and proper defaults
+    const inputNode = DomainTestHelpers.unwrapResult(
+      IONode.create({
+        nodeId: nodeId1,
+        modelId: 'test-model-123',
+        name: 'Input Node',
+        position: DomainTestHelpers.createPosition(0, 0),
+        dependencies: [],
+        executionType: ExecutionMode.SYNC,
+        status: NodeStatus.ACTIVE,
+        metadata: {},
+        visualProperties: {},
+        ioData: {
+          boundaryType: IOType.INPUT,
+        },
+      }),
+      'Input node creation'
+    );
+
+    const outputNode = DomainTestHelpers.unwrapResult(
+      IONode.create({
+        nodeId: nodeId2,
+        modelId: 'test-model-123',
+        name: 'Output Node',
+        position: DomainTestHelpers.createPosition(100, 100),
+        dependencies: [],
+        executionType: ExecutionMode.SYNC,
+        status: NodeStatus.ACTIVE,
+        metadata: {},
+        visualProperties: {},
+        ioData: {
+          boundaryType: IOType.OUTPUT,
+        },
+      }),
+      'Output node creation'
+    );
+
+    // Add nodes while model is in DRAFT state
+    DomainTestHelpers.unwrapResult(
+      testModel.addContainerNode(inputNode),
+      'Adding input node to test model'
+    );
+    DomainTestHelpers.unwrapResult(
+      testModel.addContainerNode(outputNode),
+      'Adding output node to test model'
+    );
     
-    expect(nameResult.isSuccess).toBe(true);
-    expect(versionResult.isSuccess).toBe(true);
-
-    nodeId1 = NodeId.create().value;
-    nodeId2 = NodeId.create().value;
-
-    const modelResult = FunctionModel.create({
-      modelId: 'test-model-123',
-      name: nameResult.value,
-      version: versionResult.value,
-      status: ModelStatus.PUBLISHED,
-      currentVersion: versionResult.value,
-      nodes: new Map(),
-      actionNodes: new Map(),
-      metadata: { 
-        projectId: 'proj-456',
-        createdBy: 'user-123',
-        lastModifiedBy: 'user-123',
-      },
-      permissions: { 'user-123': 'owner', 'user-456': 'collaborator' },
-    });
-
-    expect(modelResult.isSuccess).toBe(true);
-    testModel = modelResult.value;
-
-    // Add some nodes for testing
-    const inputNode = IONode.create({
-      nodeId: nodeId1.toString(),
-      name: 'Input Node',
-      nodeType: NodeType.INPUT,
-      position: Position.create(0, 0).value,
-      metadata: {},
-    }).value;
-
-    const outputNode = IONode.create({
-      nodeId: nodeId2.toString(),
-      name: 'Output Node',
-      nodeType: NodeType.OUTPUT,
-      position: Position.create(100, 100).value,
-      metadata: {},
-    }).value;
-
-    testModel.addContainerNode(inputNode);
-    testModel.addContainerNode(outputNode);
+    // Now publish the model for testing
+    DomainTestHelpers.unwrapResult(
+      testModel.publish(),
+      'Publishing test model'
+    );
   });
 
   describe('Soft Deletion State Transitions', () => {
@@ -106,23 +144,30 @@ describe('FunctionModel - Soft Deletion State Management', () => {
 
     describe('SoftDelete_DraftModel_ShouldTransitionToDeleted', () => {
       it('should successfully mark draft model as deleted', () => {
-        // Arrange
-        const draftNameResult = ModelName.create('Draft Model');
-        const versionResult = Version.create('0.1.0');
+        // Arrange - Use safe Result access patterns
+        const draftName = DomainTestHelpers.unwrapResult(
+          ModelName.create('Draft Model'),
+          'Draft ModelName creation'
+        );
+        const draftVersion = DomainTestHelpers.unwrapResult(
+          Version.create('0.1.0'),
+          'Draft Version creation'
+        );
         
-        const draftModelResult = FunctionModel.create({
-          modelId: 'draft-model-789',
-          name: draftNameResult.value,
-          version: versionResult.value,
-          status: ModelStatus.DRAFT,
-          currentVersion: versionResult.value,
-          nodes: new Map(),
-          actionNodes: new Map(),
-          metadata: {},
-          permissions: { 'user-123': 'owner' },
-        });
-
-        const draftModel = draftModelResult.value;
+        const draftModel = DomainTestHelpers.unwrapResult(
+          FunctionModel.create({
+            modelId: 'draft-model-789',
+            name: draftName,
+            version: draftVersion,
+            status: ModelStatus.DRAFT,
+            currentVersion: draftVersion,
+            nodes: new Map(),
+            actionNodes: new Map(),
+            metadata: {},
+            permissions: { 'user-123': 'owner' },
+          }),
+          'Draft FunctionModel creation'
+        );
 
         // Act
         const deleteResult = draftModel.softDelete('user-123');
@@ -210,13 +255,27 @@ describe('FunctionModel - Soft Deletion State Management', () => {
     describe('BlockNodeOperations_OnDeletedModel_ShouldPreventModification', () => {
       it('should block node addition operations on deleted models', () => {
         // Arrange
-        const newNodeId = NodeId.create().value;
-        const stageNode = StageNode.create({
-          nodeId: newNodeId.toString(),
-          name: 'New Stage',
-          position: Position.create(200, 200).value,
-          metadata: {},
-        }).value;
+        const newNodeId = NodeId.generate();
+        const stageNode = DomainTestHelpers.unwrapResult(
+          StageNode.create({
+            nodeId: newNodeId,
+            modelId: 'test-model-123',
+            name: 'New Stage',
+            position: DomainTestHelpers.createPosition(200, 200),
+            dependencies: [],
+            executionType: ExecutionMode.SYNC,
+            status: NodeStatus.ACTIVE,
+            metadata: {},
+            visualProperties: {},
+            stageData: {
+              stageType: 'milestone',
+            },
+            parallelExecution: false,
+            actionNodes: [],
+            configuration: {},
+          }),
+          'StageNode creation'
+        );
 
         // Act
         const addResult = testModel.addContainerNode(stageNode);
@@ -229,7 +288,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
 
       it('should block node removal operations on deleted models', () => {
         // Act
-        const removeResult = testModel.removeContainerNode(nodeId1.toString());
+        const removeResult = testModel.removeContainerNode(nodeId1);
 
         // Assert
         expect(removeResult.isFailure).toBe(true);
@@ -443,9 +502,15 @@ describe('FunctionModel - Soft Deletion State Management', () => {
           {
             description: 'Model with empty node structure',
             setupModel: (model: FunctionModel) => {
-              // Clear all nodes
+              // Clear all nodes - convert string keys back to NodeId
               const nodeIds = Array.from(model.nodes.keys());
-              nodeIds.forEach(nodeId => model.removeContainerNode(nodeId));
+              nodeIds.forEach(nodeIdString => {
+                const nodeId = DomainTestHelpers.unwrapResult(
+                  NodeId.create(nodeIdString),
+                  `NodeId creation for ${nodeIdString}`
+                );
+                model.removeContainerNode(nodeId);
+              });
               return model;
             },
             expectedCanDelete: true, // Empty models can be deleted
@@ -454,8 +519,37 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         ];
 
         testCases.forEach(({ description, setupModel, expectedCanDelete }) => {
-          // Arrange
-          const testModelCopy = { ...testModel };
+          // Arrange - Create a fresh model for each test case instead of copying
+          const freshModelName = DomainTestHelpers.unwrapResult(
+            ModelName.create('Fresh Test Model'),
+            'ModelName creation for validation test'
+          );
+          const freshVersion = DomainTestHelpers.unwrapResult(
+            Version.create('1.0.0'),
+            'Version creation for validation test'
+          );
+          
+          const testModelCopy = DomainTestHelpers.unwrapResult(
+            FunctionModel.create({
+              modelId: 'validation-test-model',
+              name: freshModelName,
+              version: freshVersion,
+              status: ModelStatus.DRAFT, // Start as draft so we can modify
+              currentVersion: freshVersion,
+              nodes: new Map(),
+              actionNodes: new Map(),
+              metadata: { 
+                projectId: 'validation-test-project',
+                createdBy: 'validation-tester',
+                lastModifiedBy: 'validation-tester',
+              },
+              permissions: { 'validation-tester': 'owner' },
+            }),
+            'FunctionModel creation for validation test'
+          );
+          
+          // Keep model in published state - no need to publish since we're testing various states
+          
           setupModel(testModelCopy);
 
           // Act
@@ -519,19 +613,28 @@ describe('FunctionModel - Soft Deletion State Management', () => {
 
         testCases.forEach(({ input, expected, description }, index) => {
           // Arrange - Create a fresh model for each test
-          const modelName = ModelName.create(`Test Model ${index}`);
-          const version = Version.create('1.0.0');
-          const freshModel = FunctionModel.create({
-            modelId: `test-model-${index}`,
-            name: modelName.value,
-            version: version.value,
-            status: ModelStatus.DRAFT,
-            currentVersion: version.value,
-            nodes: new Map(),
-            actionNodes: new Map(),
-            metadata: {},
-            permissions: { 'user-123': 'owner' },
-          }).value;
+          const modelName = DomainTestHelpers.unwrapResult(
+            ModelName.create(`Test Model ${index}`),
+            `ModelName creation for test case ${index}`
+          );
+          const version = DomainTestHelpers.unwrapResult(
+            Version.create('1.0.0'),
+            `Version creation for test case ${index}`
+          );
+          const freshModel = DomainTestHelpers.unwrapResult(
+            FunctionModel.create({
+              modelId: `test-model-${index}`,
+              name: modelName,
+              version: version,
+              status: ModelStatus.DRAFT,
+              currentVersion: version,
+              nodes: new Map(),
+              actionNodes: new Map(),
+              metadata: {},
+              permissions: { 'user-123': 'owner' },
+            }),
+            `FunctionModel creation for test case ${index}`
+          );
 
           // Act
           const deleteResult = freshModel.softDelete(input);

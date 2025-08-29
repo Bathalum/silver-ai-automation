@@ -20,20 +20,35 @@ describe('Model Version Change Detection', () => {
   // Helper function to create models with specific configurations
   const createModelWithNodes = (modelName: string, versionStr: string, nodeConfigs: any[]) => {
     const modelId = NodeId.generate();
-    const name = ModelName.create(modelName).value!;
-    const version = Version.create(versionStr).value!;
+    
+    const nameResult = ModelName.create(modelName);
+    if (nameResult.isFailure) {
+      throw new Error(`Failed to create model name: ${nameResult.error}`);
+    }
+    const name = nameResult.value;
+    
+    const versionResult = Version.create(versionStr);
+    if (versionResult.isFailure) {
+      throw new Error(`Failed to create version: ${versionResult.error}`);
+    }
+    const version = versionResult.value;
     
     const nodes = new Map();
     
     // Create nodes based on configurations
     nodeConfigs.forEach(config => {
       const nodeId = NodeId.generate();
-      const position = Position.create(config.x || 0, config.y || 0).value!;
+      
+      const positionResult = Position.create(config.x || 0, config.y || 0);
+      if (positionResult.isFailure) {
+        throw new Error(`Failed to create position: ${positionResult.error}`);
+      }
+      const position = positionResult.value;
       
       let node;
       switch (config.type) {
         case 'io':
-          node = IONode.create({
+          const ioNodeResult = IONode.create({
             nodeId,
             modelId: modelId.value,
             name: config.name,
@@ -45,14 +60,18 @@ describe('Model Version Change Detection', () => {
             metadata: config.metadata || {},
             visualProperties: config.visualProperties || {},
             ioData: {
-              boundaryType: config.boundaryType || 'input',
-              inputDataContract: config.inputDataContract || {},
-              outputDataContract: config.outputDataContract || {}
+              boundaryType: config.boundaryType || 'input-output',
+              inputDataContract: (config.boundaryType === 'output') ? undefined : (config.inputDataContract || {}),
+              outputDataContract: (config.boundaryType === 'input') ? undefined : (config.outputDataContract || {})
             }
-          }).value!;
+          });
+          if (ioNodeResult.isFailure) {
+            throw new Error(`Failed to create IONode: ${ioNodeResult.error}`);
+          }
+          node = ioNodeResult.value;
           break;
         case 'stage':
-          node = StageNode.create({
+          const stageNodeResult = StageNode.create({
             nodeId,
             modelId: modelId.value,
             name: config.name,
@@ -63,31 +82,19 @@ describe('Model Version Change Detection', () => {
             status: NodeStatus.ACTIVE,
             metadata: config.metadata || {},
             visualProperties: config.visualProperties || {},
+            parallelExecution: config.parallelExecution || false,
+            actionNodes: config.actionNodes || [],
+            configuration: config.configuration || {},
             stageData: {
-              stageType: config.stageType || 'processing',
-              processingInstructions: config.processingInstructions || '',
-              outputFormat: config.outputFormat || 'json'
+              stageType: config.stageType || 'process',
+              completionCriteria: config.completionCriteria || {},
+              stageGoals: config.stageGoals || []
             }
-          }).value!;
-          break;
-        case 'kb':
-          node = KBNode.create({
-            nodeId,
-            modelId: modelId.value,
-            name: config.name,
-            description: config.description || '',
-            position,
-            dependencies: config.dependencies || [],
-            executionType: ExecutionMode.SEQUENTIAL,
-            status: NodeStatus.ACTIVE,
-            metadata: config.metadata || {},
-            visualProperties: config.visualProperties || {},
-            kbData: {
-              kbId: config.kbId || 'default-kb',
-              queryType: config.queryType || 'semantic',
-              embeddingModel: config.embeddingModel || 'text-embedding-ada-002'
-            }
-          }).value!;
+          });
+          if (stageNodeResult.isFailure) {
+            throw new Error(`Failed to create StageNode: ${stageNodeResult.error}`);
+          }
+          node = stageNodeResult.value;
           break;
       }
       
@@ -96,7 +103,7 @@ describe('Model Version Change Detection', () => {
       }
     });
 
-    return FunctionModel.create({
+    const modelResult = FunctionModel.create({
       modelId: modelId.value,
       name,
       version,
@@ -107,7 +114,11 @@ describe('Model Version Change Detection', () => {
       description: `Test model - ${modelName}`,
       metadata: {},
       permissions: {}
-    }).value!;
+    });
+    if (modelResult.isFailure) {
+      throw new Error(`Failed to create FunctionModel: ${modelResult.error}`);
+    }
+    return modelResult.value;
   };
 
   beforeEach(() => {
@@ -124,7 +135,7 @@ describe('Model Version Change Detection', () => {
       // Modified model with additional node
       const modifiedModel = createModelWithNodes('Modified Model', '1.0.0', [
         { type: 'io', name: 'Input Node', boundaryType: 'input', x: 100, y: 100 },
-        { type: 'stage', name: 'Processing Stage', stageType: 'processing', x: 300, y: 100 }
+        { type: 'stage', name: 'Processing Stage', stageType: 'process', x: 300, y: 100 }
       ]);
 
       // Act - Compare models
@@ -147,8 +158,8 @@ describe('Model Version Change Detection', () => {
       // Modified model with multiple additions
       const modifiedModel = createModelWithNodes('Enhanced Model', '1.0.0', [
         { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Processing', stageType: 'processing' },
-        { type: 'kb', name: 'Knowledge Query', kbId: 'kb-1' },
+        { type: 'stage', name: 'Processing', stageType: 'process' },
+        { type: 'io', name: 'Knowledge Query', boundaryType: 'input-output' },
         { type: 'io', name: 'Output', boundaryType: 'output' }
       ]);
 
@@ -171,11 +182,11 @@ describe('Model Version Change Detection', () => {
       ]);
 
       const modelWithStage = createModelWithNodes('Stage Model', '1.0.0', [
-        { type: 'stage', name: 'Data Processing', stageType: 'transformation' }
+        { type: 'stage', name: 'Data Processing', stageType: 'process' }
       ]);
 
       const modelWithKB = createModelWithNodes('KB Model', '1.0.0', [
-        { type: 'kb', name: 'Knowledge Lookup', kbId: 'primary-kb' }
+        { type: 'io', name: 'Knowledge Lookup', boundaryType: 'input-output' }
       ]);
 
       // Act - Compare different node type additions
@@ -195,7 +206,7 @@ describe('Model Version Change Detection', () => {
       // Arrange - Base model with multiple nodes
       const baseModel = createModelWithNodes('Full Model', '1.0.0', [
         { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Processing', stageType: 'processing' },
+        { type: 'stage', name: 'Processing', stageType: 'process' },
         { type: 'io', name: 'Output', boundaryType: 'output' }
       ]);
 
@@ -228,7 +239,7 @@ describe('Model Version Change Detection', () => {
         { 
           type: 'stage', 
           name: 'Critical Processing', 
-          stageType: 'critical',
+          stageType: 'checkpoint',
           dependencies: ['source-node'],
           x: 300, 
           y: 100 
@@ -433,18 +444,18 @@ describe('Model Version Change Detection', () => {
       // Arrange - Complex base model
       const baseModel = createModelWithNodes('Complex Base', '1.0.0', [
         { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Processing', stageType: 'transformation' },
-        { type: 'kb', name: 'Knowledge', kbId: 'kb-1' },
+        { type: 'stage', name: 'Processing', stageType: 'process' },
+        { type: 'io', name: 'Knowledge', boundaryType: 'input-output' },
         { type: 'io', name: 'Output', boundaryType: 'output' }
       ]);
 
       // Complex modified model with multiple change types
       const modifiedModel = createModelWithNodes('Complex Modified', '1.0.0', [
         { type: 'io', name: 'Enhanced Input', boundaryType: 'input' }, // Modified name
-        { type: 'stage', name: 'Advanced Processing', stageType: 'ml-processing' }, // Modified properties
+        { type: 'stage', name: 'Advanced Processing', stageType: 'process' }, // Modified properties
         // Knowledge node removed
         { type: 'io', name: 'Output', boundaryType: 'output' }, // Unchanged
-        { type: 'stage', name: 'New Analysis', stageType: 'analysis' } // Added
+        { type: 'stage', name: 'New Analysis', stageType: 'process' } // Added
       ]);
 
       // Act - Detect complex changes
@@ -465,17 +476,17 @@ describe('Model Version Change Detection', () => {
       // Arrange - Linear workflow structure
       const linearModel = createModelWithNodes('Linear Workflow', '1.0.0', [
         { type: 'io', name: 'Start', boundaryType: 'input', x: 100, y: 100 },
-        { type: 'stage', name: 'Step1', stageType: 'processing', x: 300, y: 100 },
-        { type: 'stage', name: 'Step2', stageType: 'processing', x: 500, y: 100 },
+        { type: 'stage', name: 'Step1', stageType: 'process', x: 300, y: 100 },
+        { type: 'stage', name: 'Step2', stageType: 'process', x: 500, y: 100 },
         { type: 'io', name: 'End', boundaryType: 'output', x: 700, y: 100 }
       ]);
 
       // Parallel workflow structure
       const parallelModel = createModelWithNodes('Parallel Workflow', '1.0.0', [
         { type: 'io', name: 'Start', boundaryType: 'input', x: 100, y: 100 },
-        { type: 'stage', name: 'Branch1', stageType: 'processing', x: 300, y: 50 },
-        { type: 'stage', name: 'Branch2', stageType: 'processing', x: 300, y: 150 },
-        { type: 'stage', name: 'Merge', stageType: 'aggregation', x: 500, y: 100 },
+        { type: 'stage', name: 'Branch1', stageType: 'process', x: 300, y: 50 },
+        { type: 'stage', name: 'Branch2', stageType: 'process', x: 300, y: 150 },
+        { type: 'stage', name: 'Merge', stageType: 'gateway', x: 500, y: 100 },
         { type: 'io', name: 'End', boundaryType: 'output', x: 700, y: 100 }
       ]);
 
@@ -497,7 +508,7 @@ describe('Model Version Change Detection', () => {
       const baseNodesConfig = Array.from({ length: 50 }, (_, i) => ({
         type: 'stage',
         name: `Stage ${i}`,
-        stageType: 'processing',
+        stageType: 'process',
         x: (i % 10) * 100,
         y: Math.floor(i / 10) * 100
       }));
@@ -505,7 +516,7 @@ describe('Model Version Change Detection', () => {
       const modifiedNodesConfig = Array.from({ length: 55 }, (_, i) => ({
         type: 'stage',
         name: `Stage ${i}`,
-        stageType: i < 50 ? 'processing' : 'new-processing', // Modified + added nodes
+        stageType: i < 50 ? 'process' : 'milestone', // Modified + added nodes
         x: (i % 10) * 100,
         y: Math.floor(i / 10) * 100
       }));
@@ -583,14 +594,14 @@ describe('Model Version Change Detection', () => {
       // Arrange - Model with breaking changes (removing critical outputs)
       const baseModel = createModelWithNodes('Stable API', '2.1.0', [
         { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Processing', stageType: 'processing' },
+        { type: 'stage', name: 'Processing', stageType: 'process' },
         { type: 'io', name: 'Critical Output', boundaryType: 'output' },
         { type: 'io', name: 'Optional Output', boundaryType: 'output' }
       ]);
 
       const breakingModel = createModelWithNodes('Breaking API', '2.1.0', [
         { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Enhanced Processing', stageType: 'advanced-processing' },
+        { type: 'stage', name: 'Enhanced Processing', stageType: 'process' },
         { type: 'io', name: 'Optional Output', boundaryType: 'output' }
         // Critical Output removed - BREAKING CHANGE
       ]);
@@ -610,15 +621,15 @@ describe('Model Version Change Detection', () => {
       // Arrange - Model with backward compatible additions
       const baseModel = createModelWithNodes('Base Feature Set', '1.5.0', [
         { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Core Processing', stageType: 'processing' },
+        { type: 'stage', name: 'Core Processing', stageType: 'process' },
         { type: 'io', name: 'Output', boundaryType: 'output' }
       ]);
 
       const enhancedModel = createModelWithNodes('Enhanced Features', '1.5.0', [
         { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Core Processing', stageType: 'processing' },
-        { type: 'stage', name: 'Optional Enhancement', stageType: 'enhancement' }, // Added
-        { type: 'kb', name: 'Additional Knowledge', kbId: 'enhancement-kb' }, // Added
+        { type: 'stage', name: 'Core Processing', stageType: 'process' },
+        { type: 'stage', name: 'Optional Enhancement', stageType: 'milestone' }, // Added
+        { type: 'io', name: 'Additional Knowledge', boundaryType: 'input-output' }, // Added
         { type: 'io', name: 'Output', boundaryType: 'output' }
       ]);
 

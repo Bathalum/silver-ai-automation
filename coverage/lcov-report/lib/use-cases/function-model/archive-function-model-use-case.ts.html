@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">6.55% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/122</span>
+                <span class='fraction'>8/122</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">10% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/10</span>
+                <span class='fraction'>1/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">6.61% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/121</span>
+                <span class='fraction'>8/121</span>
             </div>
         
             
@@ -381,12 +381,10 @@
 <a name='L316'></a><a href='#L316'>316</a>
 <a name='L317'></a><a href='#L317'>317</a>
 <a name='L318'></a><a href='#L318'>318</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -408,12 +406,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -698,10 +698,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { FunctionModel } from '../../domain/entities/function-model';
-import { ModelStatus } from <span class="cstat-no" title="statement not covered" >'../../domain/enums';</span>
-import { Result } from <span class="cstat-no" title="statement not covered" >'../../domain/shared/result';</span>
+import { ModelStatus } from '../../domain/enums';
+import { Result } from '../../domain/shared/result';
 import { ArchiveModelCommand } from '../commands/model-commands';
-import { ModelArchived } from <span class="cstat-no" title="statement not covered" >'../../domain/events/model-events';</span>
+import { ModelArchived } from '../../domain/events/model-events';
 import { NodeDependencyService } from '../../domain/services/node-dependency-service';
 import { CrossFeatureLinkingService } from '../../domain/services/cross-feature-linking-service';
 import { IFunctionModelRepository, IEventBus } from './create-function-model-use-case';
@@ -725,12 +725,12 @@ export interface ArchiveModelResult {
   };
 }
 &nbsp;
-export class <span class="cstat-no" title="statement not covered" >ArchiveFunctionModelUseCase {</span>
-<span class="fstat-no" title="function not covered" >  constructor(</span>
-    private <span class="cstat-no" title="statement not covered" >modelRepository: IFunctionModelRepository,</span>
-    private <span class="cstat-no" title="statement not covered" >eventBus: IEventBus,</span>
-    private <span class="cstat-no" title="statement not covered" >nodeDependencyService: NodeDependencyService,</span>
-    private <span class="cstat-no" title="statement not covered" >crossFeatureLinkingService: CrossFeatureLinkingService</span>
+export class ArchiveFunctionModelUseCase {
+  constructor(
+    private modelRepository: IFunctionModelRepository,
+    private eventBus: IEventBus,
+    private nodeDependencyService: NodeDependencyService,
+    private crossFeatureLinkingService: CrossFeatureLinkingService
   ) {}
 &nbsp;
 <span class="fstat-no" title="function not covered" >  async e</span>xecute(command: ArchiveModelCommand): Promise&lt;Result&lt;ArchiveModelResult&gt;&gt; {
@@ -1021,7 +1021,7 @@ export class <span class="cstat-no" title="statement not covered" >ArchiveFuncti
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-27T00:35:44.758Z
+                at 2025-08-27T23:41:37.864Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

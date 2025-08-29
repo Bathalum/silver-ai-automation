@@ -20,12 +20,20 @@
       "mcp__ide__executeCode",
       "Bash(npm run build:*)",
       "Bash(sed:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation\\tests\\unit\\domain/**)",
+      "Bash(cat:*)",
+      "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation/**)",
+      "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation/**)",
+      "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation/**)",
+      "Bash(timeout 120 pnpm test)"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": [
-      "C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects"
+      "C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects",
+      "C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation",
+      "C:\\c\\Users\\alant\\OneDrive"
     ]
   }
 }

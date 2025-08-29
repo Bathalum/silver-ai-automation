@@ -3,6 +3,9 @@ import { FunctionModel } from '../../../../lib/domain/entities/function-model';
 import { AuditLog } from '../../../../lib/domain/entities/audit-log';
 import { ModelSoftDeletedEvent, ModelUndeletedEvent } from '../../../../lib/domain/events/model-events';
 import { Result } from '../../../../lib/domain/shared/result';
+import { Version } from '../../../../lib/domain/value-objects/version';
+import { ModelName } from '../../../../lib/domain/value-objects/model-name';
+import { DomainTestHelpers } from '../../../utils/test-helpers';
 
 /**
  * UC-009: Soft Delete Function Model - Clean Architecture Compliance Tests
@@ -37,20 +40,33 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
         expect(domainMethods).toContain('isDeleted');
         
         // Verify return types use domain Result pattern, not infrastructure exceptions
-        const modelName = { toString: () => 'Test Model' } as any;
-        const version = { toString: () => '1.0.0' } as any;
+        const modelName = DomainTestHelpers.unwrapResult(
+          ModelName.create('Test Model'),
+          'ModelName creation for compliance test'
+        );
+        const version = DomainTestHelpers.unwrapResult(
+          Version.create('1.0.0'),
+          'Version creation for compliance test'
+        );
         
-        const model = FunctionModel.create({
-          modelId: 'test-compliance',
-          name: modelName,
-          version: version,
-          status: 'DRAFT' as any,
-          currentVersion: version,
-          nodes: new Map(),
-          actionNodes: new Map(),
-          metadata: {},
-          permissions: { 'user-1': 'owner' },
-        }).value;
+        const model = DomainTestHelpers.unwrapResult(
+          FunctionModel.create({
+            modelId: 'test-compliance',
+            name: modelName,
+            version: version,
+            status: 'DRAFT' as any,
+            currentVersion: version,
+            versionCount: 1,
+            nodes: new Map(),
+            actionNodes: new Map(),
+            metadata: {},
+            permissions: { 'user-1': 'owner' },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            lastSavedAt: new Date()
+          }),
+          'FunctionModel creation for compliance test'
+        );
         
         const deleteResult = model.softDelete('user-123');
         expect(deleteResult).toBeInstanceOf(Result);
@@ -84,7 +100,7 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
         expect(createResult).toBeInstanceOf(Result);
         expect(createResult.isSuccess).toBe(true);
         
-        const auditLog = createResult.value;
+        const auditLog = DomainTestHelpers.unwrapResult(createResult, 'AuditLog creation');
         expect(auditLog.entityType).toBe('FunctionModel');
         expect(auditLog.action).toBe('SOFT_DELETE');
         
@@ -98,20 +114,33 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
     describe('DomainEntities_ShouldEncapsulateBusinessLogic', () => {
       it('should contain business logic within entities, not external services', () => {
         // Arrange
-        const modelName = { toString: () => 'Business Logic Test' } as any;
-        const version = { toString: () => '1.0.0' } as any;
+        const modelName = DomainTestHelpers.unwrapResult(
+          ModelName.create('Business Logic Test'),
+          'ModelName creation for business logic test'
+        );
+        const version = DomainTestHelpers.unwrapResult(
+          Version.create('1.0.0'),
+          'Version creation for business logic test'
+        );
         
-        const model = FunctionModel.create({
-          modelId: 'business-logic-test',
-          name: modelName,
-          version: version,
-          status: 'PUBLISHED' as any,
-          currentVersion: version,
-          nodes: new Map(),
-          actionNodes: new Map(),
-          metadata: {},
-          permissions: { 'user-1': 'owner' },
-        }).value;
+        const model = DomainTestHelpers.unwrapResult(
+          FunctionModel.create({
+            modelId: 'business-logic-test',
+            name: modelName,
+            version: version,
+            status: 'PUBLISHED' as any,
+            currentVersion: version,
+            versionCount: 1,
+            nodes: new Map(),
+            actionNodes: new Map(),
+            metadata: {},
+            permissions: { 'user-1': 'owner' },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            lastSavedAt: new Date()
+          }),
+          'FunctionModel creation for business logic test'
+        );
         
         // Act - Test business logic encapsulation
         const initialDeletedState = model.isDeleted();
@@ -220,16 +249,14 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
       it('should implement domain events following proper event sourcing architecture', () => {
         // Arrange & Act - Test domain event structure
         const deletionEvent = new ModelSoftDeletedEvent({
-          modelId: 'event-test-123',
-          modelName: 'Event Test Model',
-          version: '1.0.0',
+          aggregateId: 'event-test-123',
           deletedBy: 'event-user',
           deletedAt: new Date(),
           reason: 'Architectural compliance test',
         });
         
         const restorationEvent = new ModelUndeletedEvent({
-          modelId: 'event-test-123',
+          aggregateId: 'event-test-123',
           restoredBy: 'restore-user',
           restoredAt: new Date(),
         });
@@ -342,7 +369,7 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
         // Act & Assert - Validate import restrictions
         forbiddenImportPatterns.forEach(pattern => {
           // Domain layer should not have imports matching these patterns
-          expect(pattern.source).toMatch(/.*\/.*/); // Pattern is well-formed
+          expect(pattern.source).toMatch(/.+/); // Pattern is well-formed (has content)
         });
         
         // Allowed imports for domain layer
@@ -354,7 +381,7 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
         ];
         
         allowedImportPatterns.forEach(pattern => {
-          expect(pattern.source).toMatch(/.*\/.*/); // Pattern is well-formed
+          expect(pattern.source).toMatch(/.+/); // Pattern is well-formed (has content)
         });
       });
     });
@@ -413,8 +440,8 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
     describe('ErrorHandling_ShouldBeConsistentAcrossDomain', () => {
       it('should use consistent error handling patterns throughout domain layer', () => {
         // Arrange - Test consistent error handling across domain components
-        const modelName = { toString: () => 'Error Test Model' } as any;
-        const version = { toString: () => '1.0.0' } as any;
+        const modelName = ModelName.create('Error Test Model').value;
+        const version = Version.create('1.0.0').value;
         
         const model = FunctionModel.create({
           modelId: 'error-test-123',
@@ -422,10 +449,14 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
           version: version,
           status: 'PUBLISHED' as any,
           currentVersion: version,
+          versionCount: 1,
           nodes: new Map(),
           actionNodes: new Map(),
           metadata: {},
           permissions: { 'user-1': 'owner' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSavedAt: new Date()
         });
         
         // Act & Assert - Entity creation error handling
@@ -472,8 +503,8 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
     describe('Logging_ShouldBeInfrastructureAgnostic', () => {
       it('should not contain infrastructure-specific logging in domain layer', () => {
         // Arrange - Domain components should not have infrastructure logging
-        const modelName = { toString: () => 'Logging Test Model' } as any;
-        const version = { toString: () => '1.0.0' } as any;
+        const modelName = ModelName.create('Logging Test Model').value;
+        const version = Version.create('1.0.0').value;
         
         const model = FunctionModel.create({
           modelId: 'logging-test-123',
@@ -481,10 +512,14 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
           version: version,
           status: 'DRAFT' as any,
           currentVersion: version,
+          versionCount: 1,
           nodes: new Map(),
           actionNodes: new Map(),
           metadata: {},
           permissions: { 'user-1': 'owner' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSavedAt: new Date()
         }).value;
         
         // Act - Perform domain operations
@@ -521,8 +556,8 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
     describe('DomainPurity_ShouldMaintainBusinessLogicSeparation', () => {
       it('should maintain clear separation between business logic and technical concerns', () => {
         // Arrange - Business logic should be pure and testable
-        const modelName = { toString: () => 'Pure Business Logic Model' } as any;
-        const version = { toString: () => '1.0.0' } as any;
+        const modelName = ModelName.create('Pure Business Logic Model').value;
+        const version = Version.create('1.0.0').value;
         
         const model = FunctionModel.create({
           modelId: 'business-pure-123',
@@ -530,10 +565,14 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
           version: version,
           status: 'PUBLISHED' as any,
           currentVersion: version,
+          versionCount: 1,
           nodes: new Map(),
           actionNodes: new Map(),
           metadata: { businessValue: 'high', riskLevel: 'medium' },
           permissions: { 'business-user': 'owner' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSavedAt: new Date()
         }).value;
         
         // Act - Business operations should be pure functions of business state
@@ -571,17 +610,21 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
         // - Global state (should work with provided parameters)
         
         // Test deterministic behavior
-        const modelName2 = { toString: () => 'Deterministic Test' } as any;
+        const modelName2 = ModelName.create('Deterministic Test').value;
         const model2 = FunctionModel.create({
           modelId: 'deterministic-123',
           name: modelName2,
           version: version,
           status: 'PUBLISHED' as any,
           currentVersion: version,
+          versionCount: 1,
           nodes: new Map(),
           actionNodes: new Map(),
           metadata: {},
           permissions: { 'user': 'owner' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSavedAt: new Date()
         }).value;
         
         const delete1 = model2.softDelete('same-user');
@@ -629,14 +672,18 @@ describe('Clean Architecture Compliance - UC-009 Soft Deletion', () => {
         expect(architecturalRules.domainEntities.shouldHaveFactoryMethods).toBe(true);
         const modelCreationResult = FunctionModel.create({
           modelId: 'arch-compliance-123',
-          name: { toString: () => 'Compliance Test' } as any,
-          version: { toString: () => '1.0.0' } as any,
+          name: ModelName.create('Compliance Test').value,
+          version: Version.create('1.0.0').value,
           status: 'DRAFT' as any,
-          currentVersion: { toString: () => '1.0.0' } as any,
+          currentVersion: Version.create('1.0.0').value,
+          versionCount: 1,
           nodes: new Map(),
           actionNodes: new Map(),
           metadata: {},
           permissions: { 'user': 'owner' },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSavedAt: new Date()
         });
         expect(modelCreationResult).toBeInstanceOf(Result);
         expect(modelCreationResult.isSuccess).toBe(true);

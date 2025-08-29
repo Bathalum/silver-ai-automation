@@ -39,4 +39,26 @@ export abstract class DomainEvent {
       eventData: this.getEventData(),
     };
   }
+
+  public toJSON(): Record<string, any> {
+    const eventData = this.getEventData();
+    const result: Record<string, any> = {
+      eventId: this.eventId,
+      eventType: this.getEventName(),
+      aggregateId: this.aggregateId,
+      eventVersion: this.eventVersion,
+      occurredAt: this.occurredAt.toISOString(),
+    };
+
+    // Convert all Date objects in eventData to ISO strings for JSON serialization
+    Object.entries(eventData).forEach(([key, value]) => {
+      if (value instanceof Date) {
+        result[key] = value.toISOString();
+      } else {
+        result[key] = value;
+      }
+    });
+
+    return result;
+  }
 }

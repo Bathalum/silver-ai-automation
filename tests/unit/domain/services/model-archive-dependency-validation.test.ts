@@ -34,10 +34,14 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test input node',
         position: positionResult.value,
         dependencies: [],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         ioData: {
           boundaryType: 'input',
-          dataType: 'text',
-          required: true
+          inputDataContract: { type: 'text' },
+          dataValidationRules: { required: true }
         }
       });
 
@@ -48,10 +52,17 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test processing stage',
         position: positionResult.value,
         dependencies: [nodeAId], // B depends on A
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         stageData: {
-          stageType: 'processing',
-          priority: 5
-        }
+          stageType: 'process',
+          completionCriteria: { priority: 5 }
+        },
+        parallelExecution: false,
+        actionNodes: [],
+        configuration: {}
       });
 
       const nodeC = IONode.create({
@@ -61,10 +72,14 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test output node',
         position: positionResult.value,
         dependencies: [nodeBId], // C depends on B
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         ioData: {
           boundaryType: 'output',
-          dataType: 'json',
-          required: true
+          outputDataContract: { type: 'json' },
+          dataValidationRules: { required: true }
         }
       });
 
@@ -98,10 +113,17 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test stage A',
         position: positionResult.value,
         dependencies: [nodeBId], // A depends on B
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         stageData: {
-          stageType: 'processing',
-          priority: 5
-        }
+          stageType: 'process',
+          completionCriteria: { priority: 5 }
+        },
+        parallelExecution: false,
+        actionNodes: [],
+        configuration: {}
       });
 
       const nodeB = StageNode.create({
@@ -111,10 +133,17 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test stage B',
         position: positionResult.value,
         dependencies: [nodeAId], // B depends on A - CIRCULAR!
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         stageData: {
-          stageType: 'processing',
-          priority: 5
-        }
+          stageType: 'process',
+          completionCriteria: { priority: 5 }
+        },
+        parallelExecution: false,
+        actionNodes: [],
+        configuration: {}
       });
 
       expect(nodeA.isSuccess).toBe(true);
@@ -128,9 +157,7 @@ describe('Archive Dependency Validation Services', () => {
       // Assert
       expect(validationResult.isSuccess).toBe(true);
       expect(validationResult.value.isValid).toBe(false);
-      expect(validationResult.value.errors).toContain(
-        expect.stringContaining('Circular dependency detected')
-      );
+      expect(validationResult.value.errors.some(error => error.includes('Circular dependency detected'))).toBe(true);
     });
 
     it('should calculate execution order for safe archival documentation', () => {
@@ -149,10 +176,14 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test input',
         position: positionResult.value,
         dependencies: [],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         ioData: {
           boundaryType: 'input',
-          dataType: 'text',
-          required: true
+          inputDataContract: { type: 'text' },
+          dataValidationRules: { required: true }
         }
       });
 
@@ -163,10 +194,17 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test processing',
         position: positionResult.value,
         dependencies: [nodeAId],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         stageData: {
-          stageType: 'processing',
-          priority: 5
-        }
+          stageType: 'process',
+          completionCriteria: { priority: 5 }
+        },
+        parallelExecution: false,
+        actionNodes: [],
+        configuration: {}
       });
 
       const nodeC = IONode.create({
@@ -176,10 +214,14 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test output',
         position: positionResult.value,
         dependencies: [nodeBId],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         ioData: {
           boundaryType: 'output',
-          dataType: 'json',
-          required: true
+          outputDataContract: { type: 'json' },
+          dataValidationRules: { required: true }
         }
       });
 
@@ -221,10 +263,14 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test input',
         position: positionResult.value,
         dependencies: [],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         ioData: {
           boundaryType: 'input',
-          dataType: 'text',
-          required: true
+          inputDataContract: { type: 'text' },
+          dataValidationRules: { required: true }
         }
       });
 
@@ -235,10 +281,17 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Test stage',
         position: positionResult.value,
         dependencies: [nodeAId],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         stageData: {
-          stageType: 'processing',
-          priority: 5
-        }
+          stageType: 'process',
+          completionCriteria: { priority: 5 }
+        },
+        parallelExecution: false,
+        actionNodes: [],
+        configuration: {}
       });
 
       expect(nodeA.isSuccess).toBe(true);
@@ -272,10 +325,14 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Connected input',
         position: positionResult.value,
         dependencies: [],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         ioData: {
           boundaryType: 'input',
-          dataType: 'text',
-          required: true
+          inputDataContract: { type: 'text' },
+          dataValidationRules: { required: true }
         }
       });
 
@@ -286,10 +343,14 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Connected output',
         position: positionResult.value,
         dependencies: [nodeAId],
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         ioData: {
           boundaryType: 'output',
-          dataType: 'json',
-          required: true
+          outputDataContract: { type: 'json' },
+          dataValidationRules: { required: true }
         }
       });
 
@@ -300,10 +361,17 @@ describe('Archive Dependency Validation Services', () => {
         description: 'Disconnected stage',
         position: positionResult.value,
         dependencies: [], // No dependencies and no dependents
+        executionType: 'sequential' as any,
+        status: 'configured' as any,
+        metadata: {},
+        visualProperties: {},
         stageData: {
-          stageType: 'processing',
-          priority: 5
-        }
+          stageType: 'process',
+          completionCriteria: { priority: 5 }
+        },
+        parallelExecution: false,
+        actionNodes: [],
+        configuration: {}
       });
 
       expect(nodeA.isSuccess).toBe(true);

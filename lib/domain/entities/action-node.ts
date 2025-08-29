@@ -29,6 +29,18 @@ export abstract class ActionNode {
     return this.props.actionId;
   }
 
+  public get nodeId(): NodeId {
+    return this.props.actionId;
+  }
+
+  public get id(): string {
+    return this.props.actionId.toString();
+  }
+
+  public get type(): string {
+    return this.getActionType();
+  }
+
   public get parentNodeId(): NodeId {
     return this.props.parentNodeId;
   }
