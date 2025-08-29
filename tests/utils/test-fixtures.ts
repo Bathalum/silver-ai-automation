@@ -82,7 +82,7 @@ import { CreateModelCommand } from '@/lib/use-cases/commands';
  * Builder pattern for creating test FunctionModel instances
  */
 export class FunctionModelBuilder {
-  private modelId = crypto.randomUUID();
+  private modelId = getTestUUID('model-' + Date.now());
   private name = 'Test Function Model';
   private description = 'A test function model for unit testing';
   private version = '1.0.0';
@@ -166,8 +166,8 @@ export class FunctionModelBuilder {
  * Builder for creating test IONode instances
  */
 export class IONodeBuilder {
-  private nodeId = crypto.randomUUID();
-  private modelId = crypto.randomUUID();
+  private nodeId = getTestUUID('default-io-node');
+  private modelId = getTestUUID('default-model');
   private name = 'Test IO Node';
   private description = 'A test IO node';
   private position = { x: 100, y: 200 };
@@ -276,8 +276,8 @@ export class IONodeBuilder {
  * Builder for creating test StageNode instances
  */
 export class StageNodeBuilder {
-  private nodeId = crypto.randomUUID();
-  private modelId = crypto.randomUUID();
+  private nodeId = getTestUUID('default-stage-node');
+  private modelId = getTestUUID('default-model');
   private name = 'Test Stage Node';
   private description = 'A test stage node';
   private position = { x: 300, y: 200 };
@@ -399,9 +399,9 @@ export class StageNodeBuilder {
  * Builder for creating test TetherNode instances
  */
 export class TetherNodeBuilder {
-  private actionId = crypto.randomUUID();
-  private parentNodeId = crypto.randomUUID();
-  private modelId = crypto.randomUUID();
+  private actionId = getTestUUID('action-' + Date.now());
+  private parentNodeId = getTestUUID('parent-' + Date.now());
+  private modelId = getTestUUID('model-' + Date.now());
   private name = 'Test Tether Action';
   private description = 'A test tether action';
   private executionMode = ExecutionMode.SEQUENTIAL;
@@ -526,9 +526,9 @@ export class TetherNodeBuilder {
  * Builder for creating test KBNode instances
  */
 export class KBNodeBuilder {
-  private actionId = crypto.randomUUID();
-  private parentNodeId = crypto.randomUUID();
-  private modelId = crypto.randomUUID();
+  private actionId = getTestUUID('kb-action-' + Date.now());
+  private parentNodeId = getTestUUID('kb-parent-' + Date.now());
+  private modelId = getTestUUID('model-' + Date.now());
   private name = 'Test KB Action';
   private description = 'A test knowledge base action';
   private executionMode = ExecutionMode.SEQUENTIAL;
@@ -635,9 +635,9 @@ export class KBNodeBuilder {
  * Builder for creating test FunctionModelContainerNode instances
  */
 export class FunctionModelContainerNodeBuilder {
-  private actionId = crypto.randomUUID();
-  private parentNodeId = crypto.randomUUID();
-  private modelId = crypto.randomUUID();
+  private actionId = getTestUUID('container-action-' + Date.now());
+  private parentNodeId = getTestUUID('container-parent-' + Date.now());
+  private modelId = getTestUUID('model-' + Date.now());
   private name = 'Test Function Model Container Action';
   private description = 'A test function model container action';
   private executionMode = ExecutionMode.SEQUENTIAL;
@@ -646,7 +646,7 @@ export class FunctionModelContainerNodeBuilder {
   private estimatedDuration = 600;
   private status = ActionStatus.ACTIVE;
   private retryPolicy?: RetryPolicy;
-  private nestedModelId = crypto.randomUUID();
+  private nestedModelId = getTestUUID('nested-model-' + Date.now());
   private configuration?: any = {
     nestedModelId: this.nestedModelId,
     contextMapping: {
@@ -862,6 +862,7 @@ export const TestFactories = {
     
     // Add input node
     const inputNode = new IONodeBuilder()
+      .withId('input-node')
       .withModelId(model.modelId)
       .withName('Input')
       .withPosition(100, 200)
@@ -870,6 +871,7 @@ export const TestFactories = {
     
     // Add stage node with dependencies
     const stageNode = new StageNodeBuilder()
+      .withId('stage-node')
       .withModelId(model.modelId)
       .withName('Process')
       .withPosition(300, 200)
@@ -877,6 +879,7 @@ export const TestFactories = {
     
     // Add output node with dependencies
     const outputNode = new IONodeBuilder()
+      .withId('output-node')
       .withModelId(model.modelId)
       .withName('Output')
       .withPosition(500, 200)
