@@ -9,8 +9,8 @@ import { AddContainerNodeCommand } from '../commands/node-commands';
 
 export interface IFunctionModelRepository {
   save(model: FunctionModel): Promise<Result<void>>;
-  findById(id: string): Promise<Result<FunctionModel>>;
-  findByName(name: string, organizationId?: string): Promise<Result<FunctionModel>>;
+  findById(id: string): Promise<Result<FunctionModel | null>>;
+  findByName(name: string, organizationId?: string): Promise<Result<FunctionModel | null>>;
   delete(id: string): Promise<Result<void>>;
   findAll(filter?: ModelFilter): Promise<Result<FunctionModel[]>>;
 }
@@ -63,6 +63,10 @@ export class AddContainerNodeUseCase {
       const modelResult = await this.modelRepository.findById(command.modelId);
       if (modelResult.isFailure) {
         return Result.fail<AddContainerNodeResult>(modelResult.error);
+      }
+
+      if (!modelResult.value) {
+        return Result.fail<AddContainerNodeResult>('Function model not found');
       }
 
       const model = modelResult.value;

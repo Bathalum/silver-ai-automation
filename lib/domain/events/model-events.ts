@@ -490,7 +490,6 @@ export class ModelRestoredEvent extends DomainEvent {
 }
 
 export class ModelVersionCreated extends DomainEvent {
-  public readonly eventType = 'ModelVersionCreated';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ModelVersionCreatedData) {
@@ -499,7 +498,7 @@ export class ModelVersionCreated extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ModelVersionCreated';
   }
 
   public getEventData(): Record<string, any> {

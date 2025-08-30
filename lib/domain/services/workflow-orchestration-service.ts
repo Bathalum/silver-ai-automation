@@ -441,7 +441,7 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
     
     return {
       nestedModelId: node.containerData.nestedModelId,
-      extractedOutputs: node.containerData.outputExtraction.extractedOutputs,
+      extractedOutputs: node.containerData.outputExtraction?.extractedOutputs || {},
       result: 'Nested function model completed successfully'
     };
   }

@@ -168,8 +168,8 @@ export class KBNode extends ActionNode {
 
   public updateAccessPermissions(permissions: { view: string[]; edit: string[] }): Result<void> {
     // Clean up permissions
-    const cleanView = [...new Set(permissions.view.filter(u => u.trim()))];
-    const cleanEdit = [...new Set(permissions.edit.filter(u => u.trim()))];
+    const cleanView = Array.from(new Set(permissions.view.filter(u => u.trim())));
+    const cleanEdit = Array.from(new Set(permissions.edit.filter(u => u.trim())));
 
     // Validate that edit users have view permissions
     const missingViewPermissions = cleanEdit.filter(user => !cleanView.includes(user));

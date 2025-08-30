@@ -426,12 +426,24 @@ export class ModelRecoveryService {
         }
       }
 
-      // Handle version conflicts if needed
+      // Handle version conflicts if needed and create recovery version
       let versioningActions: RecoveryResult['versioningActions'] = {
         newVersionCreated: false,
         version: model.version.toString(),
         versionReason: 'No version changes required',
       };
+
+      // Create a new version for model recovery (restoration version)
+      const recoveryVersionResult = await this.versioningService.createRestorationVersion(model, {
+        reason: 'Model recovery restoration'
+      });
+      if (recoveryVersionResult.isSuccess) {
+        versioningActions = {
+          newVersionCreated: true,
+          version: recoveryVersionResult.value.newVersion,
+          versionReason: 'Model recovery restoration',
+        };
+      }
 
       if (plan.resolveVersionConflicts) {
         // First check for version compatibility to detect conflicts

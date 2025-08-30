@@ -66,7 +66,7 @@ export class ContainerScope {
    */
   async dispose(): Promise<void> {
     // Dispose all disposable scoped instances
-    for (const instance of this.scopedInstances.values()) {
+    for (const instance of Array.from(this.scopedInstances.values())) {
       if (instance && typeof instance.dispose === 'function') {
         try {
           await instance.dispose();
@@ -231,7 +231,7 @@ export class Container {
    */
   async dispose(): Promise<void> {
     // Dispose all disposable singleton instances
-    for (const instance of this.singletonInstances.values()) {
+    for (const instance of Array.from(this.singletonInstances.values())) {
       if (instance && typeof instance.dispose === 'function') {
         try {
           await instance.dispose();

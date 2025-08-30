@@ -26,7 +26,9 @@
       "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation/**)",
       "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation/**)",
       "Read(/C:\\c\\Users\\alant\\OneDrive\\Desktop\\Projects\\silver-ai-automation/**)",
-      "Bash(timeout 120 pnpm test)"
+      "Bash(timeout 120 pnpm test)",
+      "Bash(pnpm run:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": [],

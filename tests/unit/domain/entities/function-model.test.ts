@@ -11,7 +11,8 @@ import {
   StageNodeBuilder, 
   TetherNodeBuilder,
   TestData,
-  TestFactories 
+  TestFactories,
+  getTestUUID
 } from '../../../utils/test-fixtures';
 import { ResultTestHelpers, DateTestHelpers, UuidTestHelpers } from '../../../utils/test-helpers';
 
@@ -570,6 +571,7 @@ describe('FunctionModel', () => {
       // Add some actions
       const stageNode = Array.from(model.nodes.values())[1]; // Get stage node
       const tetherAction = new TetherNodeBuilder()
+        .withId(getTestUUID('stats-tether-' + Date.now()))
         .withParentNode(stageNode.nodeId.toString())
         .withModelId(model.modelId)
         .build();

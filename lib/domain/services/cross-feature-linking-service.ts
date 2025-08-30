@@ -227,7 +227,7 @@ export class CrossFeatureLinkingService {
     };
 
     // Check all nodes for cycles
-    for (const nodeId of adjacencyList.keys()) {
+    for (const nodeId of Array.from(adjacencyList.keys())) {
       if (!visited.has(nodeId)) {
         detectCycles(nodeId);
       }
@@ -289,10 +289,10 @@ export class CrossFeatureLinkingService {
   /**
    * Get all links for a specific feature
    */
-  public getFeatureLinks(featureType: FeatureType): NodeLink[] | CrossFeatureLink[] {
+  public getFeatureLinks(featureType: FeatureType): (NodeLink | CrossFeatureLink)[] {
     const links: (NodeLink | CrossFeatureLink)[] = [];
 
-    for (const link of this.linkRegistry.values()) {
+    for (const link of Array.from(this.linkRegistry.values())) {
       if (link instanceof CrossFeatureLink) {
         if (link.sourceFeature === featureType || link.targetFeature === featureType) {
           links.push(link);
@@ -421,7 +421,7 @@ export class CrossFeatureLinkingService {
 
   private countLinksForFeature(featureType: FeatureType): number {
     let count = 0;
-    for (const link of this.linkRegistry.values()) {
+    for (const link of Array.from(this.linkRegistry.values())) {
       if (link instanceof CrossFeatureLink || link instanceof NodeLink) {
         if (link.sourceFeature === featureType || link.targetFeature === featureType) {
           count++;
@@ -434,7 +434,7 @@ export class CrossFeatureLinkingService {
   private buildAdjacencyList(): Map<string, Array<{targetId: string, linkType: LinkType}>> {
     const adjacencyList = new Map<string, Array<{targetId: string, linkType: LinkType}>>();
 
-    for (const link of this.linkRegistry.values()) {
+    for (const link of Array.from(this.linkRegistry.values())) {
       let sourceId: string;
       let targetId: string;
 
@@ -516,7 +516,7 @@ export class CrossFeatureLinkingService {
     targetId: string,
     linkType: LinkType
   ): NodeLink | CrossFeatureLink | null {
-    for (const link of this.linkRegistry.values()) {
+    for (const link of Array.from(this.linkRegistry.values())) {
       if (link instanceof CrossFeatureLink) {
         if (link.sourceFeature === sourceFeature &&
             link.targetFeature === targetFeature &&

@@ -244,19 +244,25 @@ export class WorkflowValidationRules {
       }
 
       // Validate output extraction
-      const extractedOutputs = containerNode.containerData.outputExtraction.extractedOutputs;
-      if (extractedOutputs.length === 0) {
-        warnings.push(`Container node "${containerNode.name}" extracts no outputs from nested model`);
+      if (containerNode.containerData.outputExtraction && 
+          containerNode.containerData.outputExtraction.extractedOutputs) {
+        const extractedOutputs = containerNode.containerData.outputExtraction.extractedOutputs;
+        if (extractedOutputs.length === 0) {
+          warnings.push(`Container node "${containerNode.name}" extracts no outputs from nested model`);
+        }
       }
 
       // Validate context inheritance
-      const inheritedContexts = containerNode.containerData.contextInheritance.inheritedContexts;
-      const duplicateContexts = inheritedContexts.filter((context, index) => 
-        inheritedContexts.indexOf(context) !== index
-      );
-      
-      if (duplicateContexts.length > 0) {
-        errors.push(`Container node "${containerNode.name}" has duplicate inherited contexts: ${duplicateContexts.join(', ')}`);
+      if (containerNode.containerData.contextInheritance && 
+          containerNode.containerData.contextInheritance.inheritedContexts) {
+        const inheritedContexts = containerNode.containerData.contextInheritance.inheritedContexts;
+        const duplicateContexts = inheritedContexts.filter((context, index) => 
+          inheritedContexts.indexOf(context) !== index
+        );
+        
+        if (duplicateContexts.length > 0) {
+          errors.push(`Container node "${containerNode.name}" has duplicate inherited contexts: ${duplicateContexts.join(', ')}`);
+        }
       }
     }
 

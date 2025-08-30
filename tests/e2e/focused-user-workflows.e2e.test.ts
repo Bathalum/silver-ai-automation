@@ -329,7 +329,55 @@ describe('Focused User Workflows - E2E Test Suite', () => {
     addActionUseCase = new AddActionNodeToContainerUseCase(mockModelRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockModelRepository, mockEventBus);
     executeModelUseCase = new ExecuteFunctionModelUseCase(mockModelRepository, mockEventBus);
-    validateWorkflowUseCase = new ValidateWorkflowStructureUseCase(mockModelRepository);
+    // Mock validation services
+    const mockWorkflowValidationService = {
+      validateStructuralIntegrity: jest.fn().mockResolvedValue(Result.ok({
+        isValid: true,
+        errors: [],
+        warnings: []
+      }))
+    };
+    
+    const mockBusinessRuleValidationService = {
+      validateBusinessRules: jest.fn().mockResolvedValue(Result.ok({
+        isValid: true,
+        errors: [],
+        warnings: []
+      }))
+    };
+    
+    const mockExecutionReadinessService = {
+      validateExecutionReadiness: jest.fn().mockResolvedValue(Result.ok({
+        isValid: true,
+        errors: [],
+        warnings: []
+      }))
+    };
+    
+    const mockContextValidationService = {
+      validateContextIntegrity: jest.fn().mockResolvedValue(Result.ok({
+        isValid: true,
+        errors: [],
+        warnings: []
+      }))
+    };
+    
+    const mockCrossFeatureValidationService = {
+      validateCrossFeatureDependencies: jest.fn().mockResolvedValue(Result.ok({
+        isValid: true,
+        errors: [],
+        warnings: []
+      }))
+    };
+    
+    validateWorkflowUseCase = new ValidateWorkflowStructureUseCase(
+      mockModelRepository,
+      mockWorkflowValidationService,
+      mockBusinessRuleValidationService,
+      mockExecutionReadinessService,
+      mockContextValidationService,
+      mockCrossFeatureValidationService
+    );
     createVersionUseCase = new CreateModelVersionUseCase(mockModelRepository, mockEventBus);
   });
 
@@ -462,7 +510,8 @@ describe('Focused User Workflows - E2E Test Suite', () => {
           modelId: nonExistentModelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Invalid Container',
-          userId: testUserId
+          userId: testUserId,
+          position: { x: 100, y: 100 }
         });
 
         expect(addContainerResult.isFailure).toBe(true);
@@ -512,9 +561,8 @@ describe('Focused User Workflows - E2E Test Suite', () => {
         // Try to create a version
         const versionResult = await createVersionUseCase.execute({
           modelId,
-          userId: testUserId,
-          versionType: 'minor',
-          versionNotes: 'E2E test version increment'
+          authorId: testUserId,
+          versionType: 'minor'
         });
 
         // Check if versioning is implemented
@@ -557,10 +605,10 @@ describe('Focused User Workflows - E2E Test Suite', () => {
 
         if (validateResult.isSuccess) {
           // Empty model should likely fail validation
-          expect(validateResult.value.isValid).toBeDefined();
+          expect(validateResult.value.overallValid).toBeDefined();
           
-          if (!validateResult.value.isValid) {
-            expect(validateResult.value.validationErrors).toBeDefined();
+          if (!validateResult.value.overallValid) {
+            expect(validateResult.value.totalErrors).toBeGreaterThan(0);
             console.log('✅ Workflow validation correctly identifies invalid structures');
           } else {
             console.log('ℹ️ Workflow validation passed for empty model (may be expected)');

@@ -21,11 +21,11 @@ export interface AuditLogProps {
 export class AuditLog {
   private constructor(private props: AuditLogProps) {}
 
-  public static create(props: Omit<AuditLogProps, 'changedAt' | 'timestamp'>): Result<AuditLog> {
+  public static create(props: Omit<AuditLogProps, 'changedAt'> & Partial<Pick<AuditLogProps, 'timestamp'>>): Result<AuditLog> {
     const now = new Date();
     const auditProps: AuditLogProps = {
       ...props,
-      changedAt: props.changedAt || now,
+      changedAt: now,
       timestamp: props.timestamp || now,
     };
 
@@ -42,15 +42,15 @@ export class AuditLog {
   }
 
   public get tableName(): string {
-    return this.props.tableName;
+    return this.props.tableName || this.props.entityType || '';
   }
 
-  public get operation(): 'create' | 'update' | 'delete' {
-    return this.props.operation;
+  public get operation(): string {
+    return this.props.operation || this.props.action || '';
   }
 
   public get recordId(): string {
-    return this.props.recordId;
+    return this.props.recordId || this.props.entityId || '';
   }
 
   public get oldData(): any {
@@ -62,7 +62,7 @@ export class AuditLog {
   }
 
   public get changedBy(): string {
-    return this.props.changedBy;
+    return this.props.changedBy || this.props.userId || '';
   }
 
   public get changedAt(): Date {

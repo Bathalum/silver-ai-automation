@@ -235,12 +235,12 @@ export class NodeBusinessRules {
         errors.push(`Tether node "${actionNode.name}" has no tether reference ID`);
       }
 
-      if (tetherNode.tetherData.executionTriggers.length === 0) {
+      if (tetherNode.tetherData.executionTriggers && tetherNode.tetherData.executionTriggers.length === 0) {
         warnings.push(`Tether node "${actionNode.name}" has no execution triggers defined`);
       }
 
       const { resourceRequirements } = tetherNode.tetherData;
-      if (resourceRequirements.timeout && resourceRequirements.timeout > 3600) {
+      if (resourceRequirements && resourceRequirements.timeout && resourceRequirements.timeout > 3600) {
         warnings.push(`Tether node "${actionNode.name}" has very long timeout (${resourceRequirements.timeout}s)`);
       }
     }
@@ -268,11 +268,14 @@ export class NodeBusinessRules {
         errors.push(`Function model container "${actionNode.name}" has no nested model ID`);
       }
 
-      if (containerNode.containerData.outputExtraction.extractedOutputs.length === 0) {
+      if (containerNode.containerData.outputExtraction && 
+          containerNode.containerData.outputExtraction.extractedOutputs && 
+          containerNode.containerData.outputExtraction.extractedOutputs.length === 0) {
         warnings.push(`Function model container "${actionNode.name}" extracts no outputs from nested model`);
       }
 
-      if (containerNode.containerData.executionPolicy.timeout && 
+      if (containerNode.containerData.executionPolicy && 
+          containerNode.containerData.executionPolicy.timeout && 
           containerNode.containerData.executionPolicy.timeout > 7200) {
         warnings.push(`Function model container "${actionNode.name}" has very long timeout (${containerNode.containerData.executionPolicy.timeout}s)`);
       }

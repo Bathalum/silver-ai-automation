@@ -1029,7 +1029,16 @@ describe('BusinessRuleValidationService Integration Tests', () => {
           });
 
           const result = await validationService.validateBusinessRules(baseModel, configuredActions);
-          consistencyResults.push(result.value);
+          if (result.isSuccess) {
+            consistencyResults.push(result.value);
+          } else {
+            // Push a default failed validation result for analysis
+            consistencyResults.push({
+              isValid: false,
+              errors: [result.error || 'Validation service failed'],
+              warnings: []
+            });
+          }
         }
 
         // Assert: Verify consistent behavior across configurations

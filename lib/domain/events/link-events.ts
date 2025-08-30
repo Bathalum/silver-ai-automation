@@ -78,7 +78,6 @@ export class NodeLinkCreated extends DomainEvent {
 }
 
 export class NodeLinkRemoved extends DomainEvent {
-  public readonly eventType = 'NodeLinkRemoved';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: { linkId: string; removedBy: string; removedAt: Date; reason?: string }) {
@@ -87,7 +86,7 @@ export class NodeLinkRemoved extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'NodeLinkRemoved';
   }
 
   public getEventData(): Record<string, any> {
@@ -96,7 +95,6 @@ export class NodeLinkRemoved extends DomainEvent {
 }
 
 export class NodeLinkUpdated extends DomainEvent {
-  public readonly eventType = 'NodeLinkUpdated';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: { linkId: string; changes: Record<string, any>; updatedBy: string; updatedAt: Date }) {
@@ -105,7 +103,7 @@ export class NodeLinkUpdated extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'NodeLinkUpdated';
   }
 
   public getEventData(): Record<string, any> {
@@ -114,7 +112,6 @@ export class NodeLinkUpdated extends DomainEvent {
 }
 
 export class CrossFeatureLinkCreated extends DomainEvent {
-  public readonly eventType = 'CrossFeatureLinkCreated';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: CrossFeatureLinkCreatedData) {
@@ -123,7 +120,7 @@ export class CrossFeatureLinkCreated extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'CrossFeatureLinkCreated';
   }
 
   public getEventData(): Record<string, any> {
@@ -135,7 +132,6 @@ export class CrossFeatureLinkCreated extends DomainEvent {
 }
 
 export class CrossFeatureLinkRemoved extends DomainEvent {
-  public readonly eventType = 'CrossFeatureLinkRemoved';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: { linkId: string; removedBy: string; removedAt: Date; reason?: string }) {
@@ -144,7 +140,7 @@ export class CrossFeatureLinkRemoved extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'CrossFeatureLinkRemoved';
   }
 
   public getEventData(): Record<string, any> {

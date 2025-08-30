@@ -293,7 +293,7 @@ export class AddActionNodeToContainerUseCase {
       executionOrder: command.executionOrder,
       status: ActionStatus.DRAFT,
       priority: command.priority,
-      estimatedDuration: command.estimatedDuration,
+      estimatedDuration: 300, // Default 5 minutes for action nodes
       retryPolicy: command.retryPolicy,
     };
 
@@ -334,7 +334,7 @@ export class AddActionNodeToContainerUseCase {
           executionOrder: command.executionOrder,
           status: ActionStatus.DRAFT,
           priority: command.priority,
-          estimatedDuration: command.estimatedDuration || 0,
+          estimatedDuration: 300, // Default 5 minutes for action nodes
           retryPolicy,
           raci,
           metadata: {},

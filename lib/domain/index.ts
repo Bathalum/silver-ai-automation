@@ -108,6 +108,7 @@ export {
   ModelPublished,
   ModelArchived,
   ModelDeleted,
+  ModelVersionCreated,
   VersionCreated,
   FunctionModelVersionCreated,
   ActionNodeExecutionOrderChanged,
@@ -117,16 +118,49 @@ export {
   ContainerNodeOrchestrationStarted,
   ContainerNodeOrchestrationCompleted,
   FractalOrchestrationLevelChanged,
+  ModelSoftDeletedEvent,
+  ModelUndeletedEvent,
+  ModelRestoredEvent
+} from './events/model-events';
+export {
+  ActionNodeExecutionStarted,
+  ActionNodeExecutionCompleted,
+  ActionNodeExecutionFailed,
+  ActionNodeExecutionRetried,
+  ActionNodeStatusChanged,
+  ExecutionStarted,
+  NodeExecuted
+} from './events/execution-events';
+export {
+  ContainerNodeAdded,
+  ContainerNodeRemoved,
+  ContainerNodeUpdated,
+  ActionNodeAdded,
+  ActionNodeRemoved,
+  ActionNodeUpdated
+} from './events/node-events';
+export {
+  AIAgentConfigured,
+  AIAgentExecutionStarted,
+  AIAgentExecutionCompleted,
+  AIAgentExecutionFailed,
   AIAgentConfigurationUpdated,
   AIAgentTaskStarted,
   AIAgentTaskCompleted,
   AIAgentTaskFailed
-} from './events/model-events';
+} from './events/ai-agent-events';
 export {
-  ExecutionStarted,
-  NodeExecuted,
-  ExecutionPaused,
-  ExecutionResumed,
-  ExecutionCompleted,
-  ExecutionFailed
-} from './events/execution-events';
+  WorkflowExecutionStarted,
+  WorkflowExecutionCompleted,
+  WorkflowExecutionFailed,
+  WorkflowValidationCompleted
+} from './events/workflow-events';
+export {
+  NodeLinkCreated,
+  NodeLinkRemoved,
+  NodeLinkUpdated,
+  CrossFeatureLinkCreated,
+  CrossFeatureLinkRemoved,
+  CrossFeatureLinkEstablished,
+  CrossFeatureLinkBroken
+} from './events/link-events';

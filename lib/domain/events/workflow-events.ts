@@ -74,7 +74,6 @@ export interface FractalOrchestrationLevelChangedData {
 }
 
 export class WorkflowExecutionStarted extends DomainEvent {
-  public readonly eventType = 'WorkflowExecutionStarted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: WorkflowExecutionStartedData) {
@@ -83,7 +82,7 @@ export class WorkflowExecutionStarted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'WorkflowExecutionStarted';
   }
 
   public getEventData(): Record<string, any> {
@@ -95,7 +94,6 @@ export class WorkflowExecutionStarted extends DomainEvent {
 }
 
 export class WorkflowExecutionCompleted extends DomainEvent {
-  public readonly eventType = 'WorkflowExecutionCompleted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: WorkflowExecutionCompletedData) {
@@ -104,7 +102,7 @@ export class WorkflowExecutionCompleted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'WorkflowExecutionCompleted';
   }
 
   public getEventData(): Record<string, any> {
@@ -116,7 +114,6 @@ export class WorkflowExecutionCompleted extends DomainEvent {
 }
 
 export class WorkflowExecutionFailed extends DomainEvent {
-  public readonly eventType = 'WorkflowExecutionFailed';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: WorkflowExecutionFailedData) {
@@ -125,7 +122,7 @@ export class WorkflowExecutionFailed extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'WorkflowExecutionFailed';
   }
 
   public getEventData(): Record<string, any> {
@@ -137,7 +134,6 @@ export class WorkflowExecutionFailed extends DomainEvent {
 }
 
 export class WorkflowValidationCompleted extends DomainEvent {
-  public readonly eventType = 'WorkflowValidationCompleted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: WorkflowValidationCompletedData) {
@@ -146,7 +142,7 @@ export class WorkflowValidationCompleted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'WorkflowValidationCompleted';
   }
 
   public getEventData(): Record<string, any> {

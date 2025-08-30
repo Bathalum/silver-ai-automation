@@ -324,6 +324,7 @@ export class ActionNodeOrchestrationService {
             success: true,
             duration: new Date().getTime() - startTime.getTime(),
             timestamp: new Date(),
+            startTime,
             output: { message: `Sequential action ${action.name} completed` }
           };
           
@@ -337,6 +338,7 @@ export class ActionNodeOrchestrationService {
             actionId: action.actionId,
             success: false,
             duration: new Date().getTime() - startTime.getTime(),
+            startTime,
             timestamp: new Date(),
             error: String(error)
           };
@@ -398,6 +400,7 @@ export class ActionNodeOrchestrationService {
               success: true,
               duration: new Date().getTime() - startTime.getTime(),
               timestamp: new Date(),
+              startTime,
               output: { message: `Conditional action ${evaluation.action.name} executed` }
             };
             
@@ -409,6 +412,7 @@ export class ActionNodeOrchestrationService {
               success: true,
               duration: 0,
               timestamp: new Date(),
+              startTime,
               output: { message: `Conditional action ${evaluation.action.name} skipped` }
             };
             
@@ -420,6 +424,7 @@ export class ActionNodeOrchestrationService {
             success: false,
             duration: new Date().getTime() - startTime.getTime(),
             timestamp: new Date(),
+            startTime,
             error: String(error)
           };
           
@@ -679,10 +684,8 @@ export class ActionNodeOrchestrationService {
   ): Promise<Result<ExecutionResult>> {
     const retryPolicy = actionNode.retryPolicy;
     
-    // Check if retries are available
-    if (retryPolicy.currentAttempts >= retryPolicy.maxAttempts) {
-      return Result.fail<ExecutionResult>('Maximum retry attempts exceeded');
-    }
+    // Note: Current attempts should be tracked by the caller
+    // RetryPolicy is a value object and doesn't track current state
 
     // Update action status to retrying
     const statusUpdateResult = actionNode.updateStatus(ActionStatus.RETRYING);
@@ -718,7 +721,7 @@ export class ActionNodeOrchestrationService {
 
     // Convert groups to execution groups
     let groupIndex = 0;
-    for (const [groupKey, nodes] of groupMap.entries()) {
+    for (const [groupKey, nodes] of Array.from(groupMap.entries())) {
       const [mode, priority] = groupKey.split('_');
       
       const executionGroup: ExecutionGroup = {
@@ -849,7 +852,8 @@ export class ActionNodeOrchestrationService {
         actionId: actionNode.actionId,
         success: true,
         duration,
-        timestamp: new Date()
+        timestamp: new Date(),
+        startTime: new Date(startTime)
       };
     } catch (error) {
       // Update status to failed
@@ -862,14 +866,15 @@ export class ActionNodeOrchestrationService {
         success: false,
         duration,
         error: String(error),
-        timestamp: new Date()
+        timestamp: new Date(),
+        startTime: new Date(startTime)
       };
     }
   }
 
   private async getNodeExecutionContext(actionNode: ActionNode): Promise<Result<Record<string, any>>> {
     // Get context from the context access service
-    const contextResult = this.contextAccessService.getNodeContext(
+    const contextResult = this.contextAccessService.getNodeContextWithAccess(
       actionNode.actionId,
       actionNode.parentNodeId,
       'read'

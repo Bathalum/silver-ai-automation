@@ -15,7 +15,15 @@ import { AddContainerNodeUseCase } from '../../lib/use-cases/function-model/add-
 import { AddActionNodeToContainerUseCase } from '../../lib/use-cases/function-model/add-action-node-to-container-use-case';
 import { PublishFunctionModelUseCase } from '../../lib/use-cases/function-model/publish-function-model-use-case';
 import { ExecuteFunctionModelUseCase } from '../../lib/use-cases/function-model/execute-function-model-use-case';
-import { ValidateWorkflowStructureUseCase } from '../../lib/use-cases';
+import { 
+  ValidateWorkflowStructureUseCase, 
+  IWorkflowValidationService,
+  IBusinessRuleValidationService,
+  IExecutionReadinessService,
+  IContextValidationService,
+  ICrossFeatureValidationService
+} from '../../lib/use-cases';
+import { FunctionModel } from '../../lib/domain/entities/function-model';
 
 // Import specific interfaces for compatibility
 import { IAuditLogRepository } from '../../lib/domain/interfaces/audit-log-repository';
@@ -23,7 +31,7 @@ import { IFunctionModelRepository } from '../../lib/use-cases/function-model/cre
 import { IEventBus } from '../../lib/infrastructure/events/supabase-event-bus';
 
 import { Result } from '../../lib/domain/shared/result';
-import { ModelStatus } from '../../lib/domain/enums';
+import { ModelStatus, ContainerNodeType, ActionNodeType, ExecutionMode } from '../../lib/domain/enums';
 
 import { 
   FunctionModelBuilder, 
@@ -36,14 +44,15 @@ import {
  * Only mock external dependencies, not internal business logic
  */
 class MockFunctionModelRepository implements IFunctionModelRepository {
-  private models = new Map<string, any>();
+  private models = new Map<string, FunctionModel>();
 
-  async save(model: any): Promise<Result<void>> {
-    this.models.set(model.modelId, { ...model, savedAt: new Date() });
+  async save(model: FunctionModel): Promise<Result<void>> {
+    // Store the actual domain entity, not a plain object
+    this.models.set(model.modelId, model);
     return Result.ok(undefined);
   }
 
-  async findById(id: string): Promise<Result<any>> {
+  async findById(id: string): Promise<Result<FunctionModel>> {
     const model = this.models.get(id);
     if (!model) {
       return Result.fail(`Model with id ${id} not found`);
@@ -51,7 +60,7 @@ class MockFunctionModelRepository implements IFunctionModelRepository {
     return Result.ok(model);
   }
 
-  async findByName(name: string, organizationId?: string): Promise<Result<any>> {
+  async findByName(name: string, organizationId?: string): Promise<Result<FunctionModel>> {
     const existingModel = Array.from(this.models.values()).find(
       m => m.name.toString() === name && (!organizationId || m.metadata?.organizationId === organizationId)
     );
@@ -69,7 +78,7 @@ class MockFunctionModelRepository implements IFunctionModelRepository {
     return Result.ok(undefined);
   }
 
-  async findAll(filter?: any): Promise<Result<any[]>> {
+  async findAll(filter?: any): Promise<Result<FunctionModel[]>> {
     let results = Array.from(this.models.values());
     
     if (filter?.userId) {
@@ -92,7 +101,7 @@ class MockFunctionModelRepository implements IFunctionModelRepository {
     this.models.clear();
   }
 
-  getAllModels() {
+  getAllModels(): FunctionModel[] {
     return Array.from(this.models.values());
   }
 }
@@ -263,6 +272,65 @@ class MockEventBus implements IEventBus {
   }
 }
 
+// Mock validation services for ValidateWorkflowStructureUseCase
+class MockWorkflowValidationService implements IWorkflowValidationService {
+  async validateStructuralIntegrity(nodes: any[], actionNodes: any[]): Promise<Result<any>> {
+    // Simple structural validation: check if we have at least one node
+    const isValid = nodes.length > 0;
+    console.log(`[MockWorkflowValidationService] Validating ${nodes.length} nodes, ${actionNodes.length} action nodes - isValid: ${isValid}`);
+    return Result.ok({
+      isValid,
+      errors: isValid ? [] : ['No nodes found in workflow'],
+      warnings: []
+    });
+  }
+}
+
+class MockBusinessRuleValidationService implements IBusinessRuleValidationService {
+  async validateBusinessRules(model: any, actionNodes: any[]): Promise<Result<any>> {
+    // Simple business rule validation: always pass for E2E testing
+    return Result.ok({
+      isValid: true,
+      errors: [],
+      warnings: []
+    });
+  }
+}
+
+class MockExecutionReadinessService implements IExecutionReadinessService {
+  async validateExecutionReadiness(actionNodes: any[], executionContext: any): Promise<Result<any>> {
+    // Simple execution readiness: check if action nodes exist
+    const isValid = actionNodes.length > 0;
+    return Result.ok({
+      isValid,
+      errors: isValid ? [] : ['No action nodes configured for execution'],
+      warnings: []
+    });
+  }
+}
+
+class MockContextValidationService implements IContextValidationService {
+  async validateContextIntegrity(model: any, nodes: any[]): Promise<Result<any>> {
+    // Simple context validation: always pass for E2E testing
+    return Result.ok({
+      isValid: true,
+      errors: [],
+      warnings: []
+    });
+  }
+}
+
+class MockCrossFeatureValidationService implements ICrossFeatureValidationService {
+  async validateCrossFeatureDependencies(model: any): Promise<Result<any>> {
+    // Simple cross-feature validation: always pass for E2E testing
+    return Result.ok({
+      isValid: true,
+      errors: [],
+      warnings: []
+    });
+  }
+}
+
 /**
  * E2E Test Suite: Primary User Workflow Chain
  * 
@@ -274,6 +342,13 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
   let mockRepository: MockFunctionModelRepository;
   let mockAuditRepository: MockAuditLogRepository;
   let mockEventBus: MockEventBus;
+
+  // Validation service mocks
+  let mockWorkflowValidationService: MockWorkflowValidationService;
+  let mockBusinessRuleValidationService: MockBusinessRuleValidationService;
+  let mockExecutionReadinessService: MockExecutionReadinessService;
+  let mockContextValidationService: MockContextValidationService;
+  let mockCrossFeatureValidationService: MockCrossFeatureValidationService;
 
   // Use Cases (Real instances - no mocking)
   let createModelUseCase: CreateFunctionModelUseCase;
@@ -293,13 +368,27 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
     mockAuditRepository = new MockAuditLogRepository();
     mockEventBus = new MockEventBus();
 
+    // Initialize validation service mocks
+    mockWorkflowValidationService = new MockWorkflowValidationService();
+    mockBusinessRuleValidationService = new MockBusinessRuleValidationService();
+    mockExecutionReadinessService = new MockExecutionReadinessService();
+    mockContextValidationService = new MockContextValidationService();
+    mockCrossFeatureValidationService = new MockCrossFeatureValidationService();
+
     // Initialize Use Cases with real business logic
     createModelUseCase = new CreateFunctionModelUseCase(mockRepository, mockEventBus);
     addContainerUseCase = new AddContainerNodeUseCase(mockRepository, mockEventBus);
     addActionUseCase = new AddActionNodeToContainerUseCase(mockRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockRepository, mockEventBus);
     executeModelUseCase = new ExecuteFunctionModelUseCase(mockRepository, mockEventBus);
-    validateWorkflowUseCase = new ValidateWorkflowStructureUseCase(mockRepository);
+    validateWorkflowUseCase = new ValidateWorkflowStructureUseCase(
+      mockRepository,
+      mockWorkflowValidationService,
+      mockBusinessRuleValidationService,
+      mockExecutionReadinessService,
+      mockContextValidationService,
+      mockCrossFeatureValidationService
+    );
   });
 
   afterEach(() => {
@@ -340,7 +429,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         // UC-002: Add Container Node (must create model before adding nodes)
         const addContainerResult = await addContainerUseCase.execute({
           modelId,
-          nodeType: 'stage',
+          nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Processing Stage',
           description: 'Main processing stage for E2E test',
           position: { x: 300, y: 200 },
@@ -348,7 +437,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         });
 
         expect(addContainerResult.isSuccess).toBe(true);
-        expect(addContainerResult.value.nodeType).toBe('stage');
+        expect(addContainerResult.value.nodeType).toBe(ContainerNodeType.STAGE_NODE);
         
         const stageNodeId = addContainerResult.value.nodeId;
 
@@ -356,15 +445,27 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         const addActionResult = await addActionUseCase.execute({
           modelId,
           parentNodeId: stageNodeId,
-          actionType: 'tether',
+          actionType: ActionNodeType.TETHER_NODE,
           name: 'Process Action',
           description: 'Main processing action for E2E test',
+          executionMode: ExecutionMode.SEQUENTIAL,
           executionOrder: 1,
+          priority: 5,
+          actionSpecificData: {
+            tetherReferenceId: 'tether-ref-001',
+            tetherReference: 'default-reference',
+            executionParameters: {},
+            outputMapping: {},
+            executionTriggers: [],
+            resourceRequirements: {},
+            integrationConfig: {},
+            failureHandling: {}
+          },
           userId: testUserId
         });
 
         expect(addActionResult.isSuccess).toBe(true);
-        expect(addActionResult.value.actionType).toBe('tether');
+        expect(addActionResult.value.actionType).toBe(ActionNodeType.TETHER_NODE);
         expect(addActionResult.value.parentNodeId).toBe(stageNodeId);
 
         // UC-004: Validate and Publish (must configure actions before publishing)
@@ -375,7 +476,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         });
 
         expect(validateResult.isSuccess).toBe(true);
-        expect(validateResult.value.isValid).toBe(true);
+        expect(validateResult.value.overallValid).toBe(true);
 
         const publishResult = await publishModelUseCase.execute({
           modelId,
@@ -420,8 +521,9 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         // Act: Try to add container node to non-existent model
         const addContainerResult = await addContainerUseCase.execute({
           modelId: nonExistentModelId,
-          nodeType: 'stage',
+          nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Invalid Stage',
+          position: { x: 100, y: 100 },
           userId: testUserId
         });
 
@@ -485,7 +587,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
 
         // Assert: Validation should fail for empty workflow
         expect(validateResult.isSuccess).toBe(true); // The operation succeeds
-        expect(validateResult.value.isValid).toBe(false); // But validation reports invalid
+        expect(validateResult.value.overallValid).toBe(false); // But validation reports invalid
 
         // Try to publish with validation enforcement
         const publishResult = await publishModelUseCase.execute({
@@ -518,7 +620,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         // Create multiple container nodes
         const inputStageResult = await addContainerUseCase.execute({
           modelId,
-          nodeType: 'io',
+          nodeType: ContainerNodeType.IO_NODE,
           name: 'Input Stage',
           description: 'Input processing stage',
           position: { x: 100, y: 200 },
@@ -527,7 +629,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
 
         const processingStageResult = await addContainerUseCase.execute({
           modelId,
-          nodeType: 'stage',
+          nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Processing Stage',
           description: 'Main processing stage',
           position: { x: 300, y: 200 },
@@ -536,7 +638,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
 
         const outputStageResult = await addContainerUseCase.execute({
           modelId,
-          nodeType: 'io',
+          nodeType: ContainerNodeType.IO_NODE,
           name: 'Output Stage',
           description: 'Output generation stage',
           position: { x: 500, y: 200 },
@@ -547,20 +649,44 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         const action1Result = await addActionUseCase.execute({
           modelId,
           parentNodeId: processingStageResult.value.nodeId,
-          actionType: 'tether',
+          actionType: ActionNodeType.TETHER_NODE,
           name: 'Data Processing Action',
           description: 'Processes input data',
+          executionMode: ExecutionMode.SEQUENTIAL,
           executionOrder: 1,
+          priority: 5,
+          actionSpecificData: {
+            tetherReferenceId: 'tether-data-process',
+            tetherReference: 'data-processing-reference',
+            executionParameters: {},
+            outputMapping: {},
+            executionTriggers: [],
+            resourceRequirements: {},
+            integrationConfig: {},
+            failureHandling: {}
+          },
           userId: testUserId
         });
 
         const action2Result = await addActionUseCase.execute({
           modelId,
           parentNodeId: processingStageResult.value.nodeId,
-          actionType: 'kb',
+          actionType: ActionNodeType.KB_NODE,
           name: 'Knowledge Base Lookup',
           description: 'Looks up information from knowledge base',
+          executionMode: ExecutionMode.SEQUENTIAL,
           executionOrder: 2,
+          priority: 3,
+          actionSpecificData: {
+            kbReferenceId: 'kb-lookup-ref',
+            shortDescription: 'KB lookup action',
+            documentationContext: 'E2E test context',
+            searchKeywords: ['test', 'lookup', 'kb'],
+            accessPermissions: {
+              view: ['test-user'],
+              edit: []
+            }
+          },
           userId: testUserId
         });
 
@@ -572,7 +698,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         });
 
         expect(validateResult.isSuccess).toBe(true);
-        expect(validateResult.value.isValid).toBe(true);
+        expect(validateResult.value.overallValid).toBe(true);
 
         // Publish complex workflow
         const publishResult = await publishModelUseCase.execute({
@@ -630,19 +756,35 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         // Add container and action with failure simulation
         const stageResult = await addContainerUseCase.execute({
           modelId,
-          nodeType: 'stage',
+          nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Recovery Stage',
+          position: { x: 200, y: 300 },
           userId: testUserId
         });
 
         await addActionUseCase.execute({
           modelId,
           parentNodeId: stageResult.value.nodeId,
-          actionType: 'tether',
+          actionType: ActionNodeType.TETHER_NODE,
           name: 'Potentially Failing Action',
-          configuration: {
-            simulateTransientFailure: true,
-            maxRetryAttempts: 3
+          executionMode: ExecutionMode.SEQUENTIAL,
+          executionOrder: 1,
+          priority: 5,
+          actionSpecificData: {
+            tetherReferenceId: 'failing-tether-ref',
+            tetherReference: 'failure-test-reference',
+            executionParameters: {
+              simulateTransientFailure: true,
+              maxRetryAttempts: 3
+            },
+            outputMapping: {},
+            executionTriggers: [],
+            resourceRequirements: {},
+            integrationConfig: {},
+            failureHandling: {
+              retryOnFailure: true,
+              maxRetries: 3
+            }
           },
           userId: testUserId
         });
@@ -692,16 +834,30 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         // Act: Execute complete workflow
         const containerResult = await addContainerUseCase.execute({
           modelId,
-          nodeType: 'stage',
+          nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Compliance Test Stage',
+          position: { x: 250, y: 350 },
           userId: testUserId
         });
 
         const actionResult = await addActionUseCase.execute({
           modelId,
           parentNodeId: containerResult.value.nodeId,
-          actionType: 'tether',
+          actionType: ActionNodeType.TETHER_NODE,
           name: 'Compliance Test Action',
+          executionMode: ExecutionMode.SEQUENTIAL,
+          executionOrder: 1,
+          priority: 5,
+          actionSpecificData: {
+            tetherReferenceId: 'compliance-tether-ref',
+            tetherReference: 'compliance-test-reference',
+            executionParameters: {},
+            outputMapping: {},
+            executionTriggers: [],
+            resourceRequirements: {},
+            integrationConfig: {},
+            failureHandling: {}
+          },
           userId: testUserId
         });
 

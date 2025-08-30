@@ -36,8 +36,14 @@ describe('Model Version Change Detection', () => {
     const nodes = new Map();
     
     // Create nodes based on configurations
-    nodeConfigs.forEach(config => {
-      const nodeId = NodeId.generate();
+    nodeConfigs.forEach((config, index) => {
+      // Use deterministic node ID based on config name or index to ensure consistency across models
+      const paddedIndex = (index + 1).toString().padStart(8, '0');
+      const nodeId = config.nodeId ? NodeId.create(config.nodeId) : NodeId.create(`${paddedIndex}-0000-4000-8000-${paddedIndex}0000`);
+      if (nodeId.isFailure) {
+        throw new Error(`Failed to create nodeId: ${nodeId.error}`);
+      }
+      const deterministic_nodeId = nodeId.value;
       
       const positionResult = Position.create(config.x || 0, config.y || 0);
       if (positionResult.isFailure) {
@@ -49,7 +55,7 @@ describe('Model Version Change Detection', () => {
       switch (config.type) {
         case 'io':
           const ioNodeResult = IONode.create({
-            nodeId,
+            nodeId: deterministic_nodeId,
             modelId: modelId.value,
             name: config.name,
             description: config.description || '',
@@ -72,7 +78,7 @@ describe('Model Version Change Detection', () => {
           break;
         case 'stage':
           const stageNodeResult = StageNode.create({
-            nodeId,
+            nodeId: deterministic_nodeId,
             modelId: modelId.value,
             name: config.name,
             description: config.description || '',
@@ -99,7 +105,7 @@ describe('Model Version Change Detection', () => {
       }
       
       if (node) {
-        nodes.set(nodeId.value, node);
+        nodes.set(deterministic_nodeId.value, node);
       }
     });
 
@@ -205,15 +211,15 @@ describe('Model Version Change Detection', () => {
     it('detectNodeRemovals_SingleRemovedNode_IdentifiesRemoval', () => {
       // Arrange - Base model with multiple nodes
       const baseModel = createModelWithNodes('Full Model', '1.0.0', [
-        { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'stage', name: 'Processing', stageType: 'process' },
-        { type: 'io', name: 'Output', boundaryType: 'output' }
+        { type: 'io', name: 'Input', boundaryType: 'input', nodeId: '00000001-0000-4000-8000-000000010000' },
+        { type: 'stage', name: 'Processing', stageType: 'process', nodeId: '00000002-0000-4000-8000-000000020000' },
+        { type: 'io', name: 'Output', boundaryType: 'output', nodeId: '00000003-0000-4000-8000-000000030000' }
       ]);
 
-      // Modified model with one node removed
+      // Modified model with one node removed (Processing node is removed)
       const modifiedModel = createModelWithNodes('Reduced Model', '1.0.0', [
-        { type: 'io', name: 'Input', boundaryType: 'input' },
-        { type: 'io', name: 'Output', boundaryType: 'output' }
+        { type: 'io', name: 'Input', boundaryType: 'input', nodeId: '00000001-0000-4000-8000-000000010000' },
+        { type: 'io', name: 'Output', boundaryType: 'output', nodeId: '00000003-0000-4000-8000-000000030000' }
       ]);
 
       // Act - Compare models
@@ -223,7 +229,7 @@ describe('Model Version Change Detection', () => {
       expect(result.isSuccess).toBe(true);
       const changes = result.value;
       expect(changes.removedNodes).toHaveLength(1);
-      expect(changes.addedNodes).toHaveLength(1); // Different model IDs cause detection issues
+      expect(changes.addedNodes).toHaveLength(0);
     });
 
     it('detectNodeRemovals_CriticalNodeRemoval_IdentifiesImpact', () => {

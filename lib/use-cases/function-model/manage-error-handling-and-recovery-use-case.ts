@@ -42,7 +42,7 @@ export interface ErrorHandlingResult {
   retryAttempted?: boolean;
   retryCount?: number;
   backoffDelay?: number;
-  agentRecoveryApplied?: 'disable' | 'restart' | 'retry';
+  agentRecoveryApplied?: 'disable' | 'restart' | 'retry' | 'fail-fast';
   businessRulesViolated?: string[];
   propagatedErrors?: string[];
   finalStatus?: ActionStatus | 'disabled' | 'restarted' | 'validation-blocked';
@@ -175,7 +175,7 @@ export class ManageErrorHandlingAndRecoveryUseCase {
   async handleAgentExecutionFailure(
     agentId: NodeId,
     failureReason: string,
-    recoveryAction?: 'disable' | 'restart' | 'retry'
+    recoveryAction?: 'disable' | 'restart' | 'retry' | 'fail-fast'
   ): Promise<Result<ErrorHandlingResult>> {
     const startTime = Date.now();
 
@@ -188,7 +188,7 @@ export class ManageErrorHandlingAndRecoveryUseCase {
 
       // Step 3: System applies recovery action
       let agentRecoveryResult: Result<void>;
-      let actionTaken: 'disable' | 'restart' | 'retry' = determinedRecoveryAction;
+      let actionTaken: 'disable' | 'restart' | 'retry' | 'fail-fast' = determinedRecoveryAction;
 
       switch (determinedRecoveryAction) {
         case 'disable':
@@ -216,6 +216,11 @@ export class ManageErrorHandlingAndRecoveryUseCase {
             failureReason, 
             'retry'
           );
+          break;
+        
+        case 'fail-fast':
+          // Fail-fast: Immediately fail without recovery attempts
+          agentRecoveryResult = Result.ok<void>(undefined);
           break;
         
         default:
@@ -246,6 +251,7 @@ export class ManageErrorHandlingAndRecoveryUseCase {
         propagatedErrors: [`Agent ${agentId.value} failure: ${failureReason}`],
         finalStatus: determinedRecoveryAction === 'disable' ? 'disabled' : 
                     determinedRecoveryAction === 'restart' ? 'restarted' : 
+                    determinedRecoveryAction === 'fail-fast' ? ActionStatus.FAILED :
                     ActionStatus.RETRYING,
         executionMetrics: {
           totalDuration: executionDuration,
@@ -316,7 +322,7 @@ export class ManageErrorHandlingAndRecoveryUseCase {
           recoveryDuration: 0
         },
         contextualInformation: {
-          modelId: model.id.value,
+          modelId: model.id.toString(),
           modelName: model.name.toString(),
           validationErrors: businessRulesViolated,
           validationWarnings: warnings,
@@ -487,7 +493,7 @@ export class ManageErrorHandlingAndRecoveryUseCase {
     return RetryPolicy.create(config);
   }
 
-  private determineAgentRecoveryAction(failureReason: string): 'disable' | 'restart' | 'retry' {
+  private determineAgentRecoveryAction(failureReason: string): 'disable' | 'restart' | 'retry' | 'fail-fast' {
     // Simple heuristic based on failure reason
     if (failureReason.includes('timeout') || failureReason.includes('temporary')) {
       return 'retry';

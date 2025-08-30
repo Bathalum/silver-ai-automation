@@ -423,7 +423,8 @@ export class FunctionModel {
       return Result.fail<void>('Cannot soft delete an archived model');
     }
 
-    // Perform soft deletion - preserve original status for audit purposes
+    // Perform soft deletion - set status to ARCHIVED and update timestamps
+    this.props.status = ModelStatus.ARCHIVED;
     this.props.deletedAt = new Date();
     // Handle deletedBy parameter: trim non-empty strings, preserve empty strings and undefined
     if (deletedBy === undefined) {

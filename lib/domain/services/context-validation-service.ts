@@ -64,7 +64,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Check for improper context access
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const accessedContexts = config?.accessedContextVariables || [];
       
       for (const contextVar of accessedContexts) {
@@ -89,7 +89,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Track context variable definitions and usages
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const definedContexts = config?.definedContextVariables || [];
       const usedContexts = config?.accessedContextVariables || [];
       
@@ -139,7 +139,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Analyze context variable scopes
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const contextVars = config?.definedContextVariables || [];
       
       for (const contextVar of contextVars) {
@@ -153,7 +153,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Check for scope violations
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const accessedVars = config?.accessedContextVariables || [];
       
       for (const contextVar of accessedVars) {
@@ -178,7 +178,12 @@ export class ContextValidationService implements IContextValidationService {
     const containerNodes = nodes.filter(node => node instanceof FunctionModelContainerNode) as FunctionModelContainerNode[];
     
     for (const containerNode of containerNodes) {
-      const inheritedContexts = containerNode.containerData.contextInheritance.inheritedContexts;
+      const contextInheritance = containerNode.containerData.contextInheritance;
+      if (!contextInheritance) {
+        continue; // Skip if no context inheritance configuration
+      }
+      
+      const inheritedContexts = contextInheritance.inheritedContexts || [];
       
       // Check for duplicate inherited contexts
       const duplicates = inheritedContexts.filter((context, index) => 
@@ -216,7 +221,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Collect context type declarations
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const contextTypeDefs = config?.contextTypeDefinitions || {};
       
       for (const [contextVar, typeInfo] of Object.entries(contextTypeDefs)) {
@@ -236,7 +241,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Validate type usage consistency
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const contextUsageTypes = config?.contextUsageTypes || {};
       
       for (const [contextVar, usageType] of Object.entries(contextUsageTypes)) {
@@ -254,7 +259,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Check for long-running workflows that need context persistence
     const totalEstimatedTime = actionNodes.reduce((total, node) => {
-      const config = node.actionData.configuration;
+      const config = node.metadata?.configuration;
       return total + (config?.estimatedExecutionTimeMs || 1000);
     }, 0);
     
@@ -265,7 +270,7 @@ export class ContextValidationService implements IContextValidationService {
       const contextVars = new Set<string>();
       
       for (const actionNode of actionNodes) {
-        const config = actionNode.actionData.configuration;
+        const config = actionNode.metadata?.configuration;
         const definedVars = config?.definedContextVariables || [];
         const accessedVars = config?.accessedContextVariables || [];
         
@@ -290,11 +295,11 @@ export class ContextValidationService implements IContextValidationService {
     
     // Identify sensitive context variables and insecure action nodes
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
       // Mark sensitive context variables
       const sensitiveVars = config?.sensitiveContextVariables || [];
-      sensitiveVars.forEach(contextVar => sensitiveContextVars.add(contextVar));
+      sensitiveVars.forEach((contextVar: string) => sensitiveContextVars.add(contextVar));
       
       // Mark insecure action nodes
       const isInsecure = config?.isInsecure || 
@@ -309,7 +314,7 @@ export class ContextValidationService implements IContextValidationService {
     // Check for security violations
     for (const actionNode of actionNodes) {
       if (insecureActionNodes.has(actionNode.nodeId.toString())) {
-        const config = actionNode.actionData.configuration;
+        const config = actionNode.metadata?.configuration;
         const accessedVars = config?.accessedContextVariables || [];
         
         for (const contextVar of accessedVars) {
@@ -327,7 +332,7 @@ export class ContextValidationService implements IContextValidationService {
     
     // Track context variable lifecycles
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const createdVars = config?.definedContextVariables || [];
       const cleanedVars = config?.cleanedContextVariables || [];
       const accessedVars = config?.accessedContextVariables || [];
@@ -359,7 +364,7 @@ export class ContextValidationService implements IContextValidationService {
     const actionNodes = Array.from(model.actionNodes.values());
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const contextObjects = config?.contextObjects || {};
       
       for (const [contextVar, objectInfo] of Object.entries(contextObjects)) {
@@ -393,7 +398,7 @@ export class ContextValidationService implements IContextValidationService {
       const actionNodes = Array.from(model.actionNodes.values());
       
       for (const actionNode of actionNodes) {
-        const config = actionNode.actionData.configuration;
+        const config = actionNode.metadata?.configuration;
         const accessedVars = config?.accessedContextVariables || [];
         
         for (const contextVar of accessedVars) {
@@ -449,9 +454,12 @@ export class ContextValidationService implements IContextValidationService {
     // Check if the action node has proper inheritance for the context variable
     const parentNode = nodes.find(node => node.nodeId.equals(actionNode.parentNodeId));
     
-    if (parentNode instanceof FunctionModelContainerNode) {
-      const inheritedContexts = parentNode.containerData.contextInheritance.inheritedContexts;
-      return inheritedContexts.includes(contextVar);
+    if (parentNode && 'containerData' in parentNode) {
+      const containerNode = parentNode as any; // Type assertion since we're checking for containerData
+      const contextInheritance = containerNode.containerData?.contextInheritance;
+      if (contextInheritance && contextInheritance.inheritedContexts) {
+        return contextInheritance.inheritedContexts.includes(contextVar);
+      }
     }
     
     return false; // No proper inheritance found
@@ -499,9 +507,12 @@ export class ContextValidationService implements IContextValidationService {
       recursionStack.add(nodeId);
       
       const node = nodes.find(n => n.nodeId.toString() === nodeId);
-      if (node instanceof FunctionModelContainerNode) {
-        const inheritedContexts = node.containerData.contextInheritance.inheritedContexts;
-        // This would need to be expanded to check actual inheritance relationships
+      if (node && 'containerData' in node) {
+        const containerNode = node as any; // Type assertion since we're checking for containerData
+        const contextInheritance = containerNode.containerData?.contextInheritance;
+        if (contextInheritance && contextInheritance.inheritedContexts) {
+          // This would need to be expanded to check actual inheritance relationships
+        }
       }
       
       recursionStack.delete(nodeId);
@@ -523,7 +534,7 @@ export class ContextValidationService implements IContextValidationService {
 
   private hasPersistenceConfig(contextVar: string, actionNodes: ActionNode[]): boolean {
     return actionNodes.some(node => {
-      const config = node.actionData.configuration;
+      const config = node.metadata?.configuration;
       return config?.persistentContextVariables?.includes(contextVar);
     });
   }

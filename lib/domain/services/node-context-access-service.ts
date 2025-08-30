@@ -157,7 +157,7 @@ export class NodeContextAccessService {
    * Get context for a node by nodeId (for testing and simple access)
    */
   public getNodeContext(nodeId: NodeId): Result<BuiltContext> {
-    for (const context of this.contexts.values()) {
+    for (const context of Array.from(this.contexts.values())) {
       if (context.nodeId.equals(nodeId)) {
         return Result.ok(context);
       }
@@ -205,15 +205,22 @@ export class NodeContextAccessService {
     targetNodeId: NodeId,
     newContextData: Record<string, any>
   ): Result<void> {
-    const targetContext = this.nodeHierarchy.get(targetNodeId.value);
+    // Find the target context in the contexts map
+    let targetContext: BuiltContext | undefined;
+    for (const context of Array.from(this.contexts.values())) {
+      if (context.nodeId.equals(targetNodeId)) {
+        targetContext = context;
+        break;
+      }
+    }
+    
     if (!targetContext) {
-      return Result.fail<void>('Access denied: Target node not found');
+      return Result.fail<void>('Context not found for node');
     }
 
     // Allow self-update - a node can always update its own context
     if (updatingNodeId.equals(targetNodeId)) {
-      targetContext.contextData = { ...newContextData };
-      this.nodeHierarchy.set(targetNodeId.value, targetContext);
+      targetContext.contextData = { ...targetContext.contextData, ...newContextData };
       return Result.ok<void>(undefined);
     }
 
@@ -222,8 +229,8 @@ export class NodeContextAccessService {
       return Result.fail<void>(accessResult.error);
     }
 
-    targetContext.contextData = { ...newContextData };
-    this.nodeHierarchy.set(targetNodeId.value, targetContext);
+    // Update the context data (merge with existing)
+    targetContext.contextData = { ...targetContext.contextData, ...newContextData };
 
     return Result.ok<void>(undefined);
   }
@@ -504,9 +511,12 @@ export class NodeContextAccessService {
     const childContexts: any[] = [];
     
     for (const childId of children) {
-      const childContext = this.nodeHierarchy.get(childId);
-      if (childContext && childContext.contextData) {
-        childContexts.push(childContext.contextData);
+      // Look for context data in the contexts Map
+      for (const context of Array.from(this.contexts.values())) {
+        if (context.nodeId.value === childId && context.contextData) {
+          childContexts.push(context.contextData);
+          break; // Found the context for this child, move to next child
+        }
       }
     }
     
@@ -537,7 +547,7 @@ export class NodeContextAccessService {
     
     // Search through node hierarchy for contexts referencing target model
     
-    for (const [nodeId, nodeContext] of this.nodeHierarchy.entries()) {
+    for (const [nodeId, nodeContext] of Array.from(this.nodeHierarchy.entries())) {
       // Check if this node's context references the target model
       
       // Check if this node's context data has references to the target model
@@ -558,7 +568,7 @@ export class NodeContextAccessService {
    */
   public debugState(): { nodeCount: number, nodes: Array<{ nodeId: string, nodeType: string, hasContextData: boolean, contextKeys: string[], contextDataType: string, contextData: any }> } {
     const nodes = [];
-    for (const [nodeId, nodeContext] of this.nodeHierarchy.entries()) {
+    for (const [nodeId, nodeContext] of Array.from(this.nodeHierarchy.entries())) {
       nodes.push({
         nodeId,
         nodeType: nodeContext.nodeType,
@@ -651,7 +661,7 @@ export class NodeContextAccessService {
   /**
    * Update context data for the specified context ID
    */
-  public updateNodeContext(
+  public updateContextById(
     contextId: string,
     updateData: Record<string, any>,
     mergeMode: 'replace' | 'merge' = 'merge'
@@ -684,11 +694,11 @@ export class NodeContextAccessService {
     const contextsToRemove: string[] = [];
     
     // Find contexts for this node
-    for (const [contextId, context] of this.contexts.entries()) {
+    for (const [contextId, context] of Array.from(this.contexts.entries())) {
       if (context.nodeId.equals(nodeId)) {
         contextsToRemove.push(contextId);
         // Also find child contexts
-        for (const [childId, childContext] of this.contexts.entries()) {
+        for (const [childId, childContext] of Array.from(this.contexts.entries())) {
           if (childContext.parentContextId === contextId) {
             contextsToRemove.push(childId);
           }
@@ -752,7 +762,7 @@ export class NodeContextAccessService {
   public getHierarchicalContext(nodeId: NodeId): Result<HierarchicalContext> {
     // Find context for this node
     let nodeContext: BuiltContext | undefined;
-    for (const context of this.contexts.values()) {
+    for (const context of Array.from(this.contexts.values())) {
       if (context.nodeId.equals(nodeId)) {
         nodeContext = context;
         break;
@@ -765,7 +775,7 @@ export class NodeContextAccessService {
 
     // Find child contexts
     const childContextIds: string[] = [];
-    for (const [contextId, context] of this.contexts.entries()) {
+    for (const [contextId, context] of Array.from(this.contexts.entries())) {
       if (context.parentContextId === nodeContext.contextId) {
         childContextIds.push(contextId);
       }

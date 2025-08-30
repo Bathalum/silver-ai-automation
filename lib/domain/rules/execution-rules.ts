@@ -40,7 +40,7 @@ export class ExecutionRules {
     errors: string[];
     warnings: string[];
   }> {
-    const validationResult = ExecutionRules.validateModelForExecution(model);
+    const validationResult = ExecutionRules.staticValidateModelForExecution(model);
     if (validationResult.isFailure) {
       return Result.fail(validationResult.error);
     }
@@ -105,7 +105,7 @@ export class ExecutionRules {
     isValid: boolean;
     errors: string[];
     warnings: string[];
-    totalRequirements: Record<string, number>;
+    totalRequirements: { cpu: number; memory: number; executionTime: number; };
   }> {
     const actionNodes = Array.from(model.actionNodes.values());
     const validation = ExecutionRules.validateResourceRequirements(actionNodes, resourceLimits);
@@ -296,6 +296,10 @@ export class ExecutionRules {
       const satisfied = completedNodes.has(depId);
       
       preconditions.push({
+        id: `dep_${node.nodeId.toString()}_${depId}`,
+        description: `Dependency precondition for ${node.name}`,
+        validator: (model: FunctionModel, context: ExecutionContext) => satisfied,
+        errorMessage: `Cannot execute node ${node.name}: dependency ${depId} not completed`,
         nodeId: node.nodeId.toString(),
         type: 'dependency',
         requirement: `Node ${depId} must be completed`,
@@ -315,6 +319,10 @@ export class ExecutionRules {
         const available = this.checkResourceAvailability(resource, requirement, context);
         
         preconditions.push({
+          id: `res_${node.nodeId.toString()}_${resource}`,
+          description: `Resource requirement for ${node.name}`,
+          validator: (model: FunctionModel, context: ExecutionContext) => available,
+          errorMessage: `Node ${node.name} requires ${resource} but it is not available`,
           nodeId: node.nodeId.toString(),
           type: 'resource',
           requirement: `Resource ${resource}: ${JSON.stringify(requirement)}`,
@@ -330,11 +338,16 @@ export class ExecutionRules {
 
     // Check permission requirements
     const requiredPermissions = node.metadata?.requiredPermissions as string[] | undefined;
-    if (requiredPermissions && context.userId) {
+    const userId = context.getParameter<string>('userId');
+    if (requiredPermissions && userId) {
       for (const permission of requiredPermissions) {
-        const hasPermission = this.checkUserPermission(context.userId, permission);
+        const hasPermission = this.checkUserPermission(userId, permission);
         
         preconditions.push({
+          id: `perm_${node.nodeId.toString()}_${permission}`,
+          description: `Permission requirement for ${node.name}`,
+          validator: (model: FunctionModel, context: ExecutionContext) => hasPermission,
+          errorMessage: `Node ${node.name} requires permission ${permission} which user does not have`,
           nodeId: node.nodeId.toString(),
           type: 'permission',
           requirement: `Permission: ${permission}`,
@@ -356,6 +369,10 @@ export class ExecutionRules {
       
       if (requiredEnv && requiredEnv !== currentEnv) {
         preconditions.push({
+          id: `env_${node.nodeId.toString()}_${requiredEnv}`,
+          description: `Environment requirement for ${node.name}`,
+          validator: (model: FunctionModel, context: ExecutionContext) => false,
+          errorMessage: `Node ${node.name} requires ${requiredEnv} environment but running in ${currentEnv}`,
           nodeId: node.nodeId.toString(),
           type: 'state',
           requirement: `Environment: ${requiredEnv}`,
@@ -459,9 +476,11 @@ export class ExecutionRules {
       }
       
       // Check for gaps in sequence
-      for (let i = minOrder; i <= maxOrder; i++) {
-        if (!orders.includes(i)) {
-          errors.push(`Execution order gap detected: missing order ${i}`);
+      if (minOrder >= 1) {
+        for (let i = 1; i <= maxOrder; i++) {
+          if (!orders.includes(i)) {
+            errors.push(`Execution order gap detected: missing order ${i}`);
+          }
         }
       }
     }
@@ -523,7 +542,7 @@ export class ExecutionRules {
   /**
    * Validates a FunctionModel for execution readiness
    */
-  public static validateModelForExecution(model: FunctionModel): Result<ValidationResult> {
+  public static staticValidateModelForExecution(model: FunctionModel): Result<ValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -641,7 +660,7 @@ export class ExecutionRules {
     const allPreconditions: ExecutionPrecondition[] = [...preconditions];
     
     // 1. Validate model for execution
-    const modelValidation = this.validateModelForExecution(model);
+    const modelValidation = this.staticValidateModelForExecution(model);
     if (modelValidation.isSuccess) {
       validationResults.push(modelValidation.value);
     }

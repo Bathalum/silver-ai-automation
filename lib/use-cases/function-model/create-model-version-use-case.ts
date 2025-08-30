@@ -125,7 +125,7 @@ export class CreateModelVersionUseCase {
         status: model.status
       },
       nodes: Array.from(model.nodes.values()).map(node => ({
-        id: node.id.value,
+        id: node.id.toString(),
         type: node.type,
         name: node.name,
         description: node.description,
@@ -136,8 +136,8 @@ export class CreateModelVersionUseCase {
         metadata: node.metadata
       })),
       actions: Array.from(model.actionNodes.values()).map(action => ({
-        id: action.id.value,
-        parentNodeId: action.parentNodeId.value,
+        id: action.id.toString(),
+        parentNodeId: action.parentNodeId.toString(),
         type: action.type,
         name: action.name,
         description: action.description,

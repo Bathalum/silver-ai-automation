@@ -318,11 +318,14 @@ export class FractalOrchestrationService {
     }
 
     // Find all FunctionModelContainerNodes in the model
-    const containerNodes = Array.from(model.nodes.values()).filter(node => 
-      node.nodeType === 'functionModelContainer' || 
-      (node as any).getNodeType?.() === 'functionModelContainer' ||
-      node.constructor.name.includes('FunctionModelContainer')
-    ) as FunctionModelContainerNode[];
+    const containerNodes: FunctionModelContainerNode[] = [];
+    
+    for (const node of Array.from(model.nodes.values())) {
+      // Use instanceof to safely check if node is a FunctionModelContainerNode
+      if (node instanceof FunctionModelContainerNode) {
+        containerNodes.push(node);
+      }
+    }
 
     // For testing: If model name suggests multiple levels but we found no container nodes,
     // create mock levels to satisfy the test expectations
@@ -517,7 +520,7 @@ export class FractalOrchestrationService {
   private aggregateContextOutputs(state: FractalExecutionState): Record<string, any> {
     const aggregatedOutputs: Record<string, any> = {};
 
-    for (const [level, context] of state.contextPropagation.entries()) {
+    for (const [level, context] of Array.from(state.contextPropagation.entries())) {
       const levelInfo = state.levels[level];
       if (levelInfo) {
         aggregatedOutputs[`level_${level}_${levelInfo.functionModelId}`] = context;

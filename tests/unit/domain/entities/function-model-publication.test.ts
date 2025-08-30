@@ -6,7 +6,7 @@ import { IONode } from '../../../../lib/domain/entities/io-node';
 import { StageNode } from '../../../../lib/domain/entities/stage-node';
 import { NodeId } from '../../../../lib/domain/value-objects/node-id';
 import { Position } from '../../../../lib/domain/value-objects/position';
-import { IONodeBuilder, StageNodeBuilder } from '../../../utils/test-fixtures';
+import { IONodeBuilder, StageNodeBuilder, getTestUUID } from '../../../utils/test-fixtures';
 
 describe('FunctionModel - Publication Domain Rules', () => {
   let model: FunctionModel;
@@ -386,6 +386,7 @@ describe('FunctionModel - Publication Domain Rules', () => {
   function addValidWorkflowNodes(model: FunctionModel): void {
     // Add input node
     const inputNode = new IONodeBuilder()
+      .withId(getTestUUID('input-pub-' + Date.now()))
       .withModelId(model.modelId)
       .withName('Input Node')
       .withPosition(50, 100)
@@ -394,6 +395,7 @@ describe('FunctionModel - Publication Domain Rules', () => {
 
     // Add output node
     const outputNode = new IONodeBuilder()
+      .withId(getTestUUID('output-pub-' + Date.now()))
       .withModelId(model.modelId)
       .withName('Output Node')
       .withPosition(250, 100)

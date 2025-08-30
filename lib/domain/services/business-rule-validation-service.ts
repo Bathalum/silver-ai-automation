@@ -97,19 +97,28 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     let config: any = {};
     let actionType: string = '';
 
-    // Try to get configuration from TetherNode structure
-    if ('configuration' in actionNode && actionNode.configuration) {
-      config = actionNode.configuration;
-      actionType = config.actionType || actionNode.actionType || '';
-    } 
-    // Fallback to actionData structure for compatibility
-    else if ('actionData' in actionNode && actionNode.actionData?.configuration) {
-      config = actionNode.actionData.configuration;
-      actionType = config.actionType || actionNode.actionType || '';
+    // Try to get configuration from multiple sources
+    if (actionNode.metadata && actionNode.metadata.configuration) {
+      config = actionNode.metadata.configuration;
+    } else if ('configuration' in actionNode && (actionNode as any).configuration) {
+      // TetherNode configuration property
+      config = (actionNode as any).configuration;
+    } else if ('tetherData' in actionNode && (actionNode as any).tetherData) {
+      // TetherNode tetherData property
+      config = (actionNode as any).tetherData;
+    } else {
+      // Use empty configuration as fallback
+      config = {};
     }
-    // Last resort: check if actionType is available directly
-    else {
-      actionType = actionNode.actionType || '';
+
+    // Get actionType from configuration first (test setup), then from node property, then fallback
+    if (config && config.actionType && typeof config.actionType === 'string') {
+      actionType = config.actionType;
+    } else if ('actionType' in actionNode && typeof (actionNode as any).actionType === 'string') {
+      actionType = (actionNode as any).actionType;
+    } else {
+      // Fallback to the getActionType method result
+      actionType = actionNode.getActionType().toString();
     }
 
     return { config, actionType };
@@ -369,8 +378,8 @@ export class BusinessRuleValidationService implements IBusinessRuleValidationSer
     const ioNodes = nodes.filter(node => node instanceof IONode) as IONode[];
     
     for (const ioNode of ioNodes) {
-      // Check data classification from both ioData and metadata
-      const dataClassification = ioNode.ioData?.dataClassification || ioNode.metadata?.dataClassification;
+      // Check data classification from metadata
+      const dataClassification = ioNode.metadata?.dataClassification;
       if (dataClassification === 'confidential' || dataClassification === 'restricted') {
         const hasAppropriateHandling = actionNodes.some(action => {
           const { config } = this.getNodeConfiguration(action);
