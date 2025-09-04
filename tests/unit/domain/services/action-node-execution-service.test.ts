@@ -13,7 +13,7 @@ import { ActionStatus } from '@/lib/domain/enums';
 
 describe('ActionNodeExecutionService', () => {
   let executionService: ActionNodeExecutionService;
-  const testActionId = 'action-123';
+  const testActionId = '12345678-1234-4123-8123-123456789012';
   
   beforeEach(() => {
     executionService = new ActionNodeExecutionService();
@@ -484,8 +484,8 @@ describe('ActionNodeExecutionService', () => {
 
       it('should track multiple concurrent executions', async () => {
         // Arrange
-        const actionId2 = 'action-456';
-        const actionId3 = 'action-789';
+        const actionId2 = '87654321-4321-4321-8321-210987654321';
+        const actionId3 = 'abcdef12-abcd-4abc-8abc-abcdef123456';
         
         // Act
         await executionService.startExecution(testActionId);
@@ -509,7 +509,7 @@ describe('ActionNodeExecutionService', () => {
   describe('error handling and edge cases', () => {
     it('should handle execution ID generation uniqueness', async () => {
       // Arrange
-      const actionIds = Array.from({ length: 10 }, (_, i) => `action-${i}`);
+      const actionIds = Array.from({ length: 10 }, (_, i) => `${i.toString().padStart(8, '0')}-0000-4000-8000-${i.toString().padStart(8, '0')}0000`);
       
       // Act - Start multiple executions rapidly
       await Promise.all(actionIds.map(id => executionService.startExecution(id)));
@@ -547,7 +547,7 @@ describe('ActionNodeExecutionService', () => {
     it('should handle malformed input gracefully', async () => {
       // Act & Assert - Various malformed inputs
       const emptyIdResult = await executionService.startExecution('');
-      expect(emptyIdResult).toBeValidResult(); // Service doesn't validate ID format
+      expect(emptyIdResult).toBeFailureResult(); // Service correctly validates ID format
       
       const nullResourceResult = await executionService.trackExecutionResourceUsage(testActionId, null as any);
       expect(nullResourceResult).toBeFailureResult();

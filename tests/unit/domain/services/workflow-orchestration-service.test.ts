@@ -575,8 +575,8 @@ describe('WorkflowOrchestrationService', () => {
       
       // Assert
       expect(result).toBeValidResult();
-      // Should have executed at least the original action (may have issues with dynamic action addition)
-      expect(consoleSpy).toHaveBeenCalledTimes(1);
+      // Should have executed all 3 actions: original + sequential + parallel
+      expect(consoleSpy).toHaveBeenCalledTimes(3);
       
       // Cleanup
       consoleSpy.mockRestore();

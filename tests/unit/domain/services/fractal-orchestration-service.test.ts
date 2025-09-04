@@ -628,5 +628,52 @@ describe('FractalOrchestrationService', () => {
       expect((fractalService as any).contextAccessService).toBe(mockContextService);
       expect((fractalService as any).actionOrchestrationService).toBe(mockActionOrchestrationService);
     });
+
+    it('should handle invalid model structure with null modelId', () => {
+      // Arrange - Create a mock model object with null modelId
+      const invalidModel = {
+        get modelId() { return null; },
+        nodes: new Map(),
+        // Add other required properties to avoid other errors
+      } as any;
+      
+      // Act
+      const result = fractalService.planFractalExecution(invalidModel);
+      
+      // Assert - Should fail gracefully instead of throwing
+      expect(result).toBeFailureResult();
+      expect(result.error).toContain('Failed to plan fractal execution');
+      expect(result.error).toContain('Model ID is null or undefined');
+    });
+
+    it('should handle completely null model', () => {
+      // Act
+      const result = fractalService.planFractalExecution(null as any);
+      
+      // Assert - Should fail gracefully instead of throwing
+      expect(result).toBeFailureResult();
+      expect(result.error).toContain('Failed to plan fractal execution');
+      expect(result.error).toContain('Root model is null or undefined');
+    });
+
+    it('should handle levels iteration error in consistency validation', () => {
+      // Arrange - Create execution then corrupt levels to be non-iterable
+      const planResult = fractalService.planFractalExecution(testModel);
+      expect(planResult).toBeValidResult();
+      const executionId = planResult.value;
+      
+      // Corrupt the state by setting levels to null (non-iterable)
+      const state = (fractalService as any).executionStates.get(executionId);
+      if (state) {
+        state.levels = null;
+      }
+      
+      // Act
+      const result = fractalService.validateOrchestrationConsistency(executionId);
+      
+      // Assert - Should fail gracefully instead of throwing iteration error
+      expect(result).toBeFailureResult();
+      expect(result.error).toContain('Failed to validate orchestration consistency');
+    });
   });
 });

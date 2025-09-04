@@ -54,9 +54,20 @@ export class KBNode extends ActionNode {
       return Result.fail<KBNode>(validationResult.error);
     }
 
+    // Create and validate NodeIds
+    const actionIdResult = NodeId.create(createProps.actionId);
+    if (actionIdResult.isFailure) {
+      return Result.fail<KBNode>(`Invalid action ID: ${actionIdResult.error}`);
+    }
+    
+    const parentNodeIdResult = NodeId.create(createProps.parentNodeId);
+    if (parentNodeIdResult.isFailure) {
+      return Result.fail<KBNode>(`Invalid parent node ID: ${parentNodeIdResult.error}`);
+    }
+
     const actionNodeProps: ActionNodeProps = {
-      actionId: NodeId.create(createProps.actionId).value,
-      parentNodeId: NodeId.create(createProps.parentNodeId).value,
+      actionId: actionIdResult.value,
+      parentNodeId: parentNodeIdResult.value,
       modelId: createProps.modelId,
       name: createProps.name,
       description: createProps.description,

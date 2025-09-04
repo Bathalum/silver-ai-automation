@@ -6,7 +6,7 @@ import { ActionNodeExecutionService } from '../../domain/services/action-node-ex
 import { AIAgentOrchestrationService } from '../../domain/services/ai-agent-orchestration-service';
 import { BusinessRuleValidationService } from '../../domain/services/business-rule-validation-service';
 import { NodeContextAccessService } from '../../domain/services/node-context-access-service';
-import { FunctionModel } from '../../domain/entities/function-model';
+import { FunctionModel, ValidationResult } from '../../domain/entities/function-model';
 import { ActionNode } from '../../domain/entities/action-node';
 
 /**
@@ -322,7 +322,7 @@ export class ManageErrorHandlingAndRecoveryUseCase {
           recoveryDuration: 0
         },
         contextualInformation: {
-          modelId: model.id.toString(),
+          modelId: model.id.value,
           modelName: model.name.toString(),
           validationErrors: businessRulesViolated,
           validationWarnings: warnings,

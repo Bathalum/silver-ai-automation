@@ -394,6 +394,11 @@ describe('ModelRecoveryService', () => {
           Result.ok({ integrityMaintained: true, brokenReferences: [], missingDependencies: [] })
         );
 
+        // Mock version restoration
+        jest.mocked(mockVersioningService.createRestorationVersion).mockResolvedValue(
+          Result.ok({ versionCreated: true, newVersion: '1.0.1-restored' })
+        );
+
         // Act
         const result = await service.coordinateModelRecovery(testModel, recoveryPlan);
 
@@ -466,10 +471,16 @@ describe('ModelRecoveryService', () => {
               'Upgraded shared-library to version 1.3.0',
               'Created compatibility layer for legacy components',
             ],
+            compatibilityLayerCreated: true,
           })
         );
         jest.mocked(mockNodeDependencyService.validateDependencyIntegrity).mockResolvedValue(
           Result.ok({ integrityMaintained: true, brokenReferences: [], missingDependencies: [] })
+        );
+
+        // Mock version restoration (fallback path)
+        jest.mocked(mockVersioningService.createRestorationVersion).mockResolvedValue(
+          Result.ok({ versionCreated: true, newVersion: '2.3.1-restored' })
         );
 
         // Act
@@ -640,7 +651,9 @@ describe('ModelRecoveryService', () => {
   describe('Recovery Validation and Quality Assurance', () => {
     describe('ValidateRecoveryIntegrity_PostRecovery_ShouldEnsureModelIntegrity', () => {
       it('should validate complete model integrity after recovery', async () => {
-        // Arrange - Simulate recovered model
+        // Arrange - Simulate recovered model by restoring it first
+        testModel.restore(); // Restore the model to simulate post-recovery state
+        
         const recoveryRequest = {
           modelId: 'recoverable-model-123',
           recoveredBy: 'admin-456',
@@ -759,16 +772,13 @@ describe('ModelRecoveryService', () => {
         expect(service.constructor.name).toBe('ModelRecoveryService');
         
         // Service should only depend on other domain services, not infrastructure
-        const dependencies = [
-          mockNodeDependencyService,
-          mockVersioningService,
-        ];
+        expect(mockNodeDependencyService).toBeDefined();
+        expect(mockVersioningService).toBeDefined();
 
-        dependencies.forEach(dep => {
-          expect(dep).toBeDefined();
-          // Verify these are domain services, not infrastructure implementations
-          expect(typeof dep.validateDependencyIntegrity).toBe('function');
-        });
+        // Verify node dependency service methods
+        expect(typeof mockNodeDependencyService.validateDependencyIntegrity).toBe('function');
+        expect(typeof mockNodeDependencyService.findDependentModels).toBe('function');
+        expect(typeof mockNodeDependencyService.repairBrokenReferences).toBe('function');
 
         // Verify versioning service methods
         expect(typeof mockVersioningService.validateVersionCompatibility).toBe('function');
@@ -824,11 +834,17 @@ describe('ModelRecoveryService', () => {
           modelId: 'recoverable-model-123',
           recoveredBy: 'error-tester',
           recoveryReason: 'Error handling test',
+          repairDependencies: true, // This will trigger dependency validation
         };
 
         // Mock dependency service failure
         jest.mocked(mockNodeDependencyService.validateDependencyIntegrity).mockResolvedValue(
           Result.fail('Dependency validation service unavailable')
+        );
+
+        // Mock version restoration (would fail but needed to prevent undefined error)
+        jest.mocked(mockVersioningService.createRestorationVersion).mockResolvedValue(
+          Result.ok({ versionCreated: true, newVersion: '1.0.1-restored' })
         );
 
         // Act

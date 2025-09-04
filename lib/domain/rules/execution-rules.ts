@@ -98,6 +98,49 @@ export class ExecutionRules {
   /**
    * Validates resource requirements against limits
    */
+  /**
+   * Validates execution readiness with model and context
+   */
+  public validateExecutionReadiness(
+    model: FunctionModel, 
+    context: ExecutionContext
+  ): Result<{
+    isReady: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Basic model validation
+    if (!model) {
+      errors.push('Model is required');
+    }
+
+    // Basic context validation  
+    if (!context) {
+      errors.push('Execution context is required');
+    }
+
+    // Check model status
+    if (model && model.status !== 'draft' && model.status !== 'published') {
+      errors.push(`Model status '${model.status}' is not ready for execution`);
+    }
+
+    // Check if model has actions to execute
+    if (model && model.actionNodes.size === 0) {
+      warnings.push('Model has no action nodes to execute');
+    }
+
+    const isReady = errors.length === 0;
+
+    return Result.ok({
+      isReady,
+      errors,
+      warnings
+    });
+  }
+
   public validateResourceRequirements(
     model: FunctionModel,
     resourceLimits: Record<string, any>

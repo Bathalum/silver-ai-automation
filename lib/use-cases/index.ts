@@ -30,6 +30,14 @@ export {
   type RetryFailedNodesCommand
 } from './commands/execution-commands';
 
+export {
+  type CreateCrossFeatureLinkCommand,
+  type CalculateLinkStrengthCommand,
+  type DetectRelationshipCyclesCommand,
+  type UpdateLinkStrengthCommand,
+  type RemoveCrossFeatureLinkCommand
+} from './commands/link-commands';
+
 // Queries
 export {
   type GetFunctionModelQuery,
@@ -99,6 +107,29 @@ export {
   type ErrorHandlingRequest,
   type ErrorHandlingResult
 } from './function-model/manage-error-handling-and-recovery-use-case';
+
+// Cross-Feature Integration Use Cases
+export {
+  CreateCrossFeatureLinkUseCase,
+  type ICrossFeatureLinkRepository as ICreateLinkRepository,
+  type IDomainEventPublisher as ICreateLinkEventPublisher
+} from './cross-feature/create-cross-feature-link-use-case';
+
+export {
+  CalculateLinkStrengthUseCase,
+  type ICrossFeatureLinkRepository as ICalculateLinkRepository,
+  type ILinkAnalyticsService,
+  type IDomainEventPublisher as ICalculateLinkEventPublisher,
+  type LinkStrengthUpdated
+} from './cross-feature/calculate-link-strength-use-case';
+
+export {
+  DetectRelationshipCyclesUseCase,
+  type ICrossFeatureLinkRepository as IDetectCyclesRepository,
+  type IDomainEventPublisher as IDetectCyclesEventPublisher,
+  type CycleDetectionResult,
+  type CyclesDetected
+} from './cross-feature/detect-relationship-cycles-use-case';
 
 // Query Handlers
 export {

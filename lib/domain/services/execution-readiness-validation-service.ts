@@ -10,6 +10,30 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
       const errors: string[] = [];
       const warnings: string[] = [];
 
+      // Handle empty action nodes - check if this is a draft model being configured
+      if (actionNodes.length === 0) {
+        const isDraftConfiguration = executionContext?.validationLevel !== 'execution-readiness' && 
+                                    executionContext?.executionEnvironment === 'validation';
+        
+        if (isDraftConfiguration) {
+          // For draft models during validation, warn but don't error
+          warnings.push('No action nodes configured - workflow requires action nodes for execution');
+          return Result.ok<ValidationResult>({
+            isValid: true,
+            errors,
+            warnings
+          });
+        } else {
+          // For actual execution attempts, this is an error
+          errors.push('No action nodes configured for execution');
+          return Result.ok<ValidationResult>({
+            isValid: false,
+            errors,
+            warnings
+          });
+        }
+      }
+
       // Validate action node configurations
       this.validateActionNodeConfigurations(actionNodes, errors, warnings);
       

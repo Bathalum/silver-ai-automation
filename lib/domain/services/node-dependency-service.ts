@@ -17,6 +17,11 @@ export interface ExecutionPath {
 }
 
 export class NodeDependencyService {
+  // Alias method for interface compatibility
+  public resolveDependencies(nodes: Node[]): Result<ValidationResult> {
+    return this.validateAcyclicity(nodes);
+  }
+
   public validateAcyclicity(nodes: Node[]): Result<ValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];

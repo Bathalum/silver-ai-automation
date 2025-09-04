@@ -5,24 +5,9 @@ import { Position } from '../../domain/value-objects/position';
 import { NodeId } from '../../domain/value-objects/node-id';
 import { ContainerNodeType, ExecutionMode, NodeStatus } from '../../domain/enums';
 import { Result } from '../../domain/shared/result';
+import { IFunctionModelRepository } from '../../domain/interfaces/function-model-repository';
+import { NodeRepository } from '../../domain/interfaces/node-repository';
 import { AddContainerNodeCommand } from '../commands/node-commands';
-
-export interface IFunctionModelRepository {
-  save(model: FunctionModel): Promise<Result<void>>;
-  findById(id: string): Promise<Result<FunctionModel | null>>;
-  findByName(name: string, organizationId?: string): Promise<Result<FunctionModel | null>>;
-  delete(id: string): Promise<Result<void>>;
-  findAll(filter?: ModelFilter): Promise<Result<FunctionModel[]>>;
-}
-
-export interface ModelFilter {
-  userId?: string;
-  organizationId?: string;
-  status?: string[];
-  searchTerm?: string;
-  limit?: number;
-  offset?: number;
-}
 
 export interface IEventBus {
   publish(event: DomainEvent): Promise<void>;
@@ -48,6 +33,7 @@ export interface AddContainerNodeResult {
 export class AddContainerNodeUseCase {
   constructor(
     private modelRepository: IFunctionModelRepository,
+    private nodeRepository: NodeRepository,
     private eventBus: IEventBus
   ) {}
 
@@ -99,11 +85,7 @@ export class AddContainerNodeUseCase {
             createdBy: command.userId
           },
           visualProperties: {},
-          ioData: {
-            boundaryType: 'input', // Default, will be determined by business rules
-            inputDataContract: {}, // Only for input boundary type
-            dataValidationRules: {}
-          }
+          ioData: this.createIOData(command.name)
         });
       } else if (command.nodeType === ContainerNodeType.STAGE_NODE) {
         nodeResult = StageNode.create({
@@ -145,10 +127,10 @@ export class AddContainerNodeUseCase {
         return Result.fail<AddContainerNodeResult>(addNodeResult.error);
       }
 
-      // Save updated model to repository
-      const saveResult = await this.modelRepository.save(model);
+      // Use enhanced repository method for atomic node addition
+      const saveResult = await this.modelRepository.addNode(command.modelId, node);
       if (saveResult.isFailure) {
-        return Result.fail<AddContainerNodeResult>(`Failed to save model: ${saveResult.error}`);
+        return Result.fail<AddContainerNodeResult>(`Failed to add node: ${saveResult.error}`);
       }
 
       // Publish domain event (failure should not fail the primary operation)
@@ -186,6 +168,47 @@ export class AddContainerNodeUseCase {
       return Result.fail<AddContainerNodeResult>(
         `Failed to add container node: ${error instanceof Error ? error.message : String(error)}`
       );
+    }
+  }
+
+  private inferBoundaryType(nodeName: string): 'input' | 'output' | 'input-output' {
+    const nameLower = nodeName.toLowerCase();
+    
+    if (nameLower.includes('input')) {
+      return 'input';
+    } else if (nameLower.includes('output')) {
+      return 'output';
+    } else {
+      // Default to input-output for generic IO nodes
+      return 'input-output';
+    }
+  }
+
+  private createIOData(nodeName: string): any {
+    const boundaryType = this.inferBoundaryType(nodeName);
+    const baseData = {
+      boundaryType,
+      dataValidationRules: {}
+    };
+
+    // Add appropriate data contracts based on boundary type
+    if (boundaryType === 'input') {
+      return {
+        ...baseData,
+        inputDataContract: {}
+      };
+    } else if (boundaryType === 'output') {
+      return {
+        ...baseData,
+        outputDataContract: {}
+      };
+    } else {
+      // input-output has both contracts
+      return {
+        ...baseData,
+        inputDataContract: {},
+        outputDataContract: {}
+      };
     }
   }
 

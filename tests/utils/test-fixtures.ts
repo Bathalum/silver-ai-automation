@@ -38,7 +38,7 @@ export function getTestUUID(identifier: string): string {
   // Construct UUID with proper version (4) and variant (8,9,A,B) bits
   const segment1 = fullHex.substring(0, 8);
   const segment2 = fullHex.substring(8, 12);
-  const segment3 = '4' + fullHex.substring(13, 16); // Version 4
+  const segment3 = '4' + fullHex.substring(12, 15); // Version 4
   let segment4 = fullHex.substring(16, 20); // 4 characters
   const segment5 = fullHex.substring(20, 32); // 12 characters
   
@@ -82,7 +82,7 @@ import { CreateModelCommand } from '@/lib/use-cases/commands';
  * Builder pattern for creating test FunctionModel instances
  */
 export class FunctionModelBuilder {
-  private modelId = getTestUUID('model-' + Date.now());
+  private modelId: string | null = null;
   private name = 'Test Function Model';
   private description = 'A test function model for unit testing';
   private version = '1.0.0';
@@ -141,8 +141,11 @@ export class FunctionModelBuilder {
       throw new Error(`Invalid version: ${modelVersion.error}`);
     }
 
+    // Generate unique ID if none provided
+    const finalModelId = this.modelId || getTestUUID('model-' + Date.now() + '-' + Math.random());
+
     const result = FunctionModel.create({
-      modelId: this.modelId,
+      modelId: finalModelId,
       name: modelName.value,
       description: this.description,
       version: modelVersion.value,
@@ -166,7 +169,7 @@ export class FunctionModelBuilder {
  * Builder for creating test IONode instances
  */
 export class IONodeBuilder {
-  private nodeId = getTestUUID('default-io-node');
+  private nodeId = NodeId.generate().value;
   private modelId = getTestUUID('default-model');
   private name = 'Test IO Node';
   private description = 'A test IO node';
@@ -180,7 +183,7 @@ export class IONodeBuilder {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(nodeId)) {
       // Create a deterministic UUID based on the simple identifier
       const hash = this.simpleHash(nodeId);
-      this.nodeId = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-8${hash.substring(16, 19)}-${hash.substring(19, 31)}`;
+      this.nodeId = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(12, 15)}-8${hash.substring(15, 18)}-${hash.substring(18, 30)}`;
     } else {
       this.nodeId = nodeId;
     }
@@ -276,7 +279,7 @@ export class IONodeBuilder {
  * Builder for creating test StageNode instances
  */
 export class StageNodeBuilder {
-  private nodeId = getTestUUID('default-stage-node');
+  private nodeId = NodeId.generate().value;
   private modelId = getTestUUID('default-model');
   private name = 'Test Stage Node';
   private description = 'A test stage node';
@@ -290,7 +293,7 @@ export class StageNodeBuilder {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(nodeId)) {
       // Create a deterministic UUID based on the simple identifier
       const hash = this.simpleHash(nodeId);
-      this.nodeId = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-8${hash.substring(16, 19)}-${hash.substring(19, 31)}`;
+      this.nodeId = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(12, 15)}-8${hash.substring(15, 18)}-${hash.substring(18, 30)}`;
     } else {
       this.nodeId = nodeId;
     }
@@ -399,8 +402,8 @@ export class StageNodeBuilder {
  * Builder for creating test TetherNode instances
  */
 export class TetherNodeBuilder {
-  private actionId = getTestUUID('action-' + Date.now());
-  private parentNodeId = getTestUUID('parent-' + Date.now());
+  private actionId = NodeId.generate().value;
+  private parentNodeId = NodeId.generate().value;
   private modelId = getTestUUID('model-' + Date.now());
   private name = 'Test Tether Action';
   private description = 'A test tether action';
@@ -526,8 +529,8 @@ export class TetherNodeBuilder {
  * Builder for creating test KBNode instances
  */
 export class KBNodeBuilder {
-  private actionId = getTestUUID('kb-action-' + Date.now());
-  private parentNodeId = getTestUUID('kb-parent-' + Date.now());
+  private actionId = NodeId.generate().value;
+  private parentNodeId = NodeId.generate().value;
   private modelId = getTestUUID('model-' + Date.now());
   private name = 'Test KB Action';
   private description = 'A test knowledge base action';
@@ -635,8 +638,8 @@ export class KBNodeBuilder {
  * Builder for creating test FunctionModelContainerNode instances
  */
 export class FunctionModelContainerNodeBuilder {
-  private actionId = getTestUUID('container-action-' + Date.now());
-  private parentNodeId = getTestUUID('container-parent-' + Date.now());
+  private actionId = NodeId.generate().value;
+  private parentNodeId = NodeId.generate().value;
   private modelId = getTestUUID('model-' + Date.now());
   private name = 'Test Function Model Container Action';
   private description = 'A test function model container action';
@@ -815,6 +818,54 @@ export const TestFactories = {
   },
 
   /**
+   * Create a function model with proper value object construction for testing
+   * This prevents Version construction issues
+   */
+  createModelWithProperConstruction(params: {
+    modelId?: string;
+    name?: string;
+    description?: string;
+    version?: string;
+    status?: ModelStatus;
+    userId?: string;
+  } = {}): FunctionModel {
+    const modelNameResult = ModelName.create(params.name || TestData.VALID_MODEL_NAME);
+    const versionResult = Version.create(params.version || TestData.VALID_VERSION);
+    
+    if (modelNameResult.isFailure || versionResult.isFailure) {
+      throw new Error(`Failed to create value objects: ${modelNameResult.error || versionResult.error}`);
+    }
+
+    const modelId = params.modelId || getTestUUID('model-' + Date.now());
+    const result = FunctionModel.create({
+      modelId,
+      name: modelNameResult.value,
+      description: params.description || 'Test function model',
+      version: versionResult.value,
+      status: params.status || ModelStatus.DRAFT,
+      currentVersion: versionResult.value,
+      nodes: new Map(),
+      actionNodes: new Map(),
+      metadata: { 
+        createdFor: 'testing', 
+        testUserId: params.userId || TestData.VALID_USER_ID,
+        createdAt: new Date()
+      },
+      permissions: { 
+        owner: params.userId || TestData.VALID_USER_ID, 
+        editors: [], 
+        viewers: [] 
+      }
+    });
+
+    if (result.isFailure) {
+      throw new Error(`Failed to create FunctionModel: ${result.error}`);
+    }
+
+    return result.value;
+  },
+
+  /**
    * Create a basic workflow with IO and Stage nodes (no actions)
    */
   createBasicWorkflow(): FunctionModel {
@@ -907,6 +958,101 @@ export const TestFactories = {
   },
 
   /**
+   * Create a complete workflow with IO and Stage nodes and actions in PUBLISHED status
+   */
+  createPublishedWorkflow(): FunctionModel {
+    // Create model as DRAFT first so we can add nodes
+    const model = new FunctionModelBuilder()
+      .withName(TestData.VALID_MODEL_NAME)
+      .withVersion(TestData.VALID_VERSION)
+      .withStatus(ModelStatus.DRAFT)
+      .build();
+    
+    // Add input node
+    const inputNode = new IONodeBuilder()
+      .withId('input-node')
+      .withModelId(model.modelId)
+      .withName('Input')
+      .withPosition(100, 200)
+      .asInput()
+      .build();
+    
+    // Add stage node with dependencies
+    const stageNode = new StageNodeBuilder()
+      .withId('stage-node')
+      .withModelId(model.modelId)
+      .withName('Process')
+      .withPosition(300, 200)
+      .build();
+    
+    // Add output node with dependencies
+    const outputNode = new IONodeBuilder()
+      .withId('output-node')
+      .withModelId(model.modelId)
+      .withName('Output')
+      .withPosition(500, 200)
+      .asOutput()
+      .build();
+
+    // Add nodes to model (must be done while DRAFT)
+    const addInputResult = model.addNode(inputNode);
+    if (addInputResult.isFailure) {
+      throw new Error(`Failed to add input node: ${addInputResult.error}`);
+    }
+    
+    const addStageResult = model.addNode(stageNode);
+    if (addStageResult.isFailure) {
+      throw new Error(`Failed to add stage node: ${addStageResult.error}`);
+    }
+    
+    const addOutputResult = model.addNode(outputNode);
+    if (addOutputResult.isFailure) {
+      throw new Error(`Failed to add output node: ${addOutputResult.error}`);
+    }
+    
+    // Create connections by setting dependencies
+    stageNode.addDependency(inputNode.nodeId);
+    outputNode.addDependency(stageNode.nodeId);
+    
+    // Add an action to the stage node to avoid warnings
+    const tetherAction = new TetherNodeBuilder()
+      .withParentNode(stageNode.nodeId.toString())
+      .withModelId(model.modelId)
+      .withName('Process Action')
+      .build();
+    
+    const addActionResult = model.addActionNode(tetherAction);
+    if (addActionResult.isFailure) {
+      throw new Error(`Failed to add tether action: ${addActionResult.error}`);
+    }
+    
+    // Now publish the model
+    const publishResult = model.publish();
+    if (publishResult.isFailure) {
+      throw new Error(`Failed to publish model: ${publishResult.error}`);
+    }
+    
+    return model;
+  },
+
+  /**
+   * Create a published model with no nodes (invalid for execution)
+   */
+  createPublishedInvalidModel(): FunctionModel {
+    const model = new FunctionModelBuilder()
+      .withName(TestData.VALID_MODEL_NAME)
+      .withVersion(TestData.VALID_VERSION)
+      .withStatus(ModelStatus.DRAFT)
+      .build();
+    
+    // Manually force publish without validation by accessing private props
+    // This creates a model that is PUBLISHED but has no nodes (invalid)
+    (model as any).props.status = ModelStatus.PUBLISHED;
+    
+    return model;
+  },
+
+  /**
    * Create a CreateModelCommand for testing use cases
    */
   createModelCommand(overrides: Partial<CreateModelCommand> = {}): CreateModelCommand {
@@ -952,4 +1098,259 @@ export const MockGenerators = {
       updated_at: new Date().toISOString()
     };
   }
+};
+
+/**
+ * Mock Supabase client for testing
+ * Provides a comprehensive mock that supports most Supabase operations
+ */
+export function createMockSupabaseClient() {
+  const mockData: Record<string, Record<string, any>> = {
+    function_models: {},
+    function_model_nodes: {},
+    audit_logs: {},
+    cross_feature_links: {},
+    node_links: {},
+    ai_agents: {}
+  };
+
+  const mockFrom = (table: string) => {
+    const mockSelect = (columns = '*', options?: any) => {
+      const tableData = mockData[table] || {};
+      const allData = Object.values(tableData);
+      
+      // Handle count queries
+      if (options?.count === 'exact') {
+        return Promise.resolve({ data: allData, error: null });
+      }
+      
+      return {
+        eq: (column: string, value: any) => {
+          const filtered = allData.filter((item: any) => item[column] === value);
+          
+          const chainableResult = {
+            // Allow chaining more eq filters
+            eq: (nextColumn: string, nextValue: any) => {
+              const doubleFiltered = filtered.filter((item: any) => item[nextColumn] === nextValue);
+              
+              const nextChainable = {
+                eq: (thirdColumn: string, thirdValue: any) => {
+                  const tripleFiltered = doubleFiltered.filter((item: any) => item[thirdColumn] === thirdValue);
+                  
+                  const finalChainable = {
+                    eq: (fourthColumn: string, fourthValue: any) => {
+                      const quadFiltered = tripleFiltered.filter((item: any) => item[fourthColumn] === fourthValue);
+                      
+                      return {
+                        single: () => Promise.resolve({ 
+                          data: quadFiltered.length > 0 ? quadFiltered[0] : null, 
+                          error: quadFiltered.length === 0 ? { code: 'PGRST116', message: 'Not found' } : null 
+                        }),
+                        limit: (count: number) => Promise.resolve({ data: quadFiltered.slice(0, count), error: null }),
+                        order: (column: string, options?: { ascending?: boolean }) => Promise.resolve({ data: quadFiltered, error: null })
+                      };
+                    },
+                    single: () => Promise.resolve({ 
+                      data: tripleFiltered.length > 0 ? tripleFiltered[0] : null, 
+                      error: tripleFiltered.length === 0 ? { code: 'PGRST116', message: 'Not found' } : null 
+                    }),
+                    limit: (count: number) => Promise.resolve({ data: tripleFiltered.slice(0, count), error: null }),
+                    order: (column: string, options?: { ascending?: boolean }) => Promise.resolve({ data: tripleFiltered, error: null })
+                  };
+                  
+                  return finalChainable;
+                },
+                single: () => Promise.resolve({ 
+                  data: doubleFiltered.length > 0 ? doubleFiltered[0] : null, 
+                  error: doubleFiltered.length === 0 ? { code: 'PGRST116', message: 'Not found' } : null 
+                }),
+                limit: (count: number) => Promise.resolve({ data: doubleFiltered.slice(0, count), error: null }),
+                order: (column: string, options?: { ascending?: boolean }) => Promise.resolve({ data: doubleFiltered, error: null })
+              };
+              
+              return nextChainable;
+            },
+            single: () => Promise.resolve({ 
+              data: filtered.length > 0 ? filtered[0] : null, 
+              error: filtered.length === 0 ? { code: 'PGRST116', message: 'Not found' } : null 
+            }),
+            limit: (count: number) => Promise.resolve({ data: filtered.slice(0, count), error: null }),
+            order: (column: string, options?: { ascending?: boolean }) => Promise.resolve({ data: filtered, error: null })
+          };
+          
+          return chainableResult;
+        },
+        
+        in: (column: string, values: any[]) => {
+          const filtered = allData.filter((item: any) => values.includes(item[column]));
+          return Promise.resolve({ data: filtered, error: null });
+        },
+        
+        is: (column: string, value: any) => {
+          const filtered = allData.filter((item: any) => {
+            if (value === null) return item[column] === null || item[column] === undefined;
+            return item[column] === value;
+          });
+          return {
+            single: () => Promise.resolve({ 
+              data: filtered.length > 0 ? filtered[0] : null, 
+              error: filtered.length === 0 ? { code: 'PGRST116' } : null 
+            }),
+            limit: (count: number) => Promise.resolve({ data: filtered.slice(0, count), error: null })
+          };
+        },
+        
+        not: (column: string, operator: string, value: any) => {
+          let filtered;
+          if (operator === 'is') {
+            filtered = allData.filter((item: any) => item[column] !== value);
+          } else {
+            filtered = allData.filter((item: any) => item[column] !== value);
+          }
+          return Promise.resolve({ data: filtered, error: null });
+        },
+        
+        ilike: (column: string, pattern: string) => {
+          const regex = new RegExp(pattern.replace(/%/g, '.*'), 'i');
+          const filtered = allData.filter((item: any) => regex.test(item[column]));
+          return Promise.resolve({ data: filtered, error: null });
+        },
+        
+        or: (query: string) => {
+          // Simple OR implementation for basic queries
+          const filtered = allData; // For now, return all data
+          return {
+            order: (column: string, options?: { ascending?: boolean }) => ({
+              single: () => Promise.resolve({ 
+                data: filtered.length > 0 ? filtered[0] : null, 
+                error: filtered.length === 0 ? { code: 'PGRST116', message: 'Not found' } : null 
+              }),
+              limit: (count: number) => Promise.resolve({ data: filtered.slice(0, count), error: null })
+            })
+          };
+        },
+        
+        gte: (column: string, value: any) => {
+          const filtered = allData.filter((item: any) => item[column] >= value);
+          return Promise.resolve({ data: filtered, error: null });
+        },
+        
+        order: (column: string, options?: { ascending?: boolean }) => ({
+          limit: (count: number) => Promise.resolve({ data: allData.slice(0, count), error: null }),
+          range: (from: number, to: number) => Promise.resolve({ 
+            data: allData.slice(from, to + 1), 
+            error: null 
+          })
+        }),
+        
+        limit: (count: number) => Promise.resolve({ data: allData.slice(0, count), error: null }),
+        
+        range: (from: number, to: number) => Promise.resolve({ 
+          data: allData.slice(from, to + 1), 
+          error: null 
+        })
+      };
+    };
+
+    const mockInsert = (data: any) => {
+      const records = Array.isArray(data) ? data : [data];
+      records.forEach(record => {
+        const id = record.model_id || record.node_id || record.action_id || record.link_id || record.agent_id || record.log_id || crypto.randomUUID();
+        mockData[table][id] = { ...record, id };
+      });
+      return Promise.resolve({ data: records, error: null });
+    };
+
+    const mockUpsert = (data: any) => {
+      return mockInsert(data); // For simplicity, treat upsert as insert
+    };
+
+    const mockUpdate = (data: any) => ({
+      eq: (column: string, value: any) => {
+        const tableData = mockData[table] || {};
+        const updated: any[] = [];
+        Object.keys(tableData).forEach(key => {
+          const item = tableData[key];
+          if (item[column] === value) {
+            Object.assign(item, data, { updated_at: new Date().toISOString() });
+            updated.push(item);
+          }
+        });
+        return Promise.resolve({ data: updated, error: null });
+      },
+      is: (column: string, value: any) => ({
+        eq: (column2: string, value2: any) => {
+          // Handle chained filters like .is('deleted_at', null).eq('model_id', 'some-id')
+          const tableData = mockData[table] || {};
+          const updated: any[] = [];
+          Object.keys(tableData).forEach(key => {
+            const item = tableData[key];
+            const matchesIs = value === null ? 
+              (item[column] === null || item[column] === undefined) : 
+              item[column] === value;
+            const matchesEq = item[column2] === value2;
+            
+            if (matchesIs && matchesEq) {
+              Object.assign(item, data, { updated_at: new Date().toISOString() });
+              updated.push(item);
+            }
+          });
+          return Promise.resolve({ data: updated, error: null });
+        }
+      })
+    });
+
+    const mockDelete = () => ({
+      eq: (column: string, value: any) => {
+        const tableData = mockData[table] || {};
+        const deleted: any[] = [];
+        Object.keys(tableData).forEach(key => {
+          const item = tableData[key];
+          if (item[column] === value) {
+            deleted.push(item);
+            delete tableData[key];
+          }
+        });
+        return Promise.resolve({ data: deleted, error: null });
+      }
+    });
+
+    return {
+      select: mockSelect,
+      insert: mockInsert,
+      upsert: mockUpsert,
+      update: mockUpdate,
+      delete: mockDelete
+    };
+  };
+
+  const client = {
+    from: mockFrom,
+    mockData, // Expose mockData for test access
+    auth: {
+      getUser: () => Promise.resolve({ 
+        data: { user: MockGenerators.createMockUser() }, 
+        error: null 
+      }),
+      getSession: () => Promise.resolve({ 
+        data: { session: { user: MockGenerators.createMockUser() } }, 
+        error: null 
+      })
+    },
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ data: { path: 'mock-path' }, error: null }),
+        download: () => Promise.resolve({ data: new Blob(), error: null })
+      })
+    },
+    channel: (channelName: string) => ({
+      on: (event: string, options: any, callback: Function) => ({
+        subscribe: () => Promise.resolve()
+      }),
+      send: (payload: any) => Promise.resolve()
+    }),
+    removeAllChannels: () => Promise.resolve()
+  };
+  
+  return client;
 };

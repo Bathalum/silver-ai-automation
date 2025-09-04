@@ -257,7 +257,7 @@ export class CrossFeatureLinkingService {
                         [];
 
     if (allowedTypes.length > 0 && !allowedTypes.includes(linkType)) {
-      errors.push(`Link type ${linkType} is not allowed between ${sourceFeature} and ${targetFeature}`);
+      errors.push(`Link type ${linkType} is not compatible between ${sourceFeature} and ${targetFeature}`);
     }
 
     // Check for excessive connections by counting actual links, not just unique feature pairs

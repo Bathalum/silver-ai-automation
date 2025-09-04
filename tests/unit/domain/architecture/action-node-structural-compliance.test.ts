@@ -29,29 +29,37 @@ describe('ActionNode Structural Compliance Tests', () => {
         priority: 1,
         retryPolicy: RetryPolicy.create({
           maxAttempts: 3,
-          baseDelay: 1000,
           strategy: 'exponential',
-          maxDelay: 30000,
+          baseDelayMs: 1000,
+          maxDelayMs: 30000,
+          enabled: true,
         }).value,
         raci: RACI.create({
-          responsible: RACIRole.RESPONSIBLE,
-          accountable: RACIRole.ACCOUNTABLE,
-          consulted: RACIRole.CONSULTED,
-          informed: RACIRole.INFORMED
+          responsible: ['System'],
+          accountable: ['User'],
+          consulted: [],
+          informed: []
         }).value,
         metadata: {},
         tetherData: {
-          connection: {
-            sourceNodeId: NodeId.create('11111111-0000-4000-8000-111111110000').value,
-            targetNodeId: NodeId.create('22222222-0000-4000-8000-222222220000').value,
-            connectionType: 'data-flow',
+          tetherReferenceId: 'test-reference-id',
+          executionParameters: {},
+          outputMapping: {},
+          executionTriggers: [],
+          resourceRequirements: {
+            cpu: '200m',
+            memory: '256Mi',
+            timeout: 30,
           },
-          transformationRules: [],
         },
         createdAt: new Date(),
         updatedAt: new Date(),
       });
 
+      if (tetherNodeResult.isFailure) {
+        console.error('TetherNode creation failed:', tetherNodeResult.error);
+        throw new Error(`TetherNode creation failed: ${tetherNodeResult.error}`);
+      }
       expect(tetherNodeResult.isSuccess).toBe(true);
       tetherNode = tetherNodeResult.value;
     });

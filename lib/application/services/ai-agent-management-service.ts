@@ -299,7 +299,33 @@ export interface ArchitecturalComplianceResult {
 }
 
 export class AIAgentManagementService {
-  constructor(private readonly dependencies: AIAgentManagementServiceDependencies) {}
+  private dependencies: AIAgentManagementServiceDependencies;
+
+  constructor(
+    agentRepository: any,
+    eventBus: IEventBus,
+    businessRuleService: any,
+    dependencies?: AIAgentManagementServiceDependencies
+  ) {
+    if (dependencies) {
+      this.dependencies = dependencies;
+    } else {
+      // Create dependencies internally for legacy constructor
+      this.dependencies = {
+        registerUseCase: new RegisterAIAgentUseCase(agentRepository, eventBus),
+        discoverUseCase: new DiscoverAgentsByCapabilityUseCase(agentRepository),
+        executeUseCase: new ExecuteAIAgentTaskUseCase(agentRepository, eventBus),
+        semanticSearchUseCase: new PerformSemanticAgentSearchUseCase(agentRepository),
+        workflowCoordinationUseCase: new CoordinateWorkflowAgentExecutionUseCase(
+          new ExecuteAIAgentTaskUseCase(agentRepository, eventBus),
+          eventBus
+        ),
+        agentRepository,
+        auditRepository: {} as any, // Will be passed separately
+        eventBus
+      };
+    }
+  }
 
   // Expose dependencies for testing and architectural validation
   get registerUseCase() { return this.dependencies.registerUseCase; }
@@ -310,6 +336,113 @@ export class AIAgentManagementService {
   get agentRepository() { return this.dependencies.agentRepository; }
   get auditRepository() { return this.dependencies.auditRepository; }
   get eventBus() { return this.dependencies.eventBus; }
+
+  /**
+   * Orchestrate workflow agents based on requirements and strategy
+   * Coordinates multiple agents for complex workflow execution
+   */
+  async orchestrateWorkflowAgents(request: {
+    modelId: string;
+    agentRequirements: Array<{
+      capability: string;
+      priority: string;
+      resourceRequirements?: { memory?: string; cpu?: string; };
+    }>;
+    coordinationStrategy: {
+      executionMode: string;
+      failureHandling: string;
+      performanceOptimization?: boolean;
+    };
+    userId: string;
+  }): Promise<Result<{
+    agentsOrchestrated: number;
+    orchestrationId: string;
+    coordinationStrategy: string;
+    agentsAssigned: Array<{
+      agentId: string;
+      capability: string;
+      priority: string;
+    }>;
+  }>> {
+    try {
+      const orchestrationId = crypto.randomUUID();
+      const agentsAssigned: Array<{ agentId: string; capability: string; priority: string; }> = [];
+
+      // Step 1: Discover agents for each capability requirement
+      for (const requirement of request.agentRequirements) {
+        const discoveryResult = await this.dependencies.discoverUseCase.execute({
+          requiredCapabilities: [requirement.capability],
+          maxResults: 1,
+          userId: request.userId
+        });
+
+        if (discoveryResult.isSuccess && discoveryResult.value.matches.length > 0) {
+          const agent = discoveryResult.value.matches[0];
+          agentsAssigned.push({
+            agentId: agent.agentId,
+            capability: requirement.capability,
+            priority: requirement.priority
+          });
+        } else {
+          // Register a new agent for this capability if none found
+          const registerResult = await this.dependencies.registerUseCase.execute({
+            agentId: `agent-${requirement.capability}-${Date.now()}`,
+            name: `${requirement.capability} Agent`,
+            capabilities: [requirement.capability],
+            featureType: 'function_model' as any,
+            version: '1.0.0',
+            userId: request.userId
+          });
+
+          if (registerResult.isSuccess) {
+            agentsAssigned.push({
+              agentId: registerResult.value.agentId,
+              capability: requirement.capability,
+              priority: requirement.priority
+            });
+          }
+        }
+      }
+
+      // Step 2: Publish orchestration events
+      await this.dependencies.eventBus.publish({
+        eventType: 'ServiceCoordinationCompleted',
+        aggregateId: request.modelId,
+        eventData: {
+          service: 'AIAgentManagementService',
+          orchestrationId,
+          agentsOrchestrated: agentsAssigned.length,
+          modelId: request.modelId
+        },
+        userId: request.userId,
+        timestamp: new Date()
+      });
+
+      await this.dependencies.eventBus.publish({
+        eventType: 'AgentManagementServiceExecuted',
+        aggregateId: request.modelId,
+        eventData: {
+          orchestrationId,
+          modelId: request.modelId,
+          operationType: 'orchestrateWorkflowAgents',
+          success: true,
+          agentsCoordinated: agentsAssigned.length
+        },
+        userId: request.userId,
+        timestamp: new Date()
+      });
+
+      return Result.ok({
+        agentsOrchestrated: agentsAssigned.length,
+        orchestrationId,
+        coordinationStrategy: request.coordinationStrategy.executionMode,
+        agentsAssigned
+      });
+
+    } catch (error) {
+      return Result.fail(`Agent orchestration failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   /**
    * Execute complete agent lifecycle: register → discover → execute

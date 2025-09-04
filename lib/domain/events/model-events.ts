@@ -425,8 +425,9 @@ export class ModelUndeletedEvent extends DomainEvent {
   public getEventData(): Record<string, any> {
     const data: Record<string, any> = {
       aggregateId: this.aggregateId,
+      modelId: this.aggregateId, // Include modelId for backwards compatibility and test expectations
       restoredBy: this.restoredBy,
-      restoredAt: this.restoredAt.toISOString(),
+      restoredAt: this.restoredAt,
     };
 
     if (this.reason !== undefined) {

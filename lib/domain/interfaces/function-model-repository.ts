@@ -1,10 +1,12 @@
 import { Result } from '../shared/result';
 import { FunctionModel } from '../entities/function-model';
+import { Node } from '../entities/node';
+import { ActionNode } from '../entities/action-node';
 import { ModelStatus } from '../enums';
 
 export interface IFunctionModelRepository {
   save(model: FunctionModel): Promise<Result<void>>;
-  findById(id: string): Promise<Result<FunctionModel>>;
+  findById(id: string): Promise<Result<FunctionModel | null>>;
   findByName(name: string): Promise<Result<FunctionModel[]>>;
   findByStatus(status: ModelStatus[]): Promise<Result<FunctionModel[]>>;
   findAll(): Promise<Result<FunctionModel[]>>;
@@ -21,6 +23,20 @@ export interface IFunctionModelRepository {
   findDeleted(): Promise<Result<FunctionModel[]>>;
   findPublishedVersions(): Promise<Result<FunctionModel[]>>;
   findDraftVersions(): Promise<Result<FunctionModel[]>>;
+
+  // Enhanced methods for Phase 2
+  addNode(modelId: string, node: Node): Promise<Result<void>>;
+  addActionNode(modelId: string, actionNode: ActionNode): Promise<Result<void>>;
+  searchModelsByNodeContent(query: string): Promise<Result<FunctionModel[]>>;
+  findModelsWithComplexFilters(filters: {
+    status?: ModelStatus[];
+    namePattern?: string;
+    hasNodes?: boolean;
+    limit?: number;
+    offset?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<Result<FunctionModel[]>>;
 }
 
 // Keep backwards compatibility

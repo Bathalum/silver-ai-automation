@@ -6,6 +6,11 @@ import { Result } from '../shared/result';
 import { IBusinessRuleValidationService } from '../../use-cases/function-model/validate-workflow-structure-use-case';
 
 export class BusinessRuleValidationService implements IBusinessRuleValidationService {
+  // Alias method for interface compatibility
+  async validate(model: FunctionModel, actionNodes: ActionNode[]): Promise<Result<ValidationResult>> {
+    return this.validateBusinessRules(model, actionNodes);
+  }
+
   async validateBusinessRules(model: FunctionModel, actionNodes: ActionNode[]): Promise<Result<ValidationResult>> {
     try {
       // Handle null/undefined inputs gracefully

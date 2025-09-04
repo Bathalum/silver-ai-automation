@@ -32,6 +32,11 @@ import { AddActionNodeToContainerUseCase } from '../../lib/use-cases/function-mo
 import { ExecuteFunctionModelUseCase } from '../../lib/use-cases/function-model/execute-function-model-use-case';
 import { ArchiveFunctionModelUseCase } from '../../lib/use-cases/function-model/archive-function-model-use-case';
 import { SoftDeleteFunctionModelUseCase } from '../../lib/use-cases/function-model/soft-delete-function-model-use-case';
+import { WorkflowOrchestrationService } from '../../lib/domain/services/workflow-orchestration-service';
+import { ActionNodeExecutionService } from '../../lib/domain/services/action-node-execution-service';
+import { FractalOrchestrationService } from '../../lib/domain/services/fractal-orchestration-service';
+import { ActionNodeOrchestrationService } from '../../lib/domain/services/action-node-orchestration-service';
+import { NodeContextAccessService } from '../../lib/domain/services/node-context-access-service';
 
 import { 
   FunctionModelRepository,
@@ -44,7 +49,7 @@ import { IFunctionModelRepository } from '../../lib/use-cases/function-model/cre
 
 import { IEventBus } from '../../lib/infrastructure/events/supabase-event-bus';
 import { Result } from '../../lib/domain/shared/result';
-import { ModelStatus } from '../../lib/domain/enums';
+import { ModelStatus, ContainerNodeType } from '../../lib/domain/enums';
 
 /**
  * Mock Use Cases for missing implementations
@@ -473,7 +478,22 @@ describe('Complete User Workflows - E2E Test Suite', () => {
     addContainerUseCase = new AddContainerNodeUseCase(mockRepository, mockEventBus);
     addActionUseCase = new AddActionNodeToContainerUseCase(mockRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockRepository, mockEventBus);
-    executeModelUseCase = new ExecuteFunctionModelUseCase(mockRepository, mockEventBus);
+    // Create required domain services for execution
+    const mockWorkflowOrchestrationService = new WorkflowOrchestrationService();
+    const mockActionNodeExecutionService = new ActionNodeExecutionService();
+    const mockFractalOrchestrationService = new FractalOrchestrationService();
+    const mockActionNodeOrchestrationService = new ActionNodeOrchestrationService();
+    const mockNodeContextAccessService = new NodeContextAccessService();
+    
+    executeModelUseCase = new ExecuteFunctionModelUseCase(
+      mockRepository, 
+      mockEventBus,
+      mockWorkflowOrchestrationService,
+      mockActionNodeExecutionService,
+      mockFractalOrchestrationService,
+      mockActionNodeOrchestrationService,
+      mockNodeContextAccessService
+    );
     validateWorkflowUseCase = new ValidateWorkflowStructureUseCase(mockRepository);
     createVersionUseCase = new CreateModelVersionUseCase(mockRepository, mockEventBus);
     archiveModelUseCase = new ArchiveFunctionModelUseCase(mockRepository, mockEventBus);
@@ -521,20 +541,24 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         // Verify UC-001 effects
         const createdModel = await mockRepository.findById(modelId);
         expect(createdModel.isSuccess).toBe(true);
-        expect(createdModel.value.name.toString()).toBe(workflowName);
+        // Access name from the props structure (mock repository stores raw object)
+        expect(createdModel.value.props.name._value).toBe(workflowName);
 
         // UC-002: Add Container Node (must create model before adding nodes)
         const addContainerResult = await addContainerUseCase.execute({
           modelId,
-          nodeType: 'stage',
-          nodeName: 'Processing Stage',
-          nodeDescription: 'Main processing stage for E2E test',
+          nodeType: ContainerNodeType.STAGE_NODE,
+          name: 'Processing Stage',
+          description: 'Main processing stage for E2E test',
           position: { x: 300, y: 200 },
           userId: testUserId
         });
 
+        if (addContainerResult.isFailure) {
+          console.log('AddContainer failed with error:', addContainerResult.error);
+        }
         expect(addContainerResult.isSuccess).toBe(true);
-        expect(addContainerResult.value.nodeType).toBe('stage');
+        expect(addContainerResult.value.nodeType).toBe(ContainerNodeType.STAGE_NODE);
         
         const stageNodeId = addContainerResult.value.nodeId;
 

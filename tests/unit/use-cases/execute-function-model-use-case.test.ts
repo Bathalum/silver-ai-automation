@@ -12,11 +12,14 @@ import { ActionNodeOrchestrationService } from '@/lib/domain/services/action-nod
 import { NodeContextAccessService } from '@/lib/domain/services/node-context-access-service';
 import { TestFactories, TestData } from '../../utils/test-fixtures';
 import { ModelStatus } from '@/lib/domain/enums';
+import { AuditLogEventHandler } from '@/lib/infrastructure/events/audit-log-event-handler';
 
 describe('UC-005: ExecuteFunctionModelUseCase', () => {
   let useCase: ExecuteFunctionModelUseCase;
   let mockModelRepository: any;
   let mockEventBus: any;
+  let mockAuditRepository: any;
+  let auditLogEventHandler: AuditLogEventHandler;
   let workflowOrchestrationService: WorkflowOrchestrationService;
   let actionNodeExecutionService: ActionNodeExecutionService;
   let fractalOrchestrationService: FractalOrchestrationService;
@@ -25,7 +28,6 @@ describe('UC-005: ExecuteFunctionModelUseCase', () => {
 
   beforeEach(() => {
     // Create real service instances
-    workflowOrchestrationService = new WorkflowOrchestrationService();
     actionNodeExecutionService = new ActionNodeExecutionService();
     nodeContextAccessService = new NodeContextAccessService();
     actionNodeOrchestrationService = new ActionNodeOrchestrationService(nodeContextAccessService);
@@ -40,9 +42,24 @@ describe('UC-005: ExecuteFunctionModelUseCase', () => {
       save: jest.fn()
     };
 
-    mockEventBus = {
-      publish: jest.fn().mockResolvedValue(undefined)
+    mockAuditRepository = {
+      save: jest.fn().mockResolvedValue({ isSuccess: true }),
+      findById: jest.fn(),
+      findByEntityId: jest.fn(),
+      findAll: jest.fn().mockResolvedValue({ isSuccess: true, value: [] })
     };
+
+    mockEventBus = {
+      publish: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn()
+    };
+
+    // Set up audit trail generation
+    auditLogEventHandler = new AuditLogEventHandler(mockAuditRepository);
+    auditLogEventHandler.subscribeToEvents(mockEventBus);
+
+    // Create workflow orchestration service with event bus
+    workflowOrchestrationService = new WorkflowOrchestrationService(undefined, mockEventBus);
 
     useCase = new ExecuteFunctionModelUseCase(
       mockModelRepository,
@@ -58,8 +75,7 @@ describe('UC-005: ExecuteFunctionModelUseCase', () => {
   describe('workflow execution', () => {
     it('should execute a valid workflow successfully', async () => {
       // Arrange
-      const model = TestFactories.createCompleteWorkflow();
-      // Note: Can't directly set status as it's read-only, model is DRAFT by default which should work
+      const model = TestFactories.createPublishedWorkflow();
       
       mockModelRepository.findById.mockResolvedValue({
         isSuccess: true,
@@ -90,8 +106,10 @@ describe('UC-005: ExecuteFunctionModelUseCase', () => {
       expect(executionResult.failedNodes).toHaveLength(0);
       expect(executionResult.errors).toHaveLength(0);
       
-      // Verify events were published
-      expect(mockEventBus.publish).toHaveBeenCalledTimes(2); // Started and Completed
+      // Verify events were published - now includes orchestration and node/action events
+      expect(mockEventBus.publish).toHaveBeenCalledTimes(12); // Multiple events for comprehensive audit trail
+      
+      // Verify key workflow events
       expect(mockEventBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'WorkflowExecutionStarted',
@@ -104,11 +122,23 @@ describe('UC-005: ExecuteFunctionModelUseCase', () => {
           aggregateId: model.modelId
         })
       );
+      
+      // Verify node execution events are published
+      expect(mockEventBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'NodeExecutionStarted'
+        })
+      );
+      expect(mockEventBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'NodeExecutionCompleted'
+        })
+      );
     });
 
     it('should handle dry run execution', async () => {
       // Arrange
-      const model = TestFactories.createCompleteWorkflow();
+      const model = TestFactories.createPublishedWorkflow();
       
       mockModelRepository.findById.mockResolvedValue({
         isSuccess: true,
@@ -201,7 +231,7 @@ describe('UC-005: ExecuteFunctionModelUseCase', () => {
 
     it('should handle invalid workflows', async () => {
       // Arrange
-      const model = TestFactories.createValidModel(); // Empty model with no nodes
+      const model = TestFactories.createPublishedInvalidModel(); // Published model with no nodes
       
       mockModelRepository.findById.mockResolvedValue({
         isSuccess: true,
@@ -311,7 +341,7 @@ describe('UC-005: ExecuteFunctionModelUseCase', () => {
 
     it('should handle orchestration service errors', async () => {
       // Arrange
-      const model = TestFactories.createCompleteWorkflow();
+      const model = TestFactories.createPublishedWorkflow();
       
       mockModelRepository.findById.mockResolvedValue({
         isSuccess: true,

@@ -1,7 +1,11 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Result } from '../../domain/shared/result';
-import { IEventBus } from '../../use-cases/function-model/create-function-model-use-case';
 import { DomainEvent } from './domain-event';
+
+// Interface export for dependency injection
+export interface IEventBus {
+  publish(event: any): Promise<Result<void>>;
+}
 
 interface EventRow {
   event_id: string;

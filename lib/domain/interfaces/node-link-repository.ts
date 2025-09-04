@@ -1,5 +1,6 @@
 import { Result } from '../shared/result';
 import { NodeLink } from '../entities/node-link';
+import { CrossFeatureLink } from '../entities/cross-feature-link';
 import { NodeId } from '../value-objects/node-id';
 import { FeatureType, LinkType } from '../enums';
 
@@ -13,7 +14,7 @@ export interface NodeLinkRepository {
   findBySourceNode(nodeId: NodeId): Promise<Result<NodeLink[]>>;
   findByTargetNode(nodeId: NodeId): Promise<Result<NodeLink[]>>;
   findByLinkType(linkType: LinkType): Promise<Result<NodeLink[]>>;
-  findCrossFeatureLinks(): Promise<Result<NodeLink[]>>;
+  findCrossFeatureLinks(): Promise<Result<CrossFeatureLink[]>>;
   findByFeaturePair(sourceFeature: FeatureType, targetFeature: FeatureType): Promise<Result<NodeLink[]>>;
   findStrongLinks(threshold?: number): Promise<Result<NodeLink[]>>;
   findWeakLinks(threshold?: number): Promise<Result<NodeLink[]>>;

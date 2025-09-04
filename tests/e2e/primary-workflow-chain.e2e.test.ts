@@ -23,6 +23,16 @@ import {
   IContextValidationService,
   ICrossFeatureValidationService
 } from '../../lib/use-cases';
+import { WorkflowStructuralValidationService } from '../../lib/domain/services/workflow-structural-validation-service';
+import { BusinessRuleValidationService } from '../../lib/domain/services/business-rule-validation-service';
+import { ExecutionReadinessValidationService } from '../../lib/domain/services/execution-readiness-validation-service';
+import { ContextValidationService } from '../../lib/domain/services/context-validation-service';
+import { CrossFeatureValidationService } from '../../lib/domain/services/cross-feature-validation-service';
+import { WorkflowOrchestrationService } from '../../lib/domain/services/workflow-orchestration-service';
+import { ActionNodeExecutionService } from '../../lib/domain/services/action-node-execution-service';
+import { FractalOrchestrationService } from '../../lib/domain/services/fractal-orchestration-service';
+import { ActionNodeOrchestrationService } from '../../lib/domain/services/action-node-orchestration-service';
+import { NodeContextAccessService } from '../../lib/domain/services/node-context-access-service';
 import { FunctionModel } from '../../lib/domain/entities/function-model';
 
 // Import specific interfaces for compatibility
@@ -272,64 +282,6 @@ class MockEventBus implements IEventBus {
   }
 }
 
-// Mock validation services for ValidateWorkflowStructureUseCase
-class MockWorkflowValidationService implements IWorkflowValidationService {
-  async validateStructuralIntegrity(nodes: any[], actionNodes: any[]): Promise<Result<any>> {
-    // Simple structural validation: check if we have at least one node
-    const isValid = nodes.length > 0;
-    console.log(`[MockWorkflowValidationService] Validating ${nodes.length} nodes, ${actionNodes.length} action nodes - isValid: ${isValid}`);
-    return Result.ok({
-      isValid,
-      errors: isValid ? [] : ['No nodes found in workflow'],
-      warnings: []
-    });
-  }
-}
-
-class MockBusinessRuleValidationService implements IBusinessRuleValidationService {
-  async validateBusinessRules(model: any, actionNodes: any[]): Promise<Result<any>> {
-    // Simple business rule validation: always pass for E2E testing
-    return Result.ok({
-      isValid: true,
-      errors: [],
-      warnings: []
-    });
-  }
-}
-
-class MockExecutionReadinessService implements IExecutionReadinessService {
-  async validateExecutionReadiness(actionNodes: any[], executionContext: any): Promise<Result<any>> {
-    // Simple execution readiness: check if action nodes exist
-    const isValid = actionNodes.length > 0;
-    return Result.ok({
-      isValid,
-      errors: isValid ? [] : ['No action nodes configured for execution'],
-      warnings: []
-    });
-  }
-}
-
-class MockContextValidationService implements IContextValidationService {
-  async validateContextIntegrity(model: any, nodes: any[]): Promise<Result<any>> {
-    // Simple context validation: always pass for E2E testing
-    return Result.ok({
-      isValid: true,
-      errors: [],
-      warnings: []
-    });
-  }
-}
-
-class MockCrossFeatureValidationService implements ICrossFeatureValidationService {
-  async validateCrossFeatureDependencies(model: any): Promise<Result<any>> {
-    // Simple cross-feature validation: always pass for E2E testing
-    return Result.ok({
-      isValid: true,
-      errors: [],
-      warnings: []
-    });
-  }
-}
 
 /**
  * E2E Test Suite: Primary User Workflow Chain
@@ -368,19 +320,34 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
     mockAuditRepository = new MockAuditLogRepository();
     mockEventBus = new MockEventBus();
 
-    // Initialize validation service mocks
-    mockWorkflowValidationService = new MockWorkflowValidationService();
-    mockBusinessRuleValidationService = new MockBusinessRuleValidationService();
-    mockExecutionReadinessService = new MockExecutionReadinessService();
-    mockContextValidationService = new MockContextValidationService();
-    mockCrossFeatureValidationService = new MockCrossFeatureValidationService();
+    // Initialize validation services with real implementations
+    mockWorkflowValidationService = new WorkflowStructuralValidationService();
+    mockBusinessRuleValidationService = new BusinessRuleValidationService();
+    mockExecutionReadinessService = new ExecutionReadinessValidationService();
+    mockContextValidationService = new ContextValidationService();
+    mockCrossFeatureValidationService = new CrossFeatureValidationService();
 
     // Initialize Use Cases with real business logic
     createModelUseCase = new CreateFunctionModelUseCase(mockRepository, mockEventBus);
     addContainerUseCase = new AddContainerNodeUseCase(mockRepository, mockEventBus);
     addActionUseCase = new AddActionNodeToContainerUseCase(mockRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockRepository, mockEventBus);
-    executeModelUseCase = new ExecuteFunctionModelUseCase(mockRepository, mockEventBus);
+    // Create required domain services for execution
+    const mockWorkflowOrchestrationService = new WorkflowOrchestrationService();
+    const mockActionNodeExecutionService = new ActionNodeExecutionService();
+    const mockFractalOrchestrationService = new FractalOrchestrationService();
+    const mockActionNodeOrchestrationService = new ActionNodeOrchestrationService();
+    const mockNodeContextAccessService = new NodeContextAccessService();
+    
+    executeModelUseCase = new ExecuteFunctionModelUseCase(
+      mockRepository, 
+      mockEventBus,
+      mockWorkflowOrchestrationService,
+      mockActionNodeExecutionService,
+      mockFractalOrchestrationService,
+      mockActionNodeOrchestrationService,
+      mockNodeContextAccessService
+    );
     validateWorkflowUseCase = new ValidateWorkflowStructureUseCase(
       mockRepository,
       mockWorkflowValidationService,
@@ -468,6 +435,30 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         expect(addActionResult.value.actionType).toBe(ActionNodeType.TETHER_NODE);
         expect(addActionResult.value.parentNodeId).toBe(stageNodeId);
 
+        // Add input IO node to make workflow valid
+        const addInputResult = await addContainerUseCase.execute({
+          modelId,
+          nodeType: ContainerNodeType.IO_NODE,
+          name: 'Input Boundary',
+          description: 'Input boundary for E2E test workflow',
+          position: { x: 100, y: 200 },
+          userId: testUserId
+        });
+
+        expect(addInputResult.isSuccess).toBe(true);
+
+        // Add output IO node to make workflow valid  
+        const addOutputResult = await addContainerUseCase.execute({
+          modelId,
+          nodeType: ContainerNodeType.IO_NODE,
+          name: 'Output Boundary', 
+          description: 'Output boundary for E2E test workflow',
+          position: { x: 500, y: 200 },
+          userId: testUserId
+        });
+
+        expect(addOutputResult.isSuccess).toBe(true);
+
         // UC-004: Validate and Publish (must configure actions before publishing)
         const validateResult = await validateWorkflowUseCase.execute({
           modelId,
@@ -511,7 +502,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         expect(events.some(e => e.eventType === 'ContainerNodeAdded')).toBe(true);
         expect(events.some(e => e.eventType === 'ActionNodeAdded')).toBe(true);
         expect(events.some(e => e.eventType === 'FunctionModelPublished')).toBe(true);
-        expect(events.some(e => e.eventType === 'FunctionModelExecuted')).toBe(true);
+        expect(events.some(e => e.eventType === 'WorkflowExecutionCompleted')).toBe(true);
       });
 
       it('should_FailGracefully_WhenDependencyViolated', async () => {

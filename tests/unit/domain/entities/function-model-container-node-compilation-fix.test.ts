@@ -13,9 +13,9 @@ import { ActionStatus, ExecutionMode } from '@/lib/domain/enums';
 describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
   describe('Configuration object typing', () => {
     it('should handle executionPolicy configuration correctly', () => {
-      // Arrange
-      const nodeId = NodeId.create('test-container-node').value!;
-      const parentId = NodeId.create('parent-node').value!;
+      // Arrange - Use proper UUID format that NodeId.create expects
+      const nodeId = NodeId.generate(); // Use generate() for valid UUID
+      const parentId = NodeId.generate(); // Use generate() for valid UUID
       
       const retryPolicy = RetryPolicy.create({
         maxAttempts: 3,
@@ -53,14 +53,17 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
         console.log('Creation failed with error:', result.error);
       }
       expect(result.isSuccess).toBe(true);
-      expect(result.value!.containerData.executionPolicy).toBeDefined();
-      expect(result.value!.containerData.executionPolicy!.triggerConditions).toEqual(['condition1']);
+      
+      if (result.isSuccess) {
+        expect(result.value.containerData.executionPolicy).toBeDefined();
+        expect(result.value.containerData.executionPolicy!.triggerConditions).toEqual(['condition1']);
+      }
     });
 
     it('should handle orchestrationMode as object not string', () => {
-      // Arrange
-      const nodeId = NodeId.create('test-container-node').value!;
-      const parentId = NodeId.create('parent-node').value!;
+      // Arrange - Use proper UUID format
+      const nodeId = NodeId.generate();
+      const parentId = NodeId.generate();
       
       const retryPolicy = RetryPolicy.create({
         maxAttempts: 3,
@@ -94,14 +97,17 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
 
       // Assert
       expect(result.isSuccess).toBe(true);
-      expect(result.value!.containerData.orchestrationMode).toBeDefined();
-      expect(result.value!.containerData.orchestrationMode!.integrationStyle).toBe('embedded');
+      
+      if (result.isSuccess) {
+        expect(result.value.containerData.orchestrationMode).toBeDefined();
+        expect(result.value.containerData.orchestrationMode!.integrationStyle).toBe('embedded');
+      }
     });
 
     it('should handle contextInheritance with proper array initialization', () => {
-      // Arrange
-      const nodeId = NodeId.create('test-container-node').value!;
-      const parentId = NodeId.create('parent-node').value!;
+      // Arrange - Use proper UUID format
+      const nodeId = NodeId.generate();
+      const parentId = NodeId.generate();
       
       const retryPolicy = RetryPolicy.create({
         maxAttempts: 3,
@@ -135,16 +141,19 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
 
       // Assert
       expect(result.isSuccess).toBe(true);
-      expect(result.value!.containerData.contextInheritance).toBeDefined();
-      expect(result.value!.containerData.contextInheritance!.inheritedContexts).toEqual(['context1', 'context2']);
+      
+      if (result.isSuccess) {
+        expect(result.value.containerData.contextInheritance).toBeDefined();
+        expect(result.value.containerData.contextInheritance!.inheritedContexts).toEqual(['context1', 'context2']);
+      }
     });
   });
 
   describe('Property update methods', () => {
     it('should update orchestration mode correctly', () => {
-      // Arrange
-      const nodeId = NodeId.create('test-container-node').value!;
-      const parentId = NodeId.create('parent-node').value!;
+      // Arrange - Use proper UUID format
+      const nodeId = NodeId.generate();
+      const parentId = NodeId.generate();
       
       const createProps = {
         actionId: nodeId,
@@ -158,7 +167,11 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
         priority: 1
       };
 
-      const node = FunctionModelContainerNode.create(createProps).value!;
+      const nodeResult = FunctionModelContainerNode.create(createProps);
+      expect(nodeResult.isSuccess).toBe(true);
+      if (nodeResult.isFailure) return;
+      
+      const node = nodeResult.value;
 
       // Act - This should work with the new typing
       const result = node.updateOrchestrationMode('embedded');
@@ -170,9 +183,9 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
     });
 
     it('should update execution policy without compilation errors', () => {
-      // Arrange
-      const nodeId = NodeId.create('test-container-node').value!;
-      const parentId = NodeId.create('parent-node').value!;
+      // Arrange - Use proper UUID format
+      const nodeId = NodeId.generate();
+      const parentId = NodeId.generate();
       
       const createProps = {
         actionId: nodeId,
@@ -186,7 +199,11 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
         priority: 1
       };
 
-      const node = FunctionModelContainerNode.create(createProps).value!;
+      const nodeResult = FunctionModelContainerNode.create(createProps);
+      expect(nodeResult.isSuccess).toBe(true);
+      if (nodeResult.isFailure) return;
+      
+      const node = nodeResult.value;
 
       // Act - This should work without compilation errors
       const result = node.updateExecutionPolicy({
@@ -203,9 +220,9 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
 
   describe('Context inheritance operations', () => {
     it('should handle inherited context operations safely', () => {
-      // Arrange
-      const nodeId = NodeId.create('test-container-node').value!;
-      const parentId = NodeId.create('parent-node').value!;
+      // Arrange - Use proper UUID format
+      const nodeId = NodeId.generate();
+      const parentId = NodeId.generate();
       
       const createProps = {
         actionId: nodeId,
@@ -219,7 +236,11 @@ describe('FunctionModelContainerNode Entity - Compilation Fix', () => {
         priority: 1
       };
 
-      const node = FunctionModelContainerNode.create(createProps).value!;
+      const nodeResult = FunctionModelContainerNode.create(createProps);
+      expect(nodeResult.isSuccess).toBe(true);
+      if (nodeResult.isFailure) return;
+      
+      const node = nodeResult.value;
 
       // Act - Add context without compilation errors
       const addResult = node.addInheritedContext('test-context');
