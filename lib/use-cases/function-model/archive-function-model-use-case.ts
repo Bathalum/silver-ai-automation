@@ -16,6 +16,7 @@ export interface ArchiveValidationResult {
 
 export interface ArchiveModelResult {
   modelId: string;
+  status: ModelStatus; // Add status property that E2E test expects
   previousStatus: ModelStatus;
   archivedAt: Date;
   archivedBy: string;
@@ -106,6 +107,7 @@ export class ArchiveFunctionModelUseCase {
 
       // Publish archive domain event
       try {
+        const reason = command.reason || command.archiveReason;
         const archiveEvent = new ModelArchived({
           modelId: model.modelId,
           modelName: model.name.value,
@@ -114,7 +116,7 @@ export class ArchiveFunctionModelUseCase {
           archivedAt: model.updatedAt,
           previousStatus,
           currentStatus: ModelStatus.ARCHIVED,
-          reason: command.reason
+          reason: reason
         });
 
         await this.eventBus.publish({
@@ -132,6 +134,7 @@ export class ArchiveFunctionModelUseCase {
       // Return success result with comprehensive audit information
       return Result.ok<ArchiveModelResult>({
         modelId: model.modelId,
+        status: ModelStatus.ARCHIVED, // Add status property that E2E test expects
         previousStatus,
         archivedAt: model.updatedAt,
         archivedBy: command.userId,
@@ -154,7 +157,8 @@ export class ArchiveFunctionModelUseCase {
       return Result.fail<void>('User ID is required');
     }
 
-    if (command.reason && command.reason.length > 2000) {
+    const reason = command.reason || command.archiveReason;
+    if (reason && reason.length > 2000) {
       return Result.fail<void>('Archive reason cannot exceed 2000 characters');
     }
 
@@ -199,7 +203,13 @@ export class ArchiveFunctionModelUseCase {
       // 1. Validate internal node dependencies
       const nodes = Array.from(model.nodes.values());
       if (nodes.length > 0) {
+        if (!this.nodeDependencyService) {
+          return Result.fail<ArchiveValidationResult>('Node dependency service is not available');
+        }
         const dependencyValidation = this.nodeDependencyService.validateAcyclicity(nodes);
+        if (!dependencyValidation) {
+          return Result.fail<ArchiveValidationResult>('Node dependency validation service returned invalid result');
+        }
         if (dependencyValidation.isFailure) {
           blockingDependencies.push(`Internal dependency validation failed: ${dependencyValidation.error}`);
         } else {
@@ -286,7 +296,7 @@ export class ArchiveFunctionModelUseCase {
     riskLevel: 'low' | 'medium' | 'high';
   }> {
     const internalNodesAffected = model.nodes.size + model.actionNodes.size;
-    const crossFeatureLinks = this.crossFeatureLinkingService.getFeatureLinks(model.metadata.featureType || 'function-model' as any);
+    const crossFeatureLinks = this.crossFeatureLinkingService.getFeatureLinks(model.metadata.featureType || 'function-model' as any) || [];
     const externalLinksAffected = crossFeatureLinks.length;
 
     let riskLevel: 'low' | 'medium' | 'high' = 'low';
@@ -314,7 +324,7 @@ export class ArchiveFunctionModelUseCase {
   private async cleanupCrossFeatureLinks(modelId: string, userId: string): Promise<void> {
     try {
       // Get all cross-feature links for this model
-      const crossFeatureLinks = this.crossFeatureLinkingService.getFeatureLinks('function-model' as any);
+      const crossFeatureLinks = this.crossFeatureLinkingService.getFeatureLinks('function-model' as any) || [];
       
       // Filter links that involve this model
       const modelLinks = crossFeatureLinks.filter(link => 

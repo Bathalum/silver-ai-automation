@@ -90,6 +90,8 @@ class MockNodeContextAccessService extends NodeContextAccessService {
   // Set context data for testing
   public setContextData(nodeId: string, context: NodeContextData): void {
     this.contextData.set(nodeId, context);
+    // Also update in parent service's context storage
+    super.debugForceSetContext(nodeId, context);
   }
 
   // Set up hierarchy relationships for testing
@@ -124,9 +126,17 @@ class MockNodeContextAccessService extends NodeContextAccessService {
   // Get child contexts (read/write access for parents)
   public getChildContexts(parentNodeId: string): NodeContextData[] {
     const children = this.siblingGroups.get(parentNodeId) || [];
-    return children
-      .map(childId => this.contextData.get(childId))
-      .filter(context => context !== undefined) as NodeContextData[];
+    const childContexts: NodeContextData[] = [];
+    
+    for (const childId of children) {
+      // First try to get from local context data
+      let context = this.contextData.get(childId);
+      if (context) {
+        childContexts.push(context);
+      }
+    }
+    
+    return childContexts;
   }
 
   // Get parent context (children can access parent context)

@@ -116,7 +116,7 @@ export class AIAgentOrchestrationService {
   ): Result<AgentCapabilityMatch[]> {
     const matches: AgentCapabilityMatch[] = [];
 
-    for (const agent of this.agentRegistry.values()) {
+    for (const agent of Array.from(this.agentRegistry.values())) {
       // Filter by feature type if specified
       if (featureType && agent.featureType !== featureType) {
         continue;
@@ -314,7 +314,7 @@ export class AIAgentOrchestrationService {
     // Simple keyword-based matching (in real implementation would use vector embeddings)
     const queryKeywords = query.toLowerCase().split(' ');
 
-    for (const metadata of this.metadataRegistry.values()) {
+    for (const metadata of Array.from(this.metadataRegistry.values())) {
       if (featureType && metadata.featureType !== featureType) {
         continue;
       }
@@ -486,7 +486,7 @@ export class AIAgentOrchestrationService {
 
     // If agent is node-level, get node context
     if (agent.nodeId) {
-      const nodeContextResult = this.contextAccessService.getNodeContext(
+      const nodeContextResult = this.contextAccessService.getNodeContextWithAccess(
         agent.agentId,
         agent.nodeId,
         'read'

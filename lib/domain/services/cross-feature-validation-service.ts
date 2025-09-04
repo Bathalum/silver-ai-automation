@@ -45,7 +45,7 @@ export class CrossFeatureValidationService implements ICrossFeatureValidationSer
     
     // Collect external feature dependencies
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
       // Check for external feature module references
       const externalModules = config?.externalFeatureModules || [];
@@ -91,9 +91,9 @@ export class CrossFeatureValidationService implements ICrossFeatureValidationSer
     const actionNodes = Array.from(model.actionNodes.values());
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
-      if (actionNode.actionType === 'api-call' || config?.isExternalApiCall) {
+      if (actionNode.getActionType() === 'api-call' || config?.isExternalApiCall) {
         const serviceName = config?.serviceName;
         const expectedContract = config?.expectedApiContract;
         
@@ -133,7 +133,7 @@ export class CrossFeatureValidationService implements ICrossFeatureValidationSer
     
     // Collect service version requirements
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const serviceDependencies = config?.serviceDependencies || {};
       
       for (const [serviceName, versionRequirement] of Object.entries(serviceDependencies)) {
@@ -203,7 +203,7 @@ export class CrossFeatureValidationService implements ICrossFeatureValidationSer
     const actionNodes = Array.from(model.actionNodes.values());
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
       // Check external service integrations
       if (config?.isExternalService || config?.requiresAuthentication) {
@@ -394,7 +394,7 @@ export class CrossFeatureValidationService implements ICrossFeatureValidationSer
     const dataFlowMap = new Map<string, Set<string>>();
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const sourceSystem = config?.sourceSystem || 'internal';
       const targetSystems = config?.targetSystems || [];
       
@@ -420,7 +420,7 @@ export class CrossFeatureValidationService implements ICrossFeatureValidationSer
     let hasResidencyRequirements = false;
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
       if (config?.sourceSystem === sourceSystem && config?.targetSystems?.includes(targetSystem)) {
         containsPII = containsPII || config?.processesPersonalData || false;

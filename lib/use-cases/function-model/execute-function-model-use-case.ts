@@ -7,6 +7,7 @@ import { FractalOrchestrationService } from '../../domain/services/fractal-orche
 import { ActionNodeOrchestrationService } from '../../domain/services/action-node-orchestration-service';
 import { NodeContextAccessService } from '../../domain/services/node-context-access-service';
 import { IFunctionModelRepository, IEventBus } from './create-function-model-use-case';
+import { ModelStatus } from '../../domain/enums';
 
 export interface ExecuteWorkflowResult {
   executionId: string;
@@ -43,10 +44,13 @@ export class ExecuteFunctionModelUseCase {
 
   async execute(command: ExecuteWorkflowCommand): Promise<Result<ExecuteWorkflowResult>> {
     try {
-      // Validate command
-      const validationResult = this.validateCommand(command);
-      if (validationResult.isFailure) {
-        return Result.fail<ExecuteWorkflowResult>(validationResult.error);
+      // Basic command validation (without environment)
+      if (!command.modelId || command.modelId.trim().length === 0) {
+        return Result.fail<ExecuteWorkflowResult>('Model ID is required');
+      }
+
+      if (!command.userId || command.userId.trim().length === 0) {
+        return Result.fail<ExecuteWorkflowResult>('User ID is required');
       }
 
       // Retrieve the function model
@@ -68,6 +72,17 @@ export class ExecuteFunctionModelUseCase {
       // Check if model can be executed
       if (model.deletedAt) {
         return Result.fail<ExecuteWorkflowResult>('Cannot execute deleted model');
+      }
+
+      // BUSINESS RULE: Check publication status FIRST
+      if (model.status !== ModelStatus.PUBLISHED) {
+        return Result.fail<ExecuteWorkflowResult>('Function model must be published before execution');
+      }
+
+      // Set default environment if not provided and validate
+      const environment = command.environment || 'development';
+      if (!['development', 'staging', 'production'].includes(environment)) {
+        return Result.fail<ExecuteWorkflowResult>('Valid environment is required (development, staging, production)');
       }
 
       // Validate the workflow before execution
@@ -94,7 +109,7 @@ export class ExecuteFunctionModelUseCase {
         startTime: new Date(),
         parameters: command.parameters || {},
         userId: command.userId,
-        environment: command.environment
+        environment: environment
       };
 
       // Publish execution started event
@@ -105,12 +120,17 @@ export class ExecuteFunctionModelUseCase {
           executionId: executionContext.executionId,
           modelId: command.modelId,
           userId: command.userId,
-          environment: command.environment,
+          environment: environment,
           parameters: command.parameters
         },
         userId: command.userId,
         timestamp: executionContext.startTime
       });
+
+      // Inject event bus into orchestration service if not already set
+      if (this.workflowOrchestrationService && typeof this.workflowOrchestrationService.setEventBus === 'function') {
+        this.workflowOrchestrationService.setEventBus(this.eventBus);
+      }
 
       // Execute the workflow using orchestration service
       const executionResult = await this.workflowOrchestrationService.executeWorkflow(model, executionContext);
@@ -201,21 +221,6 @@ export class ExecuteFunctionModelUseCase {
     return this.workflowOrchestrationService.stopExecution(executionId);
   }
 
-  private validateCommand(command: ExecuteWorkflowCommand): Result<void> {
-    if (!command.modelId || command.modelId.trim().length === 0) {
-      return Result.fail<void>('Model ID is required');
-    }
-
-    if (!command.userId || command.userId.trim().length === 0) {
-      return Result.fail<void>('User ID is required');
-    }
-
-    if (!['development', 'staging', 'production'].includes(command.environment)) {
-      return Result.fail<void>('Valid environment is required (development, staging, production)');
-    }
-
-    return Result.ok<void>(undefined);
-  }
 
   private hasExecutionPermission(model: FunctionModel, userId: string): boolean {
     const permissions = model.permissions;

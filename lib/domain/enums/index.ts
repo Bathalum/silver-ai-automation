@@ -2,7 +2,8 @@ export enum FeatureType {
   FUNCTION_MODEL = 'function-model',
   KNOWLEDGE_BASE = 'knowledge-base',
   SPINDLE = 'spindle',
-  EVENT_STORM = 'event-storm'
+  EVENT_STORM = 'event-storm',
+  AI_AGENT = 'ai-agent'
 }
 
 export enum ContainerNodeType {
@@ -64,7 +65,20 @@ export enum LinkType {
   NESTED = 'nested',
   TRIGGERS = 'triggers',
   CONSUMES = 'consumes',
-  PRODUCES = 'produces'
+  PRODUCES = 'produces',
+  DEPENDENCY = 'dependency',
+  REFERENCE = 'reference'
+}
+
+export enum LinkStrength {
+  WEAK = 'weak',
+  MEDIUM = 'medium',
+  STRONG = 'strong'
+}
+
+export enum LinkDirection {
+  UNIDIRECTIONAL = 'unidirectional',
+  BIDIRECTIONAL = 'bidirectional'
 }
 
 export enum RACIRole {

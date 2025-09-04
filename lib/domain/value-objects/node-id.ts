@@ -29,7 +29,9 @@ export class NodeId {
     }
 
     const trimmedId = idString.trim();
-    if (!NodeId.UUID_PATTERN.test(trimmedId)) {
+    // Create fresh regex pattern to avoid potential caching issues
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(trimmedId)) {
       return Result.fail<NodeId>('Node ID must be a valid UUID');
     }
 
@@ -49,6 +51,9 @@ export class NodeId {
   }
 
   public equals(other: NodeId): boolean {
+    if (!other || !other._value) {
+      return false;
+    }
     return this._value.toLowerCase() === other._value.toLowerCase();
   }
 

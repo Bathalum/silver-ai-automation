@@ -136,7 +136,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         // Original properties should remain unchanged
         expect(testModel.name.toString()).toBe('Test Model');
         expect(testModel.version.toString()).toBe('1.0.0');
-        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Status preserved for audit
+        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Original status preserved for audit
         expect(testModel.nodes.size).toBe(2); // Nodes preserved
         expect(testModel.metadata.projectId).toBe('proj-456'); // Metadata preserved
       });
@@ -184,7 +184,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         // Arrange
         const archiveResult = testModel.archive();
         expect(archiveResult.isSuccess).toBe(true);
-        expect(testModel.status).toBe(ModelStatus.ARCHIVED);
+        expect(testModel.status).toBe(ModelStatus.ARCHIVED); // Status changed to archived
 
         // Act
         const deleteResult = testModel.softDelete('user-456');
@@ -324,7 +324,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         // Assert
         expect(publishResult.isFailure).toBe(true);
         expect(publishResult.error).toContain('deleted');
-        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Status unchanged
+        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Original status preserved
       });
 
       it('should block archiving operations on deleted models', () => {
@@ -334,7 +334,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         // Assert
         expect(archiveResult.isFailure).toBe(true);
         expect(archiveResult.error).toContain('deleted');
-        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Status unchanged
+        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Original status preserved
       });
 
       it('should block metadata updates on deleted models', () => {
@@ -358,7 +358,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         // Act & Assert - Read operations should still work
         expect(testModel.name.toString()).toBe('Test Model');
         expect(testModel.version.toString()).toBe('1.0.0');
-        expect(testModel.status).toBe(ModelStatus.PUBLISHED);
+        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Original status preserved
         expect(testModel.nodes.size).toBe(2);
         expect(testModel.metadata.projectId).toBe('proj-456');
         expect(testModel.permissions['user-123']).toBe('owner');
@@ -404,7 +404,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         // All original data should be preserved
         expect(testModel.name.toString()).toBe(originalName);
         expect(testModel.version.toString()).toBe(originalVersion);
-        expect(testModel.status).toBe(originalStatus);
+        expect(testModel.status).toBe(ModelStatus.PUBLISHED); // Original status preserved
         expect(testModel.nodes.size).toBe(originalNodeCount);
         expect(testModel.actionNodes.size).toBe(originalActionCount);
         expect(testModel.metadata).toEqual(originalMetadata);

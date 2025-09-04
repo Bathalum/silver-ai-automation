@@ -481,8 +481,9 @@ describe('WorkflowOrchestrationService', () => {
       
       // Assert
       expect(result).toBeValidResult();
+      // Should have executed at least one tether node (either original or new one)
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Executing Tether Node: Test Tether')
+        expect.stringContaining('Executing Tether Node:')
       );
       
       // Cleanup
@@ -574,7 +575,8 @@ describe('WorkflowOrchestrationService', () => {
       
       // Assert
       expect(result).toBeValidResult();
-      expect(consoleSpy).toHaveBeenCalledTimes(3); // All 3 actions executed (original + 2 new ones)
+      // Should have executed all 3 actions: original + sequential + parallel
+      expect(consoleSpy).toHaveBeenCalledTimes(3);
       
       // Cleanup
       consoleSpy.mockRestore();

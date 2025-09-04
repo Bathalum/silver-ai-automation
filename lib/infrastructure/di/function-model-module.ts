@@ -11,6 +11,12 @@ import { PublishFunctionModelUseCase } from '../../use-cases/function-model/publ
 import { GetFunctionModelQueryHandler } from '../../use-cases/queries/get-function-model-query';
 import { WorkflowOrchestrationService } from '../../domain/services/workflow-orchestration-service';
 import { NodeDependencyService } from '../../domain/services/node-dependency-service';
+import { WorkflowStructuralValidationService } from '../../domain/services/workflow-structural-validation-service';
+import { BusinessRuleValidationService } from '../../domain/services/business-rule-validation-service';
+import { ExecutionReadinessValidationService } from '../../domain/services/execution-readiness-validation-service';
+import { ContextValidationService } from '../../domain/services/context-validation-service';
+import { CrossFeatureValidationService } from '../../domain/services/cross-feature-validation-service';
+import { ValidateWorkflowStructureUseCase } from '../../use-cases/function-model/validate-workflow-structure-use-case';
 
 /**
  * Service module for Function Model feature registration
@@ -86,11 +92,11 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.singleton(
       ServiceTokens.CACHE_SERVICE,
       async (c) => {
-        const config = await c.resolve(ServiceTokens.CACHE_CONFIG);
-        if (config.isFailure) {
-          throw new Error('Failed to resolve cache config');
+        const configResult = await c.resolve(ServiceTokens.CACHE_CONFIG);
+        if (configResult.isFailure) {
+          throw new Error(`Failed to resolve cache config: ${configResult.error}`);
         }
-        return new MemoryCacheService(config.value);
+        return new MemoryCacheService(configResult.value);
       }
     ));
 
@@ -98,12 +104,12 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.singleton(
       ServiceTokens.FUNCTION_MODEL_CACHE_SERVICE,
       async (c) => {
-        const cacheService = await c.resolve(ServiceTokens.CACHE_SERVICE);
-        if (cacheService.isFailure) {
-          throw new Error('Failed to resolve cache service');
+        const cacheServiceResult = await c.resolve(ServiceTokens.CACHE_SERVICE);
+        if (cacheServiceResult.isFailure) {
+          throw new Error(`Failed to resolve cache service: ${cacheServiceResult.error}`);
         }
         
-        return new FunctionModelCacheService(cacheService.value, {
+        return new FunctionModelCacheService(cacheServiceResult.value, {
           modelTtl: 3600,        // 1 hour
           listTtl: 600,          // 10 minutes
           statsTtl: 1800,        // 30 minutes
@@ -117,11 +123,11 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.singleton(
       ServiceTokens.EVENT_BUS,
       async (c) => {
-        const supabaseClient = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
-        if (supabaseClient.isFailure) {
-          throw new Error('Failed to resolve Supabase client');
+        const supabaseClientResult = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
+        if (supabaseClientResult.isFailure) {
+          throw new Error(`Failed to resolve Supabase client: ${supabaseClientResult.error}`);
         }
-        return new SupabaseEventBus(supabaseClient.value);
+        return new SupabaseEventBus(supabaseClientResult.value);
       }
     ));
   }
@@ -131,11 +137,11 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.scoped(
       ServiceTokens.FUNCTION_MODEL_REPOSITORY,
       async (c) => {
-        const supabaseClient = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
-        if (supabaseClient.isFailure) {
-          throw new Error('Failed to resolve Supabase client');
+        const supabaseClientResult = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
+        if (supabaseClientResult.isFailure) {
+          throw new Error(`Failed to resolve Supabase client: ${supabaseClientResult.error}`);
         }
-        return new SupabaseFunctionModelRepository(supabaseClient.value);
+        return new SupabaseFunctionModelRepository(supabaseClientResult.value);
       }
     ));
   }
@@ -145,13 +151,13 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.singleton(
       ServiceTokens.AI_SERVICE_ADAPTER,
       async (c) => {
-        const config = await c.resolve(ServiceTokens.AI_CONFIG);
-        if (config.isFailure) {
-          throw new Error('Failed to resolve AI config');
+        const configResult = await c.resolve(ServiceTokens.AI_CONFIG);
+        if (configResult.isFailure) {
+          throw new Error(`Failed to resolve AI config: ${configResult.error}`);
         }
         return new OpenAIServiceAdapter(
-          config.value.openAI.apiKey,
-          config.value.openAI.baseUrl
+          configResult.value.openAI.apiKey,
+          configResult.value.openAI.baseUrl
         );
       }
     ));
@@ -160,13 +166,13 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.singleton(
       ServiceTokens.NOTIFICATION_SERVICE_ADAPTER,
       async (c) => {
-        const config = await c.resolve(ServiceTokens.NOTIFICATION_CONFIG);
-        if (config.isFailure) {
-          throw new Error('Failed to resolve notification config');
+        const configResult = await c.resolve(ServiceTokens.NOTIFICATION_CONFIG);
+        if (configResult.isFailure) {
+          throw new Error(`Failed to resolve notification config: ${configResult.error}`);
         }
         return new SupabaseNotificationServiceAdapter(
-          config.value.supabase.url,
-          config.value.supabase.key
+          configResult.value.supabase.url,
+          configResult.value.supabase.key
         );
       }
     ));
@@ -188,6 +194,42 @@ export class FunctionModelModule implements ServiceModule {
         return new NodeDependencyService();
       }
     ));
+
+    // Register validation services
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.WORKFLOW_VALIDATION_SERVICE,
+      async (c) => {
+        return new WorkflowStructuralValidationService();
+      }
+    ));
+
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.BUSINESS_RULE_VALIDATION_SERVICE,
+      async (c) => {
+        return new BusinessRuleValidationService();
+      }
+    ));
+
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.EXECUTION_READINESS_VALIDATION_SERVICE,
+      async (c) => {
+        return new ExecutionReadinessValidationService();
+      }
+    ));
+
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.CONTEXT_VALIDATION_SERVICE,
+      async (c) => {
+        return new ContextValidationService();
+      }
+    ));
+
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.CROSS_FEATURE_VALIDATION_SERVICE,
+      async (c) => {
+        return new CrossFeatureValidationService();
+      }
+    ));
   }
 
   private registerUseCases(container: Container): void {
@@ -195,17 +237,17 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.transient(
       ServiceTokens.CREATE_FUNCTION_MODEL_USE_CASE,
       async (c) => {
-        const repository = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
-        const eventBus = await c.resolve(ServiceTokens.EVENT_BUS);
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
         
-        if (repository.isFailure) {
-          throw new Error('Failed to resolve function model repository');
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
         }
-        if (eventBus.isFailure) {
-          throw new Error('Failed to resolve event bus');
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
         }
         
-        return new CreateFunctionModelUseCase(repository.value, eventBus.value);
+        return new CreateFunctionModelUseCase(repositoryResult.value, eventBusResult.value);
       }
     ));
 
@@ -213,17 +255,17 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.transient(
       ServiceTokens.UPDATE_FUNCTION_MODEL_USE_CASE,
       async (c) => {
-        const repository = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
-        const eventBus = await c.resolve(ServiceTokens.EVENT_BUS);
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
         
-        if (repository.isFailure) {
-          throw new Error('Failed to resolve function model repository');
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
         }
-        if (eventBus.isFailure) {
-          throw new Error('Failed to resolve event bus');
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
         }
         
-        return new UpdateFunctionModelUseCase(repository.value, eventBus.value);
+        return new UpdateFunctionModelUseCase(repositoryResult.value, eventBusResult.value);
       }
     ));
 
@@ -231,17 +273,58 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.transient(
       ServiceTokens.PUBLISH_FUNCTION_MODEL_USE_CASE,
       async (c) => {
-        const repository = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
-        const eventBus = await c.resolve(ServiceTokens.EVENT_BUS);
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
         
-        if (repository.isFailure) {
-          throw new Error('Failed to resolve function model repository');
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
         }
-        if (eventBus.isFailure) {
-          throw new Error('Failed to resolve event bus');
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
         }
         
-        return new PublishFunctionModelUseCase(repository.value, eventBus.value);
+        return new PublishFunctionModelUseCase(repositoryResult.value, eventBusResult.value);
+      }
+    ));
+
+    // Register validate workflow structure use case
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.VALIDATE_WORKFLOW_STRUCTURE_USE_CASE,
+      async (c) => {
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const workflowValidationServiceResult = await c.resolve(ServiceTokens.WORKFLOW_VALIDATION_SERVICE);
+        const businessRuleValidationServiceResult = await c.resolve(ServiceTokens.BUSINESS_RULE_VALIDATION_SERVICE);
+        const executionReadinessServiceResult = await c.resolve(ServiceTokens.EXECUTION_READINESS_VALIDATION_SERVICE);
+        const contextValidationServiceResult = await c.resolve(ServiceTokens.CONTEXT_VALIDATION_SERVICE);
+        const crossFeatureValidationServiceResult = await c.resolve(ServiceTokens.CROSS_FEATURE_VALIDATION_SERVICE);
+        
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
+        }
+        if (workflowValidationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve workflow validation service: ${workflowValidationServiceResult.error}`);
+        }
+        if (businessRuleValidationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve business rule validation service: ${businessRuleValidationServiceResult.error}`);
+        }
+        if (executionReadinessServiceResult.isFailure) {
+          throw new Error(`Failed to resolve execution readiness service: ${executionReadinessServiceResult.error}`);
+        }
+        if (contextValidationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve context validation service: ${contextValidationServiceResult.error}`);
+        }
+        if (crossFeatureValidationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve cross feature validation service: ${crossFeatureValidationServiceResult.error}`);
+        }
+        
+        return new ValidateWorkflowStructureUseCase(
+          repositoryResult.value,
+          workflowValidationServiceResult.value,
+          businessRuleValidationServiceResult.value,
+          executionReadinessServiceResult.value,
+          contextValidationServiceResult.value,
+          crossFeatureValidationServiceResult.value
+        );
       }
     ));
   }
@@ -251,13 +334,13 @@ export class FunctionModelModule implements ServiceModule {
     container.register(ServiceRegistration.transient(
       ServiceTokens.GET_FUNCTION_MODEL_QUERY_HANDLER,
       async (c) => {
-        const repository = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
         
-        if (repository.isFailure) {
-          throw new Error('Failed to resolve function model repository');
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
         }
         
-        return new GetFunctionModelQueryHandler(repository.value);
+        return new GetFunctionModelQueryHandler(repositoryResult.value);
       }
     ));
   }

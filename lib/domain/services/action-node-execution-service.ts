@@ -50,9 +50,12 @@ export class ActionNodeExecutionService {
 
       const executionId = this.generateExecutionId();
       
-      // Handle NodeId creation - for tests, store the original ID but create a proper NodeId for internal use
+      // Validate NodeId - execution should fail if actionId is invalid
       const nodeIdResult = NodeId.create(actionId);
-      const nodeIdValue = nodeIdResult.isSuccess ? nodeIdResult.value : NodeId.generate();
+      if (nodeIdResult.isFailure) {
+        return Result.fail<void>(`Failed to start execution: ${nodeIdResult.error}`);
+      }
+      const nodeIdValue = nodeIdResult.value;
       
       const executionContext: ExecutionContext = {
         actionId: nodeIdValue,
@@ -240,6 +243,11 @@ export class ActionNodeExecutionService {
     }
   }
 
+  // Alias for the use case that expects this method name
+  public async evaluateRetryPolicy(actionId: string): Promise<Result<boolean>> {
+    return this.retryPolicyEvaluation(actionId);
+  }
+
   public async getExecutionMetrics(actionId: string): Promise<Result<ExecutionMetrics>> {
     try {
       const metrics = this.executionMetrics.get(actionId);
@@ -355,7 +363,7 @@ export class ActionNodeExecutionService {
 
       const snapshot = this.executionSnapshots.get(actionId);
       if (snapshot) {
-        snapshot.status = ActionStatus.PAUSED;
+        snapshot.status = ActionStatus.INACTIVE;
         snapshot.metadata.pausedAt = new Date();
         this.executionSnapshots.set(actionId, snapshot);
       }

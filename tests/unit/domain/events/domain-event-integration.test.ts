@@ -145,9 +145,9 @@ describe('Domain Event Behavior and Integration - Clean Architecture Compliance'
         .withStatus(ModelStatus.DRAFT)
         .build();
 
-      // Add required nodes for valid publication
-      const inputNode = new IONodeBuilder().withModelId(model.modelId).asInput().build();
-      const outputNode = new IONodeBuilder().withModelId(model.modelId).asOutput().build();
+      // Add required nodes for valid publication  
+      const inputNode = new IONodeBuilder().withId('input-node-test').withModelId(model.modelId).asInput().build();
+      const outputNode = new IONodeBuilder().withId('output-node-test').withModelId(model.modelId).asOutput().build();
       model.addNode(inputNode);
       model.addNode(outputNode);
 

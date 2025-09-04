@@ -251,7 +251,7 @@ describe('FunctionModel - Archive Lifecycle', () => {
   });
 
   describe('Archived Model - Soft Delete Integration', () => {
-    it('should set status to ARCHIVED when soft deleting', () => {
+    it('should preserve original status when soft deleting for audit purposes', () => {
       // Arrange - model starts as DRAFT
       expect(model.status).toBe(ModelStatus.DRAFT);
       expect(model.isDeleted()).toBe(false);
@@ -261,7 +261,7 @@ describe('FunctionModel - Archive Lifecycle', () => {
 
       // Assert
       expect(result.isSuccess).toBe(true);
-      expect(model.status).toBe(ModelStatus.ARCHIVED);
+      expect(model.status).toBe(ModelStatus.DRAFT); // Status preserved for audit
       expect(model.isDeleted()).toBe(true);
       expect(model.deletedAt).toBeDefined();
       expect(model.deletedBy).toBe('test-user');
@@ -273,7 +273,7 @@ describe('FunctionModel - Archive Lifecycle', () => {
 
       // Assert
       expect(result.isSuccess).toBe(true);
-      expect(model.status).toBe(ModelStatus.ARCHIVED);
+      expect(model.status).toBe(ModelStatus.DRAFT); // Status preserved for audit
       expect(model.isDeleted()).toBe(true);
       expect(model.deletedAt).toBeDefined();
       expect(model.deletedBy).toBeUndefined();

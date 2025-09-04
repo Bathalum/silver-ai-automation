@@ -1,150 +1,173 @@
 import { Result } from '../../domain/shared/result';
-import { FunctionModel } from '../../domain/entities/function-model';
-import { FunctionModelVersion } from '../../domain/entities/function-model-version';
 import { ModelVersioningService } from '../../domain/services/model-versioning-service';
-import { ModelStatus } from '../../domain/enums';
+import { ModelVersionCreated } from '../../domain/events/model-events';
 
-export interface CreateModelVersionRequest {
+// Command interface matching test expectations
+export interface CreateModelVersionCommand {
   modelId: string;
+  userId: string;
   versionType: 'major' | 'minor' | 'patch';
-  authorId: string;
+  versionNotes?: string;
 }
 
-export interface CreateModelVersionResponse {
-  versionId: string;
-  versionNumber: string;
+// Result interface matching test expectations
+export interface CreateModelVersionResult {
+  newVersion: string;
+  versionType: 'major' | 'minor' | 'patch';
   modelId: string;
-  authorId: string;
-  isPublished: boolean;
+  userId: string;
+  versionNotes?: string;
   createdAt: Date;
+}
+
+export interface IEventBus {
+  publish(event: any): Promise<void>;
+}
+
+export interface IFunctionModelRepository {
+  findById(id: string): Promise<Result<any>>;
+  save(model: any): Promise<Result<void>>;
+  saveVersion?(modelId: string, version: any): Promise<Result<void>>;
 }
 
 export class CreateModelVersionUseCase {
   constructor(
-    private modelVersioningService: ModelVersioningService,
-    private functionModelRepository: any // Repository interface not yet defined
+    private readonly repository: IFunctionModelRepository,
+    private readonly eventBus: IEventBus
   ) {}
 
-  async execute(request: CreateModelVersionRequest): Promise<Result<CreateModelVersionResponse>> {
+  async execute(command: CreateModelVersionCommand): Promise<Result<CreateModelVersionResult>> {
     try {
-      // Validate request
-      const validationResult = this.validateRequest(request);
+      // Validate command
+      const validationResult = this.validateCommand(command);
       if (validationResult.isFailure) {
-        return Result.fail<CreateModelVersionResponse>(validationResult.error);
+        return Result.fail<CreateModelVersionResult>(validationResult.error);
       }
 
-      // Get the model (this would normally come from repository)
-      // For now, we'll simulate this since the repository pattern isn't fully implemented
-      const model = await this.getModelById(request.modelId);
-      if (!model) {
-        return Result.fail<CreateModelVersionResponse>('Model not found');
+      // Get the model from repository
+      const modelResult = await this.repository.findById(command.modelId);
+      if (modelResult.isFailure) {
+        return Result.fail<CreateModelVersionResult>(`Model not found: ${modelResult.error}`);
       }
 
-      // Check if model can create a new version
-      const canVersionResult = this.canCreateVersion(model);
-      if (canVersionResult.isFailure) {
-        return Result.fail<CreateModelVersionResponse>(canVersionResult.error);
-      }
+      const model = modelResult.value;
 
-      // Create the new version using the versioning service
-      const newVersionResult = await this.modelVersioningService.createVersion(model, request.versionType);
+      // Create versioning service and determine new version number
+      const versioningService = new ModelVersioningService();
+      const newVersionResult = await versioningService.createVersion(model, command.versionType);
+      
       if (newVersionResult.isFailure) {
-        return Result.fail<CreateModelVersionResponse>(newVersionResult.error);
+        return Result.fail<CreateModelVersionResult>(newVersionResult.error);
       }
 
       const newVersion = newVersionResult.value;
+      const newVersionString = newVersion.toString();
 
-      // Capture complete model state
-      const versionData = this.captureModelState(model);
-
-      // Create version entity
-      const versionEntityResult = FunctionModelVersion.create({
-        versionId: this.generateVersionId(),
-        modelId: request.modelId,
-        versionNumber: newVersion.toString(),
-        versionData: versionData,
-        authorId: request.authorId,
-        isPublished: false // New versions start as unpublished
-      });
-
-      if (versionEntityResult.isFailure) {
-        return Result.fail<CreateModelVersionResponse>(versionEntityResult.error);
+      // Create new model version using entity's createVersion method
+      const newModelResult = model.createVersion(newVersionString);
+      if (newModelResult.isFailure) {
+        return Result.fail<CreateModelVersionResult>(newModelResult.error);
       }
 
-      const versionEntity = versionEntityResult.value;
+      const newModel = newModelResult.value;
+      
+      // Save the new model version
+      const saveResult = await this.repository.save(newModel);
+      if (saveResult.isFailure) {
+        return Result.fail<CreateModelVersionResult>(`Failed to save model: ${saveResult.error}`);
+      }
 
-      // Prepare response
-      const response: CreateModelVersionResponse = {
-        versionId: versionEntity.versionId,
-        versionNumber: versionEntity.versionNumber,
-        modelId: versionEntity.modelId,
-        authorId: versionEntity.authorId,
-        isPublished: versionEntity.isPublished,
-        createdAt: versionEntity.createdAt
+      // Save version history if repository supports it
+      if (this.repository.saveVersion) {
+        const versionData = {
+          versionId: this.generateVersionId(),
+          modelId: command.modelId,
+          versionNumber: newVersionString,
+          versionType: command.versionType,
+          userId: command.userId,
+          versionNotes: command.versionNotes,
+          createdAt: new Date(),
+          versionData: this.captureModelState(newModel)
+        };
+
+        await this.repository.saveVersion(command.modelId, versionData);
+      }
+
+      // Publish domain event
+      const event = new ModelVersionCreated({
+        modelId: command.modelId,
+        modelName: newModel.name?.value || newModel.name || 'Unknown Model',
+        previousVersion: model.version?.toString() || '1.0.0',
+        newVersion: newVersionString,
+        createdBy: command.userId,
+        createdAt: new Date(),
+        versionNotes: command.versionNotes
+      });
+      
+      await this.eventBus.publish(event);
+
+      // Return result matching test expectations
+      const result: CreateModelVersionResult = {
+        newVersion: newVersionString,
+        versionType: command.versionType,
+        modelId: command.modelId,
+        userId: command.userId,
+        versionNotes: command.versionNotes,
+        createdAt: new Date()
       };
 
-      return Result.ok<CreateModelVersionResponse>(response);
+      return Result.ok<CreateModelVersionResult>(result);
 
     } catch (error) {
-      return Result.fail<CreateModelVersionResponse>(`Failed to create model version: ${error instanceof Error ? error.message : String(error)}`);
+      return Result.fail<CreateModelVersionResult>(
+        `Failed to create model version: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
-  private validateRequest(request: CreateModelVersionRequest): Result<void> {
-    if (!request.modelId || request.modelId.trim().length === 0) {
+  private validateCommand(command: CreateModelVersionCommand): Result<void> {
+    if (!command.modelId || command.modelId.trim().length === 0) {
       return Result.fail<void>('Model ID is required');
     }
 
-    if (!request.authorId || request.authorId.trim().length === 0) {
-      return Result.fail<void>('Author ID is required');
+    if (!command.userId || command.userId.trim().length === 0) {
+      return Result.fail<void>('User ID is required');
     }
 
-    if (!['major', 'minor', 'patch'].includes(request.versionType)) {
+    if (!['major', 'minor', 'patch'].includes(command.versionType)) {
       return Result.fail<void>('Version type must be major, minor, or patch');
     }
 
     return Result.ok<void>(undefined);
   }
 
-  private canCreateVersion(model: FunctionModel): Result<void> {
-    // Only draft models can create new versions directly
-    if (model.status !== ModelStatus.DRAFT) {
-      return Result.fail<void>('Only draft models can create new versions directly');
-    }
-
-    return Result.ok<void>(undefined);
-  }
-
-  private captureModelState(model: FunctionModel): any {
+  private captureModelState(model: any): any {
     // Capture complete reproducible model state
     return Object.freeze({
       modelMetadata: {
-        id: model.id,
-        name: model.name.value,
-        description: model.description,
+        id: model.modelId || model.id,
+        name: model.name?.value || model.name || 'Unknown',
+        description: model.description || '',
         status: model.status
       },
-      nodes: Array.from(model.nodes.values()).map(node => ({
-        id: node.id.value,
+      nodes: model.nodes ? Array.from(model.nodes.values()).map((node: any) => ({
+        id: node.id?.toString() || node.nodeId,
         type: node.type,
         name: node.name,
         description: node.description,
-        position: {
-          x: node.position.x,
-          y: node.position.y
-        },
-        metadata: node.metadata
-      })),
-      actions: Array.from(model.actionNodes.values()).map(action => ({
-        id: action.id.value,
-        parentNodeId: action.parentNodeId.value,
+        position: node.position || { x: 0, y: 0 },
+        metadata: node.metadata || {}
+      })) : [],
+      actions: model.actionNodes ? Array.from(model.actionNodes.values()).map((action: any) => ({
+        id: action.id?.toString() || action.nodeId,
+        parentNodeId: action.parentNodeId?.toString(),
         type: action.type,
         name: action.name,
         description: action.description,
         executionOrder: action.executionOrder,
         priority: action.priority,
-        metadata: action.metadata
-      })),
+        metadata: action.metadata || {}
+      })) : [],
       links: [], // Links would be captured here when implemented
       configuration: model.metadata || {}
     });
@@ -152,13 +175,5 @@ export class CreateModelVersionUseCase {
 
   private generateVersionId(): string {
     return `version_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  private async getModelById(modelId: string): Promise<FunctionModel | null> {
-    // This would normally use the repository
-    // For now, return null to simulate not found
-    // In a real implementation, this would be:
-    // return await this.functionModelRepository.getById(modelId);
-    return null;
   }
 }

@@ -237,7 +237,6 @@ export class AIAgentExecutionStarted extends DomainEvent {
 }
 
 export class AIAgentExecutionCompleted extends DomainEvent {
-  public readonly eventType = 'AIAgentExecutionCompleted';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: AIAgentExecutionCompletedData) {
@@ -246,7 +245,7 @@ export class AIAgentExecutionCompleted extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'AIAgentExecutionCompleted';
   }
 
   public getEventData(): Record<string, any> {
@@ -258,7 +257,6 @@ export class AIAgentExecutionCompleted extends DomainEvent {
 }
 
 export class AIAgentExecutionFailed extends DomainEvent {
-  public readonly eventType = 'AIAgentExecutionFailed';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: AIAgentExecutionFailedData) {
@@ -267,7 +265,7 @@ export class AIAgentExecutionFailed extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'AIAgentExecutionFailed';
   }
 
   public getEventData(): Record<string, any> {

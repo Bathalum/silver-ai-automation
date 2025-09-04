@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.35% </span>
+                <span class="strong">2.32% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/170</span>
+                <span class='fraction'>4/172</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/72</span>
+                <span class='fraction'>0/80</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.7% </span>
+                <span class="strong">2.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/148</span>
+                <span class='fraction'>4/150</span>
             </div>
         
             
@@ -364,13 +364,19 @@
 <a name='L299'></a><a href='#L299'>299</a>
 <a name='L300'></a><a href='#L300'>300</a>
 <a name='L301'></a><a href='#L301'>301</a>
-<a name='L302'></a><a href='#L302'>302</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">34x</span>
+<span class="cline-any cline-yes">34x</span>
+<span class="cline-any cline-yes">34x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">34x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -611,18 +617,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -911,19 +923,25 @@ export class <span class="cstat-no" title="statement not covered" >WorkflowValid
       }
 &nbsp;
       // Validate output extraction
-      const extractedOutputs = <span class="cstat-no" title="statement not covered" >containerNode.containerData.outputExtraction.extractedOutputs;</span>
-<span class="cstat-no" title="statement not covered" >      if (extractedOutputs.length === 0) {</span>
-<span class="cstat-no" title="statement not covered" >        warnings.push(`Container node "${containerNode.name}" extracts no outputs from nested model`);</span>
+<span class="cstat-no" title="statement not covered" >      if (containerNode.containerData.outputExtraction &amp;&amp; </span>
+          containerNode.containerData.outputExtraction.extractedOutputs) {
+        const extractedOutputs = <span class="cstat-no" title="statement not covered" >containerNode.containerData.outputExtraction.extractedOutputs;</span>
+<span class="cstat-no" title="statement not covered" >        if (extractedOutputs.length === 0) {</span>
+<span class="cstat-no" title="statement not covered" >          warnings.push(`Container node "${containerNode.name}" extracts no outputs from nested model`);</span>
+        }
       }
 &nbsp;
       // Validate context inheritance
-      const inheritedContexts = <span class="cstat-no" title="statement not covered" >containerNode.containerData.contextInheritance.inheritedContexts;</span>
-      const duplicateContexts = <span class="cstat-no" title="statement not covered" >inheritedContexts.filter(<span class="fstat-no" title="function not covered" >(c</span>ontext, index) =&gt; </span>
-<span class="cstat-no" title="statement not covered" >        inheritedContexts.indexOf(context) !== index</span>
-      );
-      
-<span class="cstat-no" title="statement not covered" >      if (duplicateContexts.length &gt; 0) {</span>
-<span class="cstat-no" title="statement not covered" >        errors.push(`Container node "${containerNode.name}" has duplicate inherited contexts: ${duplicateContexts.join(', ')}`);</span>
+<span class="cstat-no" title="statement not covered" >      if (containerNode.containerData.contextInheritance &amp;&amp; </span>
+          containerNode.containerData.contextInheritance.inheritedContexts) {
+        const inheritedContexts = <span class="cstat-no" title="statement not covered" >containerNode.containerData.contextInheritance.inheritedContexts;</span>
+        const duplicateContexts = <span class="cstat-no" title="statement not covered" >inheritedContexts.filter(<span class="fstat-no" title="function not covered" >(c</span>ontext, index) =&gt; </span>
+<span class="cstat-no" title="statement not covered" >          inheritedContexts.indexOf(context) !== index</span>
+        );
+        
+<span class="cstat-no" title="statement not covered" >        if (duplicateContexts.length &gt; 0) {</span>
+<span class="cstat-no" title="statement not covered" >          errors.push(`Container node "${containerNode.name}" has duplicate inherited contexts: ${duplicateContexts.join(', ')}`);</span>
+        }
       }
     }
 &nbsp;
@@ -973,7 +991,7 @@ export class <span class="cstat-no" title="statement not covered" >WorkflowValid
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-27T23:41:37.864Z
+                at 2025-09-01T07:23:38.524Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

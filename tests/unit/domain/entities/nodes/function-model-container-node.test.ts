@@ -41,7 +41,14 @@ describe('FunctionModelContainerNode', () => {
           userContext: 'parent.user'
         }
       },
-      orchestrationMode: 'embedded'
+      orchestrationMode: {
+        integrationStyle: 'embedded',
+        communicationPattern: 'direct',
+        stateManagement: 'isolated',
+        errorPropagation: 'bubble',
+        resourceSharing: 'inherited',
+        executionIsolation: 'sandboxed'
+      }
     };
 
     const nodeId = NodeId.create('123e4567-e89b-42d3-a456-426614174002');
@@ -79,7 +86,14 @@ describe('FunctionModelContainerNode', () => {
       expect(containerNode.name).toBe('Test Container Node');
       expect(containerNode.getActionType()).toBe(ActionNodeType.FUNCTION_MODEL_CONTAINER);
       expect(containerNode.containerData.nestedModelId).toBe('nested-model-123');
-      expect(containerNode.containerData.orchestrationMode).toBe('embedded');
+      expect(containerNode.containerData.orchestrationMode).toEqual({
+        integrationStyle: 'embedded',
+        communicationPattern: 'direct',
+        stateManagement: 'isolated',
+        errorPropagation: 'bubble',
+        resourceSharing: 'inherited',
+        executionIsolation: 'sandboxed'
+      });
       expect(containerNode.createdAt).toBeInstanceOf(Date);
       expect(containerNode.updatedAt).toBeInstanceOf(Date);
     });
@@ -137,14 +151,21 @@ describe('FunctionModelContainerNode', () => {
 
     it('should reject creation with invalid orchestration mode', () => {
       // Arrange
-      validProps.configuration.orchestrationMode = 'invalid';
+      validProps.configuration.orchestrationMode = {
+        integrationStyle: 'invalid',
+        communicationPattern: 'direct',
+        stateManagement: 'isolated',
+        errorPropagation: 'bubble',
+        resourceSharing: 'inherited',
+        executionIsolation: 'sandboxed'
+      };
       
       // Act
       const result = FunctionModelContainerNode.create(validProps);
       
       // Assert
       expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Invalid orchestration mode');
+      expect(result).toHaveErrorMessage('Invalid orchestration integration style');
     });
 
     it('should reject creation with no extracted outputs', () => {
@@ -760,7 +781,14 @@ describe('FunctionModelContainerNode', () => {
       
       // Assert
       expect(result).toBeValidResult();
-      expect(containerNode.containerData.orchestrationMode).toBe('parallel');
+      expect(containerNode.containerData.orchestrationMode).toEqual({
+        integrationStyle: 'parallel',
+        communicationPattern: 'direct',
+        stateManagement: 'isolated',
+        errorPropagation: 'bubble',
+        resourceSharing: 'inherited',
+        executionIsolation: 'sandboxed'
+      });
     });
 
     it('should accept all valid orchestration modes', () => {
@@ -769,7 +797,15 @@ describe('FunctionModelContainerNode', () => {
       validModes.forEach(mode => {
         const result = containerNode.updateOrchestrationMode(mode);
         expect(result).toBeValidResult();
-        expect(containerNode.containerData.orchestrationMode).toBe(mode);
+        expect(containerNode.containerData.orchestrationMode?.integrationStyle).toBe(mode);
+        expect(containerNode.containerData.orchestrationMode).toMatchObject({
+          integrationStyle: mode,
+          communicationPattern: 'direct',
+          stateManagement: 'isolated',
+          errorPropagation: 'bubble',
+          resourceSharing: 'inherited',
+          executionIsolation: 'sandboxed'
+        });
       });
     });
 

@@ -403,7 +403,13 @@ export class ModelRecoveryService {
       // Handle dependency repair if needed
       if (plan.repairDependencies) {
         const initialIntegrityResult = await this.nodeDependencyService.validateDependencyIntegrity(plan.modelId);
-        if (initialIntegrityResult.isSuccess && !initialIntegrityResult.value.integrityMaintained) {
+        
+        // Check if dependency validation service failed
+        if (initialIntegrityResult.isFailure) {
+          return Result.fail<RecoveryResult>(`Failed to coordinate model recovery: ${initialIntegrityResult.error}`);
+        }
+        
+        if (!initialIntegrityResult.value.integrityMaintained) {
           const repairResult = await this.nodeDependencyService.repairBrokenReferences(
             plan.modelId,
             {
@@ -426,12 +432,24 @@ export class ModelRecoveryService {
         }
       }
 
-      // Handle version conflicts if needed
+      // Handle version conflicts if needed and create recovery version
       let versioningActions: RecoveryResult['versioningActions'] = {
         newVersionCreated: false,
         version: model.version.toString(),
         versionReason: 'No version changes required',
       };
+
+      // Create a new version for model recovery (restoration version)
+      const recoveryVersionResult = await this.versioningService.createRestorationVersion(model, {
+        reason: 'Model recovery restoration'
+      });
+      if (recoveryVersionResult.isSuccess) {
+        versioningActions = {
+          newVersionCreated: true,
+          version: recoveryVersionResult.value.newVersion,
+          versionReason: 'Model recovery restoration',
+        };
+      }
 
       if (plan.resolveVersionConflicts) {
         // First check for version compatibility to detect conflicts
@@ -719,6 +737,9 @@ export class ModelRecoveryService {
             dependencyIssues: {
               brokenReferences: issues.brokenReferences || [],
             },
+            dataConsistencyIssues: {
+              inconsistentFields: issues.dataInconsistencies || [],
+            },
           },
           remediationPlan: {
             immediateActions: [
@@ -728,7 +749,11 @@ export class ModelRecoveryService {
                 priority: 'HIGH',
               },
             ],
-            dataRepairActions: [],
+            dataRepairActions: (issues.dataInconsistencies || []).map(field => ({
+              action: 'FIX_METADATA_INCONSISTENCY',
+              field: field,
+              priority: 'MEDIUM',
+            })),
           },
         });
       }

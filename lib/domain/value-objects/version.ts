@@ -3,9 +3,9 @@ import { Result } from '../shared/result';
 export class Version {
   private static readonly VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)*))?$/;
 
-  private readonly _major: number;
-  private readonly _minor: number;
-  private readonly _patch: number;
+  private readonly _major!: number;
+  private readonly _minor!: number;
+  private readonly _patch!: number;
   private readonly _prerelease?: string;
 
   private constructor(major: number, minor: number, patch: number, prerelease?: string) {

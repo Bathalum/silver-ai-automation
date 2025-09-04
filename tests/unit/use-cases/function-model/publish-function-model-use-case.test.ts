@@ -108,6 +108,20 @@ describe('PublishFunctionModelUseCase', () => {
       expect(mockRepository.findById).not.toHaveBeenCalled();
     });
 
+    it('should fail when version is missing with enforceValidation', async () => {
+      // Arrange
+      const invalidCommand = { ...validCommand, version: '', enforceValidation: true };
+
+      // Act
+      const result = await useCase.execute(invalidCommand);
+
+      // Assert
+      expect(result.isFailure).toBe(true);
+      expect(result.error).toContain('validation');
+      expect(result.error).toBe('Version validation failed: Version is required');
+      expect(mockRepository.findById).not.toHaveBeenCalled();
+    });
+
     it('should fail when publishNotes exceed 2000 characters', async () => {
       // Arrange
       const longNotes = 'x'.repeat(2001);
@@ -119,6 +133,21 @@ describe('PublishFunctionModelUseCase', () => {
       // Assert
       expect(result.isFailure).toBe(true);
       expect(result.error).toBe('Publish notes cannot exceed 2000 characters');
+      expect(mockRepository.findById).not.toHaveBeenCalled();
+    });
+
+    it('should fail when publishNotes exceed 2000 characters with enforceValidation', async () => {
+      // Arrange
+      const longNotes = 'x'.repeat(2001);
+      const invalidCommand = { ...validCommand, publishNotes: longNotes, enforceValidation: true };
+
+      // Act
+      const result = await useCase.execute(invalidCommand);
+
+      // Assert
+      expect(result.isFailure).toBe(true);
+      expect(result.error).toContain('validation');
+      expect(result.error).toBe('Publish notes validation failed: Publish notes cannot exceed 2000 characters');
       expect(mockRepository.findById).not.toHaveBeenCalled();
     });
   });

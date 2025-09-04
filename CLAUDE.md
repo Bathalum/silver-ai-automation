@@ -6,34 +6,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🚨 IMPLEMENTATION RULE — STRICT, NO EXCEPTIONS 🚨
 
-**Principle:**
-Always follow **Clean Architecture** and a **Test-Driven Development (TDD)** loop. The **code must follow the passing test** — never the other way around.
+# 🧩 Clean Architecture TDD Orchestrator
 
-**Scope:**
+## Principle
+Always enforce **Clean Architecture** and the **Test-Driven Development (TDD) loop**.  
+➡️ **Code must follow the passing test — never the other way around.**
 
-Applies to all layers:
+---
 
-* **Phase 1:** Domain, Application
-* **Phase 2:** UI/API Adapters, Persistence Adapters
+## Scope
+Applies to all layers in two phases:
 
-**Process (Strict 1–2 Punch):**
+- **Phase 1:** Domain, Application  
+- **Phase 2:** UI/API Adapters, Persistence Adapters  
 
-1. **Test First** – Write the test that defines the behavior.
+---
 
-   * Use `clean-architecture-test-planner` agent.
-2. **Implement Code** – Write the minimum Clean Architecture–compliant code that makes the test pass.
+## Process (Strict 1–2 Punch)
 
-   * Use `clean-architecture-implementor` agent.
+1. **Test First**  
+   - Write a failing test that defines expected behavior.  
+   - Delegate to `clean-architecture-test-planner` agent.  
 
-**Loop:**
-Repeat steps **1 → 2 → 1 → 2** until all behaviors are covered and tests pass.
+2. **Implement Code**  
+   - Write the minimum Clean Architecture–compliant code that makes the test pass.  
+   - Delegate to `clean-architecture-implementor` agent.  
 
-**Non-Negotiable Rule:**
+---
 
-* No skipping.
-* No code before a test.
-* No test conforming to existing code.
-* Every implementation must serve a passing test.
+## Loop
+Repeat **1 → 2 → 1 → 2** until all behaviors are defined and tests pass.
+
+---
+
+## Non-Negotiable Rules
+- 🚫 No skipping steps  
+- 🚫 No code before a test  
+- 🚫 No test conforming to existing code  
+- ✅ Every implementation must serve a **passing test**  
 
 ---
 

@@ -142,13 +142,13 @@ export class FunctionModelVersioningService {
         description: model.description || 'Test Description'
       },
       nodes: Array.from(model.nodes.values()).map(node => ({
-        id: node.id.value,
+        id: node.id,
         type: node.type,
         position: { x: node.position.x, y: node.position.y }
       })),
       actions: Array.from(model.actionNodes.values()).map(action => ({
-        id: action.id.value,
-        parentNodeId: action.parentNodeId.value,
+        id: action.id,
+        parentNodeId: action.parentNodeId.toString(),
         type: action.type
       })),
       links: [],
@@ -204,7 +204,7 @@ export class FunctionModelVersioningService {
    * Validates author information
    */
   validateAuthorInfo(authorData: { authorId: string; createdBy: string; createdAt: string }): boolean {
-    return (
+    return !!(
       authorData.authorId && 
       typeof authorData.authorId === 'string' &&
       authorData.authorId.length > 0 &&

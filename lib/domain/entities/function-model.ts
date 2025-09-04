@@ -48,9 +48,15 @@ export interface FunctionModelProps {
 export class FunctionModel {
   private constructor(private props: FunctionModelProps) {}
 
-  public static create(props: Omit<FunctionModelProps, 'createdAt' | 'updatedAt' | 'lastSavedAt' | 'versionCount'>): Result<FunctionModel> {
+  public static create(props: Partial<Omit<FunctionModelProps, 'createdAt' | 'updatedAt' | 'lastSavedAt' | 'versionCount'>> & { name: ModelName; version: Version; currentVersion: Version }): Result<FunctionModel> {
     const now = new Date();
     const modelProps: FunctionModelProps = {
+      modelId: crypto.randomUUID(),
+      nodes: new Map<string, Node>(),
+      actionNodes: new Map<string, ActionNode>(),
+      metadata: {},
+      permissions: {},
+      status: props.status || ModelStatus.DRAFT,
       ...props,
       versionCount: 1,
       createdAt: now,
@@ -65,6 +71,16 @@ export class FunctionModel {
     }
 
     return Result.ok<FunctionModel>(new FunctionModel(modelProps));
+  }
+
+  public static fromDatabase(props: FunctionModelProps): Result<FunctionModel> {
+    // Validate business rules
+    const validationResult = FunctionModel.validateInitialState(props);
+    if (validationResult.isFailure) {
+      return Result.fail<FunctionModel>(validationResult.error);
+    }
+
+    return Result.ok<FunctionModel>(new FunctionModel(props));
   }
 
   public get modelId(): string {
@@ -423,7 +439,8 @@ export class FunctionModel {
       return Result.fail<void>('Cannot soft delete an archived model');
     }
 
-    // Perform soft deletion - preserve original status for audit purposes
+    // Perform soft deletion - preserve original status but track deletion metadata
+    // Status is preserved for audit purposes - only set deletion metadata
     this.props.deletedAt = new Date();
     // Handle deletedBy parameter: trim non-empty strings, preserve empty strings and undefined
     if (deletedBy === undefined) {
@@ -444,8 +461,7 @@ export class FunctionModel {
 
     this.props.deletedAt = undefined;
     this.props.deletedBy = undefined;
-    // Restore to previous status - for now, assume PUBLISHED
-    this.props.status = ModelStatus.PUBLISHED;
+    // Status is preserved as it was before deletion - no need to change it
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }

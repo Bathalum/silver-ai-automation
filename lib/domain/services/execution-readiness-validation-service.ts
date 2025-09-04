@@ -1,6 +1,7 @@
 import { ActionNode } from '../entities/action-node';
 import { ValidationResult } from '../entities/function-model';
 import { Result } from '../shared/result';
+import { NodeId } from '../value-objects/node-id';
 import { IExecutionReadinessService } from '../../use-cases/function-model/validate-workflow-structure-use-case';
 
 export class ExecutionReadinessValidationService implements IExecutionReadinessService {
@@ -8,6 +9,30 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
     try {
       const errors: string[] = [];
       const warnings: string[] = [];
+
+      // Handle empty action nodes - check if this is a draft model being configured
+      if (actionNodes.length === 0) {
+        const isDraftConfiguration = executionContext?.validationLevel !== 'execution-readiness' && 
+                                    executionContext?.executionEnvironment === 'validation';
+        
+        if (isDraftConfiguration) {
+          // For draft models during validation, warn but don't error
+          warnings.push('No action nodes configured - workflow requires action nodes for execution');
+          return Result.ok<ValidationResult>({
+            isValid: true,
+            errors,
+            warnings
+          });
+        } else {
+          // For actual execution attempts, this is an error
+          errors.push('No action nodes configured for execution');
+          return Result.ok<ValidationResult>({
+            isValid: false,
+            errors,
+            warnings
+          });
+        }
+      }
 
       // Validate action node configurations
       this.validateActionNodeConfigurations(actionNodes, errors, warnings);
@@ -54,10 +79,10 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
 
   private validateActionNodeConfigurations(actionNodes: ActionNode[], errors: string[], warnings: string[]): void {
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
       // Validate API call configurations
-      if (actionNode.actionType === 'api-call') {
+      if (actionNode.getActionType() === 'api-call') {
         if (!config?.endpoint || !config.endpoint.toString().startsWith('http')) {
           errors.push(`Action node ${actionNode.name} missing required configuration: endpoint URL`);
         }
@@ -72,7 +97,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
       }
       
       // Validate data transformation configurations
-      if (actionNode.actionType === 'data-transformation') {
+      if (actionNode.getActionType() === 'data-transformation') {
         if (!config?.transformationScript && !config?.transformationRules) {
           errors.push(`Action node ${actionNode.name} missing transformation logic`);
         }
@@ -83,7 +108,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
       }
       
       // Validate database operation configurations
-      if (actionNode.actionType === 'database-operation') {
+      if (actionNode.getActionType() === 'database-operation') {
         if (!config?.connectionString && !config?.connectionId) {
           errors.push(`Action node ${actionNode.name} missing database connection configuration`);
         }
@@ -94,7 +119,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
       }
       
       // Validate file operation configurations
-      if (actionNode.actionType === 'file-operation') {
+      if (actionNode.getActionType() === 'file-operation') {
         if (!config?.filePath && !config?.filePattern) {
           errors.push(`Action node ${actionNode.name} missing file path specification`);
         }
@@ -112,7 +137,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
     let totalCpuRequired = 0;
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const memoryMb = config?.memoryRequirementMb || 512;
       const cpuUnits = config?.cpuRequirement || 1;
       
@@ -217,7 +242,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
           
           // Check for resource conflicts
           const totalParallelMemory = parallelActions.reduce((total, action) => {
-            return total + (action.actionData.configuration?.memoryRequirementMb || 512);
+            return total + (action.metadata?.configuration?.memoryRequirementMb || 512);
           }, 0);
           
           if (totalParallelMemory > 16384) { // 16GB
@@ -230,8 +255,8 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
 
   private validateRetryAndErrorHandling(actionNodes: ActionNode[], errors: string[], warnings: string[]): void {
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
-      const isCriticalAction = config?.isCritical || actionNode.actionType === 'api-call';
+      const config = actionNode.metadata?.configuration;
+      const isCriticalAction = config?.isCritical || actionNode.getActionType() === 'api-call';
       
       // Check error handling configuration
       if (isCriticalAction && !config?.errorHandling) {
@@ -262,14 +287,14 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
 
   private validateTimeoutConfigurations(actionNodes: ActionNode[], errors: string[], warnings: string[]): void {
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const timeout = config?.timeoutMs;
       
       // Check if timeout is configured
       if (!timeout) {
-        const isLongRunning = actionNode.actionType === 'data-transformation' || 
-                            actionNode.actionType === 'file-operation' ||
-                            actionNode.actionType === 'database-operation';
+        const isLongRunning = actionNode.getActionType() === 'data-transformation' || 
+                            actionNode.getActionType() === 'file-operation' ||
+                            actionNode.getActionType() === 'database-operation';
         
         if (isLongRunning) {
           warnings.push(`Long-running action ${actionNode.name} should specify timeout configuration`);
@@ -298,9 +323,9 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
     
     // Collect external dependencies
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
-      if (actionNode.actionType === 'api-call' && config?.endpoint) {
+      if (actionNode.getActionType() === 'api-call' && config?.endpoint) {
         externalDependencies.add(config.endpoint);
       }
       
@@ -330,7 +355,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
     
     // Collect environment requirements
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
       // Check for required libraries/packages
       if (config?.requiredLibraries) {
@@ -347,7 +372,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
       }
       
       // Specific checks based on action type
-      if (actionNode.actionType === 'data-transformation' && config?.language === 'python') {
+      if (actionNode.getActionType() === 'data-transformation' && config?.language === 'python') {
         if (config?.pythonVersion && !await this.checkPythonVersion(config.pythonVersion)) {
           errors.push(`Execution environment missing required Python version: ${config.pythonVersion}`);
         }
@@ -381,14 +406,14 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
     const dataFlowMap = new Map<string, any>();
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       const nodeId = actionNode.nodeId.toString();
       
       // Record output schema
       if (config?.outputSchema) {
         dataFlowMap.set(nodeId, {
           outputSchema: config.outputSchema,
-          actionType: actionNode.actionType,
+          actionType: actionNode.getActionType(),
           name: actionNode.name
         });
       }
@@ -396,10 +421,12 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
     
     // Check schema compatibility between connected actions
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
-      if (config?.inputSchema && actionNode.dependencies.length > 0) {
-        for (const depId of actionNode.dependencies) {
+      // ActionNode doesn't have dependencies property - using metadata.dependencies or empty array
+      const actionDependencies = (config?.dependencies as NodeId[]) || [];
+      if (config?.inputSchema && actionDependencies.length > 0) {
+        for (const depId of actionDependencies) {
           const dependency = dataFlowMap.get(depId.toString());
           
           if (dependency && dependency.outputSchema) {
@@ -422,10 +449,10 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
     const organizationId = executionContext.organizationId;
     
     for (const actionNode of actionNodes) {
-      const config = actionNode.actionData.configuration;
+      const config = actionNode.metadata?.configuration;
       
       // Check database operation permissions
-      if (actionNode.actionType === 'database-operation') {
+      if (actionNode.getActionType() === 'database-operation') {
         const requiredRole = config?.requiredDatabaseRole;
         if (requiredRole && !this.hasPermission(userId, requiredRole, organizationId)) {
           errors.push(`Insufficient permissions to execute database action: requires ${requiredRole} role`);
@@ -433,7 +460,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
       }
       
       // Check file system permissions
-      if (actionNode.actionType === 'file-operation') {
+      if (actionNode.getActionType() === 'file-operation') {
         const requiredPermission = config?.requiredFilePermission;
         if (requiredPermission && !this.hasFilePermission(userId, requiredPermission)) {
           errors.push(`Insufficient file system permissions for action: ${actionNode.name}`);
@@ -441,7 +468,7 @@ export class ExecutionReadinessValidationService implements IExecutionReadinessS
       }
       
       // Check API access permissions
-      if (actionNode.actionType === 'api-call') {
+      if (actionNode.getActionType() === 'api-call') {
         const apiKey = config?.apiKey;
         const apiScope = config?.requiredApiScope;
         

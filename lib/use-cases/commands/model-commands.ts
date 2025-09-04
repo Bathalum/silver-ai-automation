@@ -16,15 +16,17 @@ export interface UpdateModelCommand {
 
 export interface PublishModelCommand {
   modelId: string;
-  version: string;
+  version?: string;
   userId: string;
   publishNotes?: string;
+  enforceValidation?: boolean;
 }
 
 export interface ArchiveModelCommand {
   modelId: string;
   userId: string;
   reason?: string;
+  archiveReason?: string; // Support both reason and archiveReason for compatibility
   enforceRiskAssessment?: boolean;
   cleanupCrossFeatureLinks?: boolean;
 }

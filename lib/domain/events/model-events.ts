@@ -425,8 +425,9 @@ export class ModelUndeletedEvent extends DomainEvent {
   public getEventData(): Record<string, any> {
     const data: Record<string, any> = {
       aggregateId: this.aggregateId,
+      modelId: this.aggregateId, // Include modelId for backwards compatibility and test expectations
       restoredBy: this.restoredBy,
-      restoredAt: this.restoredAt.toISOString(),
+      restoredAt: this.restoredAt,
     };
 
     if (this.reason !== undefined) {
@@ -490,7 +491,6 @@ export class ModelRestoredEvent extends DomainEvent {
 }
 
 export class ModelVersionCreated extends DomainEvent {
-  public readonly eventType = 'ModelVersionCreated';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ModelVersionCreatedData) {
@@ -499,7 +499,7 @@ export class ModelVersionCreated extends DomainEvent {
   }
 
   public getEventName(): string {
-    return this.eventType;
+    return 'ModelVersionCreated';
   }
 
   public getEventData(): Record<string, any> {

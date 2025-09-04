@@ -221,7 +221,6 @@ export class ActionNodeExecutionFailed extends DomainEvent {
 }
 
 export class ActionNodeExecutionRetried extends DomainEvent {
-  public readonly eventType = 'ActionNodeExecutionRetried';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeExecutionRetriedData) {
@@ -230,7 +229,7 @@ export class ActionNodeExecutionRetried extends DomainEvent {
   }
 
   public getEventName(): string {
-    return 'ActionNodeExecutionOrderChanged';
+    return 'ActionNodeExecutionRetried';
   }
 
   public getEventData(): Record<string, any> {
@@ -252,7 +251,6 @@ export class ActionNodeExecutionRetried extends DomainEvent {
 }
 
 export class ActionNodeStatusChanged extends DomainEvent {
-  public readonly eventType = 'ActionNodeStatusChanged';
   public readonly occurredAt: Date;
 
   constructor(public readonly data: ActionNodeStatusChangedData) {
@@ -261,7 +259,7 @@ export class ActionNodeStatusChanged extends DomainEvent {
   }
 
   public getEventName(): string {
-    return 'ActionNodeExecutionOrderChanged';
+    return 'ActionNodeStatusChanged';
   }
 
   public getEventData(): Record<string, any> {

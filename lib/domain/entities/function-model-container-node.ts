@@ -10,6 +10,9 @@ export interface FunctionModelContainerData {
   contextMapping?: Record<string, any>;
   outputExtraction?: Record<string, any>;
   executionPolicy?: {
+    executionTrigger?: 'manual' | 'automatic' | 'conditional' | 'scheduled';
+    conditions?: Record<string, any>;
+    timeout?: number;
     triggerConditions?: string[];
     failureHandling?: string;
     resourceInheritance?: string;
@@ -254,7 +257,14 @@ export class FunctionModelContainerNode extends ActionNode {
       this.props.configuration = {};
     }
     
-    this.props.configuration.orchestrationMode = mode;
+    this.props.configuration.orchestrationMode = {
+      integrationStyle: mode,
+      communicationPattern: 'direct',
+      stateManagement: 'isolated',
+      errorPropagation: 'bubble',
+      resourceSharing: 'inherited',
+      executionIsolation: 'sandboxed'
+    };
     this.props.updatedAt = new Date();
     return Result.ok<void>(undefined);
   }
@@ -316,8 +326,11 @@ export class FunctionModelContainerNode extends ActionNode {
     if (!this.props.configuration.contextInheritance) {
       this.props.configuration.contextInheritance = { inheritedContexts: [] };
     }
+    if (!this.props.configuration.contextInheritance.inheritedContexts) {
+      this.props.configuration.contextInheritance.inheritedContexts = [];
+    }
     
-    if (this.props.configuration.contextInheritance.inheritedContexts?.includes(trimmedContext)) {
+    if (this.props.configuration.contextInheritance.inheritedContexts.includes(trimmedContext)) {
       return Result.fail<void>('Context already inherited');
     }
 
@@ -400,8 +413,12 @@ export class FunctionModelContainerNode extends ActionNode {
     }
 
     // Validate orchestration mode if provided
-    if (configuration.orchestrationMode && !['embedded', 'federated', 'microservice'].includes(configuration.orchestrationMode)) {
-      return Result.fail<void>('Invalid orchestration mode');
+    if (configuration.orchestrationMode) {
+      const validStyles = ['embedded', 'parallel', 'sequential', 'federated', 'microservice'];
+      if (configuration.orchestrationMode.integrationStyle && 
+          !validStyles.includes(configuration.orchestrationMode.integrationStyle)) {
+        return Result.fail<void>('Invalid orchestration integration style');
+      }
     }
 
     // Validate output extraction if provided
@@ -413,7 +430,7 @@ export class FunctionModelContainerNode extends ActionNode {
       }
       
       if (extractedOutputs) {
-        const duplicates = extractedOutputs.filter((output, index) => 
+        const duplicates = extractedOutputs.filter((output: any, index: number) => 
           extractedOutputs.indexOf(output) !== index);
         if (duplicates.length > 0) {
           return Result.fail<void>('Extracted outputs must be unique');

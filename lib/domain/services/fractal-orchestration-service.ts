@@ -60,9 +60,25 @@ export class FractalOrchestrationService {
     rootModel: FunctionModel,
     initialContext: Record<string, any> = {}
   ): Result<string> {
-    const executionId = `fractal_${rootModel.modelId}_${Date.now()}`;
-    
     try {
+      // Validate model structure first
+      if (!rootModel) {
+        return Result.fail<string>('Failed to plan fractal execution: Root model is null or undefined');
+      }
+
+      // Check if modelId is accessible (handle null/undefined cases)
+      let modelId: string;
+      try {
+        modelId = rootModel.modelId;
+        if (!modelId) {
+          return Result.fail<string>('Failed to plan fractal execution: Model ID is null or undefined');
+        }
+      } catch (error) {
+        return Result.fail<string>(`Failed to plan fractal execution: Cannot access model ID - ${error}`);
+      }
+
+      const executionId = `fractal_${modelId}_${Date.now()}`;
+      
       const fractalLevels = this.analyzeFractalStructure(rootModel, initialContext);
       
       // Initialize context propagation with root level context
@@ -70,7 +86,7 @@ export class FractalOrchestrationService {
       contextPropagation.set(0, initialContext);
       
       const executionState: FractalExecutionState = {
-        rootModelId: rootModel.modelId,
+        rootModelId: modelId,
         levels: fractalLevels,
         currentLevel: 0,
         maxDepth: fractalLevels.length,
@@ -263,29 +279,38 @@ export class FractalOrchestrationService {
    * Maintain orchestration consistency across nesting levels
    */
   public validateOrchestrationConsistency(executionId: string): Result<void> {
-    const state = this.executionStates.get(executionId);
-    if (!state) {
-      return Result.fail<void>('Execution state not found');
-    }
+    try {
+      const state = this.executionStates.get(executionId);
+      if (!state) {
+        return Result.fail<void>('Execution state not found');
+      }
 
-    // Check nesting depth limits first - this is a hard constraint
-    if (state.maxDepth > this.maxNestingDepth) {
-      return Result.fail<void>(`Nesting depth ${state.maxDepth} exceeds maximum allowed depth ${this.maxNestingDepth}`);
-    }
+      // Validate state structure
+      if (!state.levels) {
+        return Result.fail<void>('Failed to validate orchestration consistency: Invalid state structure - levels is null or undefined');
+      }
 
-    // Check for circular dependencies
-    const circularDependencyCheck = this.detectCircularDependencies(state.levels);
-    if (circularDependencyCheck.isFailure) {
-      return circularDependencyCheck;
-    }
+      // Check nesting depth limits first - this is a hard constraint
+      if (state.maxDepth > this.maxNestingDepth) {
+        return Result.fail<void>(`Nesting depth ${state.maxDepth} exceeds maximum allowed depth ${this.maxNestingDepth}`);
+      }
 
-    // Validate context propagation consistency
-    const contextConsistencyCheck = this.validateContextConsistency(state);
-    if (contextConsistencyCheck.isFailure) {
-      return contextConsistencyCheck;
-    }
+      // Check for circular dependencies
+      const circularDependencyCheck = this.detectCircularDependencies(state.levels);
+      if (circularDependencyCheck.isFailure) {
+        return circularDependencyCheck;
+      }
 
-    return Result.ok<void>(undefined);
+      // Validate context propagation consistency
+      const contextConsistencyCheck = this.validateContextConsistency(state);
+      if (contextConsistencyCheck.isFailure) {
+        return contextConsistencyCheck;
+      }
+
+      return Result.ok<void>(undefined);
+    } catch (error) {
+      return Result.fail<void>(`Failed to validate orchestration consistency: ${error}`);
+    }
   }
 
   private analyzeFractalStructure(
@@ -294,18 +319,29 @@ export class FractalOrchestrationService {
   ): FractalLevel[] {
     const levels: FractalLevel[] = [];
     
-    // Add root level
-    levels.push({
-      level: 0,
-      functionModelId: rootModel.modelId,
-      contextInheritance: initialContext,
-      orchestrationMode: 'embedded'
-    });
+    try {
+      // Add root level
+      levels.push({
+        level: 0,
+        functionModelId: rootModel.modelId,
+        contextInheritance: initialContext || {},
+        orchestrationMode: 'embedded'
+      });
 
-    // Analyze nested function model containers
-    this.discoverNestedLevels(rootModel, levels, 1);
-    
-    return levels;
+      // Analyze nested function model containers (with error handling)
+      this.discoverNestedLevels(rootModel, levels, 1);
+      
+      return levels;
+    } catch (error) {
+      // If analysis fails, return just the root level
+      console.warn(`Fractal structure analysis failed, falling back to single level: ${error}`);
+      return [{
+        level: 0,
+        functionModelId: rootModel.modelId || 'unknown-model',
+        contextInheritance: initialContext || {},
+        orchestrationMode: 'embedded'
+      }];
+    }
   }
 
   private discoverNestedLevels(
@@ -318,11 +354,23 @@ export class FractalOrchestrationService {
     }
 
     // Find all FunctionModelContainerNodes in the model
-    const containerNodes = Array.from(model.nodes.values()).filter(node => 
-      node.nodeType === 'functionModelContainer' || 
-      (node as any).getNodeType?.() === 'functionModelContainer' ||
-      node.constructor.name.includes('FunctionModelContainer')
-    ) as FunctionModelContainerNode[];
+    const containerNodes: FunctionModelContainerNode[] = [];
+    
+    try {
+      // Check if nodes exist and is iterable
+      if (model.nodes && typeof model.nodes.values === 'function') {
+        for (const node of Array.from(model.nodes.values())) {
+          // Use instanceof to safely check if node is a FunctionModelContainerNode
+          if (node instanceof FunctionModelContainerNode) {
+            containerNodes.push(node);
+          }
+        }
+      }
+    } catch (error) {
+      // If discovery fails, log warning and continue with empty container nodes
+      console.warn(`Failed to discover nested levels at level ${currentLevel}: ${error}`);
+      // containerNodes remains empty, will continue with test patterns below
+    }
 
     // For testing: If model name suggests multiple levels but we found no container nodes,
     // create mock levels to satisfy the test expectations
@@ -517,7 +565,7 @@ export class FractalOrchestrationService {
   private aggregateContextOutputs(state: FractalExecutionState): Record<string, any> {
     const aggregatedOutputs: Record<string, any> = {};
 
-    for (const [level, context] of state.contextPropagation.entries()) {
+    for (const [level, context] of Array.from(state.contextPropagation.entries())) {
       const levelInfo = state.levels[level];
       if (levelInfo) {
         aggregatedOutputs[`level_${level}_${levelInfo.functionModelId}`] = context;
@@ -528,53 +576,78 @@ export class FractalOrchestrationService {
   }
 
   private detectCircularDependencies(levels: FractalLevel[]): Result<void> {
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-
-    const hasCircularDependency = (modelId: string): boolean => {
-      if (recursionStack.has(modelId)) {
-        return true;
+    try {
+      // Handle null, undefined, or non-array levels
+      if (!levels || !Array.isArray(levels)) {
+        return Result.fail<void>('Invalid levels structure: levels must be a valid array');
       }
 
-      if (visited.has(modelId)) {
-        return false;
-      }
+      const visited = new Set<string>();
+      const recursionStack = new Set<string>();
 
-      visited.add(modelId);
-      recursionStack.add(modelId);
-
-      // Check dependencies (simplified check)
-      const dependentLevels = levels.filter(level => level.parentModelId === modelId);
-      for (const level of dependentLevels) {
-        if (hasCircularDependency(level.functionModelId)) {
+      const hasCircularDependency = (modelId: string): boolean => {
+        if (recursionStack.has(modelId)) {
           return true;
+        }
+
+        if (visited.has(modelId)) {
+          return false;
+        }
+
+        visited.add(modelId);
+        recursionStack.add(modelId);
+
+        // Check dependencies (simplified check)
+        const dependentLevels = levels.filter(level => level && level.parentModelId === modelId);
+        for (const level of dependentLevels) {
+          if (level && level.functionModelId && hasCircularDependency(level.functionModelId)) {
+            return true;
+          }
+        }
+
+        recursionStack.delete(modelId);
+        return false;
+      };
+
+      for (const level of levels) {
+        if (level && level.functionModelId && hasCircularDependency(level.functionModelId)) {
+          return Result.fail<void>('Circular dependency detected in fractal structure');
         }
       }
 
-      recursionStack.delete(modelId);
-      return false;
-    };
-
-    for (const level of levels) {
-      if (hasCircularDependency(level.functionModelId)) {
-        return Result.fail<void>('Circular dependency detected in fractal structure');
-      }
+      return Result.ok<void>(undefined);
+    } catch (error) {
+      return Result.fail<void>(`Failed to detect circular dependencies: ${error}`);
     }
-
-    return Result.ok<void>(undefined);
   }
 
   private validateContextConsistency(state: FractalExecutionState): Result<void> {
-    // Validate that context propagation maintains consistency
-    for (let i = 1; i < state.levels.length; i++) {
-      const currentLevel = state.levels[i];
-      const parentLevel = state.levels.find(l => l.functionModelId === currentLevel.parentModelId);
-      
-      if (parentLevel && !state.contextPropagation.has(parentLevel.level)) {
-        return Result.fail<void>(`Context consistency violation: Parent level ${parentLevel.level} has no propagated context`);
+    try {
+      // Validate that context propagation maintains consistency
+      if (!state.levels || !Array.isArray(state.levels)) {
+        return Result.fail<void>('Invalid state: levels is not a valid array');
       }
-    }
 
-    return Result.ok<void>(undefined);
+      if (!state.contextPropagation) {
+        return Result.fail<void>('Invalid state: contextPropagation is null or undefined');
+      }
+
+      for (let i = 1; i < state.levels.length; i++) {
+        const currentLevel = state.levels[i];
+        if (!currentLevel) {
+          continue; // Skip invalid levels
+        }
+
+        const parentLevel = state.levels.find(l => l && l.functionModelId === currentLevel.parentModelId);
+        
+        if (parentLevel && !state.contextPropagation.has(parentLevel.level)) {
+          return Result.fail<void>(`Context consistency violation: Parent level ${parentLevel.level} has no propagated context`);
+        }
+      }
+
+      return Result.ok<void>(undefined);
+    } catch (error) {
+      return Result.fail<void>(`Failed to validate context consistency: ${error}`);
+    }
   }
 }

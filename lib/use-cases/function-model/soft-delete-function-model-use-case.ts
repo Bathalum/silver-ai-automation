@@ -130,7 +130,6 @@ export class SoftDeleteFunctionModelUseCase {
         action: 'SOFT_DELETE',
         userId,
         details: auditDetails,
-        timestamp: new Date(),
       });
 
       if (auditLogResult.isFailure) {
@@ -210,7 +209,6 @@ export class SoftDeleteFunctionModelUseCase {
           restoredAt: new Date(),
           restoredBy: userId,
         },
-        timestamp: new Date(),
       });
 
       if (auditLogResult.isFailure) {

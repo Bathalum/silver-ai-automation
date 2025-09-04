@@ -2,7 +2,7 @@ export interface ExecuteWorkflowCommand {
   modelId: string;
   userId: string;
   parameters?: Record<string, any>;
-  environment: 'development' | 'staging' | 'production';
+  environment?: 'development' | 'staging' | 'production';
   dryRun?: boolean;
 }
 

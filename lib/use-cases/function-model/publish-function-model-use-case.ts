@@ -2,8 +2,20 @@ import { FunctionModel } from '../../domain/entities/function-model';
 import { Version } from '../../domain/value-objects/version';
 import { ModelStatus } from '../../domain/enums';
 import { Result } from '../../domain/shared/result';
+import { IFunctionModelRepository } from '../../domain/interfaces/function-model-repository';
 import { PublishModelCommand } from '../commands/model-commands';
-import { IFunctionModelRepository, IEventBus } from './create-function-model-use-case';
+
+export interface IEventBus {
+  publish(event: DomainEvent): Promise<void>;
+}
+
+export interface DomainEvent {
+  eventType: string;
+  aggregateId: string;
+  eventData: any;
+  userId?: string;
+  timestamp: Date;
+}
 
 export interface PublishModelResult {
   modelId: string;
@@ -52,35 +64,57 @@ export class PublishFunctionModelUseCase {
         return Result.fail<PublishModelResult>('Cannot publish deleted model');
       }
 
-      // Validate the version format
-      const versionResult = Version.create(command.version);
-      if (versionResult.isFailure) {
-        return Result.fail<PublishModelResult>(`Invalid version format: ${versionResult.error}`);
-      }
+      // Auto-generate version if not provided
+      let newVersion: Version;
+      if (command.version) {
+        // Validate the provided version format
+        const versionResult = Version.create(command.version);
+        if (versionResult.isFailure) {
+          const message = command.enforceValidation 
+            ? `Version format validation failed: ${versionResult.error}` 
+            : `Invalid version format: ${versionResult.error}`;
+          return Result.fail<PublishModelResult>(message);
+        }
 
-      const newVersion = versionResult.value;
+        newVersion = versionResult.value;
 
-      // Validate that the new version is greater than current
-      if (newVersion.compare(model.version) <= 0) {
-        return Result.fail<PublishModelResult>('New version must be greater than current version');
+        // Validate that the new version is greater than current
+        if (newVersion.compare(model.version) <= 0) {
+          const message = command.enforceValidation 
+            ? 'Version validation failed: New version must be greater than current version'
+            : 'New version must be greater than current version';
+          return Result.fail<PublishModelResult>(message);
+        }
+      } else {
+        // Auto-generate the next minor version
+        newVersion = model.version.incrementMinor();
       }
 
       // Perform comprehensive validation before publishing
       const workflowValidation = model.validateWorkflow();
       if (workflowValidation.isFailure) {
-        return Result.fail<PublishModelResult>(`Workflow validation failed: ${workflowValidation.error}`);
+        const message = command.enforceValidation
+          ? `Workflow validation failed: ${workflowValidation.error}`
+          : `Workflow validation failed: ${workflowValidation.error}`;
+        return Result.fail<PublishModelResult>(message);
       }
 
       const validation = workflowValidation.value;
       if (!validation.isValid) {
-        const errorMessage = `Cannot publish model with validation errors:\n${validation.errors.join('\n')}`;
+        const prefix = command.enforceValidation
+          ? 'Cannot publish model with validation errors'
+          : 'Cannot publish model with validation errors';
+        const errorMessage = `${prefix}:\n${validation.errors.join('\n')}`;
         return Result.fail<PublishModelResult>(errorMessage);
       }
 
       // Check for critical warnings that should block publication
       const criticalWarnings = this.filterCriticalWarnings(validation.warnings);
       if (criticalWarnings.length > 0) {
-        const warningMessage = `Cannot publish model with critical warnings:\n${criticalWarnings.join('\n')}`;
+        const prefix = command.enforceValidation
+          ? 'Cannot publish model with critical validation warnings'
+          : 'Cannot publish model with critical warnings';
+        const warningMessage = `${prefix}:\n${criticalWarnings.join('\n')}`;
         return Result.fail<PublishModelResult>(warningMessage);
       }
 
@@ -93,10 +127,10 @@ export class PublishFunctionModelUseCase {
       // Update version count
       model.incrementVersionCount();
 
-      // Save the updated model
-      const saveResult = await this.modelRepository.save(model);
-      if (saveResult.isFailure) {
-        return Result.fail<PublishModelResult>(`Failed to save published model: ${saveResult.error}`);
+      // Use enhanced repository method for atomic model publishing
+      const publishRepoResult = await this.modelRepository.publishModel(command.modelId);
+      if (publishRepoResult.isFailure) {
+        return Result.fail<PublishModelResult>(`Failed to publish model: ${publishRepoResult.error}`);
       }
 
       // Mark as saved
@@ -148,19 +182,25 @@ export class PublishFunctionModelUseCase {
 
   private validateCommand(command: PublishModelCommand): Result<void> {
     if (!command.modelId || command.modelId.trim().length === 0) {
-      return Result.fail<void>('Model ID is required');
+      const message = command.enforceValidation ? 'Model ID validation failed: Model ID is required' : 'Model ID is required';
+      return Result.fail<void>(message);
     }
 
     if (!command.userId || command.userId.trim().length === 0) {
-      return Result.fail<void>('User ID is required');
+      const message = command.enforceValidation ? 'User ID validation failed: User ID is required' : 'User ID is required';
+      return Result.fail<void>(message);
     }
 
-    if (!command.version || command.version.trim().length === 0) {
-      return Result.fail<void>('Version is required');
+    // Check if version is explicitly set to empty string (invalid)
+    // undefined/null means auto-generate, empty string means invalid input
+    if (command.version !== undefined && (!command.version || command.version.trim().length === 0)) {
+      const message = command.enforceValidation ? 'Version validation failed: Version is required' : 'Version is required';
+      return Result.fail<void>(message);
     }
 
     if (command.publishNotes && command.publishNotes.length > 2000) {
-      return Result.fail<void>('Publish notes cannot exceed 2000 characters');
+      const message = command.enforceValidation ? 'Publish notes validation failed: Publish notes cannot exceed 2000 characters' : 'Publish notes cannot exceed 2000 characters';
+      return Result.fail<void>(message);
     }
 
     return Result.ok<void>(undefined);

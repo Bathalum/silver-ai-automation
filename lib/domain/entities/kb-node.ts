@@ -54,9 +54,20 @@ export class KBNode extends ActionNode {
       return Result.fail<KBNode>(validationResult.error);
     }
 
+    // Create and validate NodeIds
+    const actionIdResult = NodeId.create(createProps.actionId);
+    if (actionIdResult.isFailure) {
+      return Result.fail<KBNode>(`Invalid action ID: ${actionIdResult.error}`);
+    }
+    
+    const parentNodeIdResult = NodeId.create(createProps.parentNodeId);
+    if (parentNodeIdResult.isFailure) {
+      return Result.fail<KBNode>(`Invalid parent node ID: ${parentNodeIdResult.error}`);
+    }
+
     const actionNodeProps: ActionNodeProps = {
-      actionId: NodeId.create(createProps.actionId).value,
-      parentNodeId: NodeId.create(createProps.parentNodeId).value,
+      actionId: actionIdResult.value,
+      parentNodeId: parentNodeIdResult.value,
       modelId: createProps.modelId,
       name: createProps.name,
       description: createProps.description,
@@ -168,8 +179,8 @@ export class KBNode extends ActionNode {
 
   public updateAccessPermissions(permissions: { view: string[]; edit: string[] }): Result<void> {
     // Clean up permissions
-    const cleanView = [...new Set(permissions.view.filter(u => u.trim()))];
-    const cleanEdit = [...new Set(permissions.edit.filter(u => u.trim()))];
+    const cleanView = Array.from(new Set(permissions.view.filter(u => u.trim())));
+    const cleanEdit = Array.from(new Set(permissions.edit.filter(u => u.trim())));
 
     // Validate that edit users have view permissions
     const missingViewPermissions = cleanEdit.filter(user => !cleanView.includes(user));

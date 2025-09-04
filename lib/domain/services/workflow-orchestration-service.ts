@@ -28,6 +28,7 @@ export interface NodeExecutionResult {
 
 export interface IWorkflowOrchestrationService {
   executeWorkflow(model: FunctionModel, context: ExecutionContext): Promise<Result<ExecutionResult>>;
+  orchestrate(model: FunctionModel, context: ExecutionContext): Promise<Result<ExecutionResult>>;
   pauseExecution(executionId: string): Promise<Result<void>>;
   resumeExecution(executionId: string): Promise<Result<void>>;
   stopExecution(executionId: string): Promise<Result<void>>;
@@ -49,6 +50,20 @@ export interface ExecutionStatus {
 export class WorkflowOrchestrationService implements IWorkflowOrchestrationService {
   private executionStates = new Map<string, ExecutionStatus>();
   private pausedExecutions = new Set<string>();
+  private eventBus?: any; // IEventBus interface
+
+  constructor(private nodeDependencyService?: any, eventBus?: any) {
+    this.eventBus = eventBus;
+  }
+
+  setEventBus(eventBus: any): void {
+    this.eventBus = eventBus;
+  }
+
+  // Alias method for interface compatibility
+  async orchestrate(model: FunctionModel, context: ExecutionContext): Promise<Result<ExecutionResult>> {
+    return this.executeWorkflow(model, context);
+  }
 
   async executeWorkflow(model: FunctionModel, context: ExecutionContext): Promise<Result<ExecutionResult>> {
     try {
@@ -75,6 +90,23 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
       };
       
       this.executionStates.set(context.executionId, executionStatus);
+
+      // Publish workflow execution started event
+      if (this.eventBus) {
+        await this.eventBus.publish({
+          eventType: 'WorkflowExecutionStarted',
+          aggregateId: context.modelId,
+          eventData: {
+            executionId: context.executionId,
+            modelId: context.modelId,
+            userId: context.userId,
+            startTime: context.startTime,
+            totalNodes: Array.from(model.nodes.values()).length
+          },
+          userId: context.userId,
+          timestamp: context.startTime
+        });
+      }
 
       // Calculate execution order
       const executionOrder = this.calculateExecutionOrder(Array.from(model.nodes.values()));
@@ -105,20 +137,96 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
         executionStatus.currentNodes = [nodeId];
         executionStatus.progress = (i / totalNodes) * 100;
 
+        // Publish node execution started event
+        if (this.eventBus) {
+          await this.eventBus.publish({
+            eventType: 'NodeExecutionStarted',
+            aggregateId: nodeId,
+            eventData: {
+              executionId: context.executionId,
+              modelId: context.modelId,
+              nodeId: nodeId,
+              nodeName: node.name,
+              startedAt: new Date()
+            },
+            userId: context.userId,
+            timestamp: new Date()
+          });
+        }
+
         // Execute container node (orchestrate its actions)
         const nodeResult = await this.executeContainerNode(node, model, context);
         nodeResults.set(nodeId, nodeResult);
 
         if (nodeResult.success) {
           executionStatus.completedNodes.push(nodeId);
+          
+          // Publish node completion event
+          if (this.eventBus) {
+            await this.eventBus.publish({
+              eventType: 'NodeExecutionCompleted',
+              aggregateId: nodeId,
+              eventData: {
+                executionId: context.executionId,
+                modelId: context.modelId,
+                nodeId: nodeId,
+                nodeName: node.name,
+                success: true,
+                completedAt: nodeResult.endTime,
+                executionTime: nodeResult.endTime.getTime() - nodeResult.startTime.getTime(),
+                output: nodeResult.output
+              },
+              userId: context.userId,
+              timestamp: nodeResult.endTime
+            });
+          }
         } else {
           executionStatus.failedNodes.push(nodeId);
+          
+          // Publish node failure event
+          if (this.eventBus) {
+            await this.eventBus.publish({
+              eventType: 'NodeExecutionFailed',
+              aggregateId: nodeId,
+              eventData: {
+                executionId: context.executionId,
+                modelId: context.modelId,
+                nodeId: nodeId,
+                nodeName: node.name,
+                success: false,
+                failedAt: nodeResult.endTime,
+                error: nodeResult.error,
+                retryCount: nodeResult.retryCount
+              },
+              userId: context.userId,
+              timestamp: nodeResult.endTime
+            });
+          }
           
           // Check if this is a critical failure
           if (this.isCriticalNode(node)) {
             executionStatus.status = 'failed';
             executionStatus.endTime = new Date();
             executionStatus.error = nodeResult.error;
+            
+            // Publish workflow failure event
+            if (this.eventBus) {
+              await this.eventBus.publish({
+                eventType: 'WorkflowExecutionFailed',
+                aggregateId: context.modelId,
+                eventData: {
+                  executionId: context.executionId,
+                  modelId: context.modelId,
+                  success: false,
+                  failedAt: executionStatus.endTime,
+                  error: nodeResult.error,
+                  completedNodes: executionStatus.completedNodes.length,
+                  failedNodes: executionStatus.failedNodes.length
+                },
+                userId: context.userId,
+                timestamp: executionStatus.endTime
+              });
+            }
             
             return Result.ok<ExecutionResult>({
               success: false,
@@ -137,8 +245,33 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
       executionStatus.endTime = new Date();
       executionStatus.currentNodes = [];
 
+      const success = executionStatus.failedNodes.length === 0;
+
+      // Publish workflow completion event
+      if (this.eventBus) {
+        await this.eventBus.publish({
+          eventType: success ? 'WorkflowExecutionCompleted' : 'WorkflowExecutionFailed',
+          aggregateId: context.modelId,
+          eventData: {
+            executionId: context.executionId,
+            modelId: context.modelId,
+            success: success,
+            completedAt: executionStatus.endTime,
+            totalExecutionTime: Date.now() - context.startTime.getTime(),
+            completedNodes: executionStatus.completedNodes.length,
+            failedNodes: executionStatus.failedNodes.length,
+            errors: executionStatus.failedNodes.map(nodeId => {
+              const result = nodeResults.get(nodeId);
+              return result?.error || `Node ${nodeId} failed`;
+            })
+          },
+          userId: context.userId,
+          timestamp: executionStatus.endTime
+        });
+      }
+
       return Result.ok<ExecutionResult>({
-        success: executionStatus.failedNodes.length === 0,
+        success: success,
         completedNodes: executionStatus.completedNodes,
         failedNodes: executionStatus.failedNodes,
         executionTime: Date.now() - context.startTime.getTime(),
@@ -366,6 +499,24 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
       // Update action status
       await actionNode.updateStatus(ActionStatus.EXECUTING);
 
+      // Publish action started event
+      if (this.eventBus) {
+        await this.eventBus.publish({
+          eventType: 'ActionExecutionStarted',
+          aggregateId: nodeId,
+          eventData: {
+            executionId: context.executionId,
+            modelId: context.modelId,
+            actionId: nodeId,
+            actionName: actionNode.name,
+            actionType: actionNode.getActionType(),
+            startedAt: startTime
+          },
+          userId: context.userId,
+          timestamp: startTime
+        });
+      }
+
       let result: any;
       
       if (actionNode instanceof TetherNode) {
@@ -381,11 +532,34 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
       // Update status to completed
       await actionNode.updateStatus(ActionStatus.COMPLETED);
 
+      const endTime = new Date();
+
+      // Publish action completed event
+      if (this.eventBus) {
+        await this.eventBus.publish({
+          eventType: 'ActionExecutionCompleted',
+          aggregateId: nodeId,
+          eventData: {
+            executionId: context.executionId,
+            modelId: context.modelId,
+            actionId: nodeId,
+            actionName: actionNode.name,
+            actionType: actionNode.getActionType(),
+            success: true,
+            completedAt: endTime,
+            executionTime: endTime.getTime() - startTime.getTime(),
+            result: result
+          },
+          userId: context.userId,
+          timestamp: endTime
+        });
+      }
+
       return {
         nodeId,
         success: true,
         startTime,
-        endTime: new Date(),
+        endTime,
         output: result,
         retryCount: 0
       };
@@ -394,11 +568,34 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
       // Update status to failed
       await actionNode.updateStatus(ActionStatus.FAILED);
       
+      const endTime = new Date();
+
+      // Publish action failed event
+      if (this.eventBus) {
+        await this.eventBus.publish({
+          eventType: 'ActionExecutionFailed',
+          aggregateId: nodeId,
+          eventData: {
+            executionId: context.executionId,
+            modelId: context.modelId,
+            actionId: nodeId,
+            actionName: actionNode.name,
+            actionType: actionNode.getActionType(),
+            success: false,
+            failedAt: endTime,
+            error: error instanceof Error ? error.message : String(error),
+            executionTime: endTime.getTime() - startTime.getTime()
+          },
+          userId: context.userId,
+          timestamp: endTime
+        });
+      }
+      
       return {
         nodeId,
         success: false,
         startTime,
-        endTime: new Date(),
+        endTime,
         error: error instanceof Error ? error.message : String(error),
         retryCount: 0
       };
@@ -441,7 +638,7 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
     
     return {
       nestedModelId: node.containerData.nestedModelId,
-      extractedOutputs: node.containerData.outputExtraction.extractedOutputs,
+      extractedOutputs: node.containerData.outputExtraction?.extractedOutputs || {},
       result: 'Nested function model completed successfully'
     };
   }

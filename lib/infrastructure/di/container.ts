@@ -44,7 +44,7 @@ export class ContainerScope {
    * Get service from scope
    */
   async resolve<T>(token: string | symbol | Function): Promise<Result<T>> {
-    return this.parent.resolve<T>(token, this);
+    return this.parent.resolve<T>(token, this, undefined);
   }
 
   /**
@@ -66,7 +66,7 @@ export class ContainerScope {
    */
   async dispose(): Promise<void> {
     // Dispose all disposable scoped instances
-    for (const instance of this.scopedInstances.values()) {
+    for (const instance of Array.from(this.scopedInstances.values())) {
       if (instance && typeof instance.dispose === 'function') {
         try {
           await instance.dispose();
@@ -163,29 +163,48 @@ export class Container {
   /**
    * Resolve a service
    */
-  async resolve<T>(token: string | symbol | Function, scope?: ContainerScope): Promise<Result<T>> {
+  async resolve<T>(token: string | symbol | Function, scope?: ContainerScope, resolutionStack?: Set<string | symbol | Function>): Promise<Result<T>> {
     try {
+      // Initialize resolution stack for circular dependency detection
+      if (!resolutionStack) {
+        resolutionStack = new Set<string | symbol | Function>();
+      }
+
+      // Check for circular dependency
+      const tokenKey = typeof token === 'symbol' ? token : token.toString();
+      if (resolutionStack.has(tokenKey)) {
+        return Result.fail(`Circular dependency detected: ${this.getResolutionChain(resolutionStack, tokenKey)}`);
+      }
+
       const descriptor = this.findDescriptor(token);
       if (!descriptor) {
         return Result.fail(`Service not registered: ${String(token)}`);
       }
 
-      // Handle different lifetimes
-      switch (descriptor.lifetime) {
-        case ServiceLifetime.Singleton:
-          return this.resolveSingleton<T>(descriptor);
-          
-        case ServiceLifetime.Scoped:
-          if (!scope) {
-            return Result.fail(`Scoped service '${String(token)}' requires a scope`);
-          }
-          return this.resolveScoped<T>(descriptor, scope);
-          
-        case ServiceLifetime.Transient:
-          return this.resolveTransient<T>(descriptor, scope);
-          
-        default:
-          return Result.fail(`Unknown service lifetime: ${descriptor.lifetime}`);
+      // Add current token to resolution stack
+      resolutionStack.add(tokenKey);
+
+      try {
+        // Handle different lifetimes
+        switch (descriptor.lifetime) {
+          case ServiceLifetime.Singleton:
+            return await this.resolveSingleton<T>(descriptor, resolutionStack);
+            
+          case ServiceLifetime.Scoped:
+            if (!scope) {
+              return Result.fail(`Scoped service '${String(token)}' requires a scope`);
+            }
+            return await this.resolveScoped<T>(descriptor, scope, resolutionStack);
+            
+          case ServiceLifetime.Transient:
+            return await this.resolveTransient<T>(descriptor, scope, resolutionStack);
+            
+          default:
+            return Result.fail(`Unknown service lifetime: ${descriptor.lifetime}`);
+        }
+      } finally {
+        // Remove from resolution stack when done
+        resolutionStack.delete(tokenKey);
       }
     } catch (error) {
       return Result.fail(
@@ -231,7 +250,7 @@ export class Container {
    */
   async dispose(): Promise<void> {
     // Dispose all disposable singleton instances
-    for (const instance of this.singletonInstances.values()) {
+    for (const instance of Array.from(this.singletonInstances.values())) {
       if (instance && typeof instance.dispose === 'function') {
         try {
           await instance.dispose();
@@ -245,6 +264,15 @@ export class Container {
     this.services.clear();
   }
 
+  /**
+   * Get resolution chain for circular dependency error messages
+   */
+  private getResolutionChain(resolutionStack: Set<string | symbol | Function>, currentToken: string | symbol | Function): string {
+    const chain = Array.from(resolutionStack).map(token => String(token));
+    chain.push(String(currentToken));
+    return chain.join(' -> ');
+  }
+
   private findDescriptor(token: string | symbol | Function): ServiceDescriptor | undefined {
     const descriptor = this.services.get(token);
     if (descriptor) {
@@ -254,31 +282,56 @@ export class Container {
     return this.parent?.findDescriptor(token);
   }
 
-  private async resolveSingleton<T>(descriptor: ServiceDescriptor<T>): Promise<Result<T>> {
+  private async resolveSingleton<T>(descriptor: ServiceDescriptor<T>, resolutionStack: Set<string | symbol | Function>): Promise<Result<T>> {
+    // Check if instance exists in current container
     let instance = this.singletonInstances.get(descriptor.token);
     
+    // If not found and has parent, check parent's singletons
+    if (!instance && this.parent) {
+      instance = this.parent.singletonInstances.get(descriptor.token);
+      if (instance) {
+        // Store reference to parent's singleton in child for faster subsequent access
+        this.singletonInstances.set(descriptor.token, instance);
+        return Result.ok(instance);
+      }
+    }
+    
+    // Create new instance if not found anywhere in hierarchy
     if (!instance) {
-      instance = await descriptor.factory(this);
-      this.singletonInstances.set(descriptor.token, instance);
+      try {
+        instance = await descriptor.factory(new ResolutionContainer(this, resolutionStack));
+        this.singletonInstances.set(descriptor.token, instance);
+      } catch (error) {
+        return Result.fail(`Failed to create singleton instance: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     
     return Result.ok(instance);
   }
 
-  private async resolveScoped<T>(descriptor: ServiceDescriptor<T>, scope: ContainerScope): Promise<Result<T>> {
+  private async resolveScoped<T>(descriptor: ServiceDescriptor<T>, scope: ContainerScope, resolutionStack: Set<string | symbol | Function>): Promise<Result<T>> {
     let instance = scope.getScopedInstance<T>(descriptor.token);
     
     if (!instance) {
-      instance = await descriptor.factory(this);
-      scope.setScopedInstance(descriptor.token, instance);
+      try {
+        instance = await descriptor.factory(new ResolutionContainer(this, resolutionStack, scope));
+        scope.setScopedInstance(descriptor.token, instance);
+      } catch (error) {
+        return Result.fail(`Failed to create scoped instance: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     
     return Result.ok(instance);
   }
 
-  private async resolveTransient<T>(descriptor: ServiceDescriptor<T>, scope?: ContainerScope): Promise<Result<T>> {
-    const instance = await descriptor.factory(this);
-    return Result.ok(instance);
+  private async resolveTransient<T>(descriptor: ServiceDescriptor<T>, scope?: ContainerScope, resolutionStack?: Set<string | symbol | Function>): Promise<Result<T>> {
+    try {
+      const resolutionContainer = resolutionStack ? new ResolutionContainer(this, resolutionStack, scope) : this;
+      const instance = await descriptor.factory(resolutionContainer);
+      return Result.ok(instance);
+    } catch (error) {
+      return Result.fail(`Failed to create transient instance: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
 
@@ -367,6 +420,16 @@ export const ServiceTokens = {
   WORKFLOW_ORCHESTRATION_SERVICE: Symbol('IWorkflowOrchestrationService'),
   NODE_DEPENDENCY_SERVICE: Symbol('NodeDependencyService'),
   
+  // Validation service tokens
+  WORKFLOW_VALIDATION_SERVICE: Symbol('IWorkflowValidationService'),
+  BUSINESS_RULE_VALIDATION_SERVICE: Symbol('IBusinessRuleValidationService'),
+  EXECUTION_READINESS_VALIDATION_SERVICE: Symbol('IExecutionReadinessService'),
+  CONTEXT_VALIDATION_SERVICE: Symbol('IContextValidationService'),
+  CROSS_FEATURE_VALIDATION_SERVICE: Symbol('ICrossFeatureValidationService'),
+  
+  // Validation use case tokens
+  VALIDATE_WORKFLOW_STRUCTURE_USE_CASE: Symbol('ValidateWorkflowStructureUseCase'),
+  
   // Infrastructure tokens
   SUPABASE_CLIENT: Symbol('SupabaseClient'),
   
@@ -381,6 +444,38 @@ export const ServiceTokens = {
  */
 export interface ServiceModule {
   register(container: Container): void;
+}
+
+/**
+ * Resolution container that tracks circular dependencies
+ */
+class ResolutionContainer {
+  constructor(
+    private readonly container: Container, 
+    private readonly resolutionStack: Set<string | symbol | Function>,
+    private readonly currentScope?: ContainerScope
+  ) {}
+
+  async resolve<T>(token: string | symbol | Function): Promise<Result<T>> {
+    return this.container.resolve<T>(token, this.currentScope, this.resolutionStack);
+  }
+
+  // Delegate other methods to the main container
+  isRegistered(token: string | symbol | Function): boolean {
+    return this.container.isRegistered(token);
+  }
+
+  getRegisteredTokens(): (string | symbol | Function)[] {
+    return this.container.getRegisteredTokens();
+  }
+
+  createScope(): ContainerScope {
+    return this.container.createScope();
+  }
+
+  createChild(): Container {
+    return this.container.createChild();
+  }
 }
 
 /**

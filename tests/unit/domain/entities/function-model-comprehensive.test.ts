@@ -39,7 +39,8 @@ import {
   IONodeBuilder, 
   StageNodeBuilder, 
   TetherNodeBuilder,
-  TestData 
+  TestData,
+  getTestUUID
 } from '../../../utils/test-fixtures';
 
 describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
@@ -164,11 +165,13 @@ describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
     it('Publish_ValidDraftModel_ShouldTransitionStateAndEnforceRules', () => {
       // Arrange - Add minimum required nodes for valid workflow (input and output nodes)
       const inputNode = new IONodeBuilder()
+        .withId(getTestUUID('input-node-' + Date.now()))
         .withModelId(validModel.modelId)
         .asInput()
         .build();
       
       const outputNode = new IONodeBuilder()
+        .withId(getTestUUID('output-node-' + Date.now()))
         .withModelId(validModel.modelId)
         .asOutput()
         .build();
@@ -189,8 +192,12 @@ describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
 
     it('Publish_AlreadyPublishedModel_ShouldEnforceBusinessRule', () => {
       // Arrange - Published model with both input and output nodes
-      const inputNode = new IONodeBuilder().withModelId(validModel.modelId).asInput().build();
-      const outputNode = new IONodeBuilder().withModelId(validModel.modelId).asOutput().build();
+      const inputNode = new IONodeBuilder()
+        .withId(getTestUUID('input-already-pub-' + Date.now()))
+        .withModelId(validModel.modelId).asInput().build();
+      const outputNode = new IONodeBuilder()
+        .withId(getTestUUID('output-already-pub-' + Date.now()))
+        .withModelId(validModel.modelId).asOutput().build();
       validModel.addNode(inputNode);
       validModel.addNode(outputNode);
       validModel.publish(); // First publish
@@ -349,23 +356,27 @@ describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
     it('ValidateWorkflow_CompleteWorkflow_ShouldPassValidation', () => {
       // Arrange - Complete valid workflow
       const inputNode = new IONodeBuilder()
+        .withId(getTestUUID('input-complete-' + Date.now()))
         .withModelId(model.modelId)
         .withName('Input')
         .asInput()
         .build();
       
       const stageNode = new StageNodeBuilder()
+        .withId(getTestUUID('stage-complete-' + Date.now()))
         .withModelId(model.modelId)
         .withName('Processing Stage')
         .build();
       
       const outputNode = new IONodeBuilder()
+        .withId(getTestUUID('output-complete-' + Date.now()))
         .withModelId(model.modelId)
         .withName('Output')
         .asOutput()
         .build();
 
       const actionNode = new TetherNodeBuilder()
+        .withId(getTestUUID('action-complete-' + Date.now()))
         .withModelId(model.modelId)
         .withParentNode(stageNode.nodeId.toString())
         .withName('Process Action')
@@ -411,11 +422,13 @@ describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
     it('ValidateWorkflow_WithIONode_ShouldPassValidation', () => {
       // Arrange - Valid workflow with both input and output nodes
       const inputNode = new IONodeBuilder()
+        .withId(getTestUUID('input-io-' + Date.now()))
         .withModelId(model.modelId)
         .asInput()
         .build();
       
       const outputNode = new IONodeBuilder()
+        .withId(getTestUUID('output-io-' + Date.now()))
         .withModelId(model.modelId)
         .asOutput()
         .build();
@@ -436,9 +449,15 @@ describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
 
     it('ValidateWorkflow_WithStageNodes_ShouldNotGenerateWarnings', () => {
       // Arrange - Valid workflow with connected stage nodes and required IO nodes
-      const inputNode = new IONodeBuilder().withModelId(model.modelId).asInput().build();
-      const outputNode = new IONodeBuilder().withModelId(model.modelId).asOutput().build();
-      const stageNode = new StageNodeBuilder().withModelId(model.modelId).build();
+      const inputNode = new IONodeBuilder()
+        .withId(getTestUUID('input-stage-' + Date.now()))
+        .withModelId(model.modelId).asInput().build();
+      const outputNode = new IONodeBuilder()
+        .withId(getTestUUID('output-stage-' + Date.now()))
+        .withModelId(model.modelId).asOutput().build();
+      const stageNode = new StageNodeBuilder()
+        .withId(getTestUUID('stage-stage-' + Date.now()))
+        .withModelId(model.modelId).build();
 
       model.addNode(inputNode);
       model.addNode(outputNode);
@@ -450,6 +469,7 @@ describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
 
       // Add an action to the stage node to prevent "no actions" warning
       const tetherAction = new TetherNodeBuilder()
+        .withId(getTestUUID('tether-stage-' + Date.now()))
         .withParentNode(stageNode.nodeId.toString())
         .withModelId(model.modelId)
         .withName('Stage Action')
@@ -559,9 +579,13 @@ describe('FunctionModel - Comprehensive Domain Entity Tests', () => {
     });
 
     it('Equals_DifferentModelId_ShouldNotBeEqual', () => {
-      // Arrange
-      const model1 = new FunctionModelBuilder().withName('Same Name').build();
-      const model2 = new FunctionModelBuilder().withName('Same Name').build();
+      // Arrange - Ensure different model IDs
+      const model1 = new FunctionModelBuilder()
+        .withId(getTestUUID('model-1-' + Date.now()))
+        .withName('Same Name').build();
+      const model2 = new FunctionModelBuilder()
+        .withId(getTestUUID('model-2-' + Date.now()))
+        .withName('Same Name').build();
 
       // Act & Assert - Different entities despite same properties
       expect(model1.equals(model2)).toBe(false);

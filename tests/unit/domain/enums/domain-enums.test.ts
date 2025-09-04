@@ -138,12 +138,12 @@ describe('Domain Enumerations', () => {
       expect(NodeStatus.ERROR).toBe('error');
     });
 
-    it('should have exactly 5 node statuses', () => {
-      expect(Object.keys(NodeStatus)).toHaveLength(5);
+    it('should have exactly 6 node statuses', () => {
+      expect(Object.keys(NodeStatus)).toHaveLength(6);
     });
 
     it('should be consistent with domain model specification', () => {
-      const expectedStatuses = ['active', 'inactive', 'draft', 'archived', 'error'];
+      const expectedStatuses = ['active', 'inactive', 'draft', 'configured', 'archived', 'error'];
       const actualStatuses = Object.values(NodeStatus);
       expect(actualStatuses.sort()).toEqual(expectedStatuses.sort());
     });
