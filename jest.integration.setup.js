@@ -1,7 +1,9 @@
-// Learn more: https://github.com/testing-library/jest-dom
+// Integration test setup - NO MOCKS ALLOWED
+
+// Basic test environment setup
 import '@testing-library/jest-dom'
 
-// Mock Next.js router
+// Mock Next.js router only (not Supabase)
 jest.mock('next/navigation', () => ({
   useRouter() {
     return {
@@ -21,7 +23,7 @@ jest.mock('next/navigation', () => ({
   },
 }))
 
-// Mock Next.js Image component
+// Mock Next.js Image component only
 jest.mock('next/image', () => ({
   __esModule: true,
   default: (props) => {
@@ -30,30 +32,7 @@ jest.mock('next/image', () => ({
   },
 }))
 
-// Mock Supabase client only for unit tests, not integration tests
-if (!process.env.TEST_MODE || process.env.TEST_MODE !== 'integration') {
-  jest.mock('@supabase/supabase-js', () => ({
-    createClient: jest.fn(() => ({
-      from: jest.fn(() => ({
-        select: jest.fn(() => ({
-          eq: jest.fn(() => ({
-            single: jest.fn(() => Promise.resolve({ data: null, error: null })),
-            order: jest.fn(() => ({
-              limit: jest.fn(() => Promise.resolve({ data: [], error: null }))
-            }))
-          })),
-          insert: jest.fn(() => Promise.resolve({ data: null, error: null })),
-          update: jest.fn(() => ({
-            eq: jest.fn(() => Promise.resolve({ data: null, error: null }))
-          })),
-          delete: jest.fn(() => ({
-            eq: jest.fn(() => Promise.resolve({ data: null, error: null }))
-          }))
-        }))
-      }))
-    }))
-  }))
-}
+// DO NOT MOCK SUPABASE - Let integration tests use real client
 
 // Global test setup
 global.ResizeObserver = jest.fn().mockImplementation(() => ({
@@ -75,4 +54,4 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: jest.fn(),
     dispatchEvent: jest.fn(),
   })),
-}) 
+})

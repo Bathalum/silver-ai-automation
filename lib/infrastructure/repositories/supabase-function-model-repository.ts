@@ -118,7 +118,6 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
         .eq('model_id', modelId)
         .single();
 
-
       if (modelError || !modelData) {
         return Result.fail(`Model not found: ${modelId}`);
       }
@@ -130,24 +129,16 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
         .eq('model_id', modelId)
         .eq('node_id', node.nodeId.toString());
 
-      if (existingNode) {
+      if (existingNode && existingNode.length > 0) {
         return Result.fail(`Node already exists: ${node.nodeId.toString()}`);
       }
 
       // Add node to association table
       const nodeRow = this.nodeFromDomain(node, modelId);
       
-      // Handle different client implementations
-      const nodeTableBuilder = this.supabase.from('function_model_nodes');
-      let nodeError = null;
-      
-      if (typeof nodeTableBuilder.insert === 'function') {
-        const { error } = await nodeTableBuilder.insert([nodeRow]);
-        nodeError = error;
-      } else {
-        // Mock client - assume success
-        nodeError = null;
-      }
+      const { error: nodeError } = await this.supabase
+        .from('function_model_nodes')
+        .insert([nodeRow]);
 
       if (nodeError) {
         return Result.fail(this.handleDatabaseError(nodeError));
@@ -216,17 +207,9 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
       // Add action node to actions table
       const actionRow = this.actionNodeFromDomain(actionNode, modelId);
       
-      // Handle different client implementations
-      const actionTableBuilder = this.supabase.from('function_model_actions');
-      let actionError = null;
-      
-      if (typeof actionTableBuilder.insert === 'function') {
-        const { error } = await actionTableBuilder.insert([actionRow]);
-        actionError = error;
-      } else {
-        // Mock client - assume success
-        actionError = null;
-      }
+      const { error: actionError } = await this.supabase
+        .from('function_model_actions')
+        .insert([actionRow]);
 
       if (actionError) {
         return Result.fail(this.handleDatabaseError(actionError));
@@ -510,38 +493,51 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
 
   async save(model: FunctionModel): Promise<Result<void>> {
     try {
+      console.log('🔍 REPOSITORY SAVE DEBUG - Starting save for modelId:', model.modelId);
+      
       // Save the main model
       const modelRow = this.fromDomain(model);
+      console.log('🔍 Converting model to database row for upsert');
       
-      // Use upsert if available, otherwise fallback to insert/update
-      let modelError = null;
+      // Check if we have a functional Supabase client
       const tableBuilder = this.supabase.from('function_models');
       
-      if (typeof tableBuilder.upsert === 'function') {
-        // Use upsert method
-        const { error } = await tableBuilder.upsert(modelRow);
-        modelError = error;
-      } else if (typeof tableBuilder.insert === 'function') {
-        // Fallback to insert/update pattern
-        const { error: insertError } = await tableBuilder.insert([modelRow]);
-        
-        if (insertError) {
-          if (insertError.code === '23505' || insertError.message?.includes('duplicate key')) {
-            const { error: updateError } = await tableBuilder
-              .update(modelRow)
-              .eq('model_id', modelRow.model_id);
-            modelError = updateError;
-          } else {
-            modelError = insertError;
-          }
-        }
-      } else {
-        // If neither method is available, this is likely a mocked client
-        modelError = null; // Assume success for mocked tests
+      if (typeof tableBuilder.insert !== 'function') {
+        console.error('🔍 Supabase client is missing insert functionality');
+        console.error('🔍 This suggests a configuration or environment issue');
+        console.error('🔍 Available methods on tableBuilder:', Object.getOwnPropertyNames(Object.getPrototypeOf(tableBuilder)));
+        return Result.fail('Database client is not properly configured - missing insert functionality');
       }
 
-      if (modelError) {
-        return Result.fail(this.handleDatabaseError(modelError));
+      // Use insert with update fallback pattern (reliable for all Supabase versions)
+      console.log('🔍 About to attempt insert/update for model_id:', modelRow.model_id);
+      
+      // Try insert first
+      const { error: insertError } = await tableBuilder.insert([modelRow]);
+
+      if (insertError) {
+        // If it's a duplicate key error, try update
+        if (insertError.code === '23505' || insertError.message?.includes('duplicate key')) {
+          console.log('🔍 Model exists, updating instead');
+          const { error: updateError } = await this.supabase
+            .from('function_models')
+            .update(modelRow)
+            .eq('model_id', modelRow.model_id);
+
+          if (updateError) {
+            console.error('🔍 Model update failed with error:', updateError);
+            console.error('🔍 Error details:', JSON.stringify(updateError, null, 2));
+            return Result.fail(this.handleDatabaseError(updateError));
+          }
+          console.log('🔍 Model updated successfully');
+        } else {
+          console.error('🔍 Model insert failed with error:', insertError);
+          console.error('🔍 Error details:', JSON.stringify(insertError, null, 2));
+          console.error('🔍 Model row attempted:', JSON.stringify(modelRow, null, 2));
+          return Result.fail(this.handleDatabaseError(insertError));
+        }
+      } else {
+        console.log('🔍 Model inserted successfully');
       }
 
       // Save nodes (combines both regular nodes and action nodes)
@@ -560,23 +556,32 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
       }
 
       if (allNodeRows.length > 0) {
-        // Delete existing nodes first
+        console.log('🔍 Saving', allNodeRows.length, 'nodes to database');
+        
+        // Delete existing nodes first (clean slate approach)
         const { error: deleteError } = await this.supabase
           .from('function_model_nodes')
           .delete()
           .eq('model_id', model.modelId);
 
         if (deleteError) {
+          console.error('🔍 Failed to delete existing nodes:', deleteError);
           return Result.fail(this.handleDatabaseError(deleteError));
         }
 
+        // Insert all nodes
         const { error: nodesError } = await this.supabase
           .from('function_model_nodes')
           .insert(allNodeRows);
 
         if (nodesError) {
+          console.error('🔍 Failed to insert nodes:', nodesError);
           return Result.fail(this.handleDatabaseError(nodesError));
         }
+        
+        console.log('🔍 Successfully saved all nodes');
+      } else {
+        console.log('🔍 No nodes to save');
       }
 
       return Result.ok();
@@ -587,7 +592,9 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
 
   async findById(modelId: string): Promise<Result<FunctionModel | null>> {
     try {
-      // Get the main model
+      console.log('🔍 REPOSITORY FINDBYID DEBUG - Finding modelId:', modelId);
+      
+      // Get the main model using standard Supabase query
       const { data: modelData, error: modelError } = await this.supabase
         .from('function_models')
         .select('*')
@@ -596,20 +603,37 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
 
       if (modelError) {
         if (modelError.code === 'PGRST116') {
+          console.log('🔍 Model not found (PGRST116)');
           return Result.ok(null); // Not found
         }
+        console.error('🔍 Database error finding model:', modelError);
         return Result.fail(this.handleDatabaseError(modelError));
       }
 
-      // Get all nodes (both regular nodes and action nodes are stored in function_model_nodes table)
+      if (!modelData) {
+        console.log('🔍 No model data found for modelId:', modelId);
+        return Result.ok(null); // Not found
+      }
+      
+      console.log('🔍 Found model data:', {
+        model_id: modelData.model_id,
+        name: modelData.name,
+        deleted_at: modelData.deleted_at,
+        deleted_by: modelData.deleted_by
+      });
+
+      // Get all nodes using standard Supabase query
       const { data: nodesData, error: nodesError } = await this.supabase
         .from('function_model_nodes')
         .select('*')
         .eq('model_id', modelId);
 
       if (nodesError) {
+        console.error('🔍 Error fetching nodes:', nodesError);
         return Result.fail(this.handleDatabaseError(nodesError));
       }
+      
+      console.log('🔍 Found', nodesData?.length || 0, 'nodes for model');
 
       // Convert to domain objects, separating nodes and action nodes
       const nodes = new Map<string, Node>();
@@ -635,9 +659,12 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
       
       const modelResult = this.toDomainWithNodesAndActions(modelData as FunctionModelRow, nodes, actionNodes);
       if (modelResult.isFailure) {
+        console.log('🔍 Failed to convert to domain:', modelResult.error);
         return Result.fail(modelResult.error);
       }
 
+      console.log('🔍 Successfully converted to domain model');
+      console.log('🔍 Domain model deletedAt:', modelResult.value.deletedAt);
       return Result.ok(modelResult.value);
     } catch (error) {
       return Result.fail(this.handleDatabaseError(error));
@@ -698,7 +725,7 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
 
       if (error) {
         if (error.code === 'PGRST116') {
-          return Result.ok(false);
+          return Result.ok(false); // Not found
         }
         return Result.fail(this.handleDatabaseError(error));
       }
@@ -991,10 +1018,24 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
 
   private toDomainWithNodesAndActions(row: FunctionModelRow, nodes: Map<string, Node>, actionNodes: Map<string, ActionNode>): Result<FunctionModel> {
     try {
+      // Defensive null checking for entire row
+      if (!row) {
+        return Result.fail('Database row is null or undefined - model may not exist or there was a database error');
+      }
+      
+      // Check for required fields
+      if (!row.model_id || typeof row.model_id !== 'string') {
+        return Result.fail('Database row missing required model_id field');
+      }
 
-      const modelNameResult = ModelName.create(row.name);
-      const versionResult = Version.create(row.version);
-      const currentVersionResult = Version.create(row.current_version);
+      // Handle null/undefined values from database with comprehensive safety
+      const safeName = (row.name && typeof row.name === 'string') ? row.name : 'Untitled Model';
+      const safeVersion = (row.version && typeof row.version === 'string') ? row.version : '1.0.0';
+      const safeCurrentVersion = (row.current_version && typeof row.current_version === 'string') ? row.current_version : '1.0.0';
+
+      const modelNameResult = ModelName.create(safeName);
+      const versionResult = Version.create(safeVersion);
+      const currentVersionResult = Version.create(safeCurrentVersion);
 
       if (modelNameResult.isFailure) {
         return Result.fail(`Invalid model name: ${modelNameResult.error}`);
@@ -1172,11 +1213,20 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
   private nodeFromDomain(node: Node, modelId: string): ProductionNodeRow {
     const typeSpecificData = this.extractNodeTypeData(node);
     
+    // Safely get node name with null handling
+    let nodeName: string;
+    try {
+      nodeName = node.name || 'Untitled Node';
+    } catch (error) {
+      console.warn('Node name access failed, using default:', error);
+      nodeName = 'Untitled Node';
+    }
+    
     return {
       node_id: node.nodeId.toString(),
       model_id: modelId,
       node_type: this.mapNodeTypeToProduction(node.getNodeType()),
-      name: node.name,
+      name: nodeName,
       description: node.description,
       position_x: node.position.x,
       position_y: node.position.y,

@@ -301,30 +301,8 @@ export interface ArchitecturalComplianceResult {
 export class AIAgentManagementService {
   private dependencies: AIAgentManagementServiceDependencies;
 
-  constructor(
-    agentRepository: any,
-    eventBus: IEventBus,
-    businessRuleService: any,
-    dependencies?: AIAgentManagementServiceDependencies
-  ) {
-    if (dependencies) {
-      this.dependencies = dependencies;
-    } else {
-      // Create dependencies internally for legacy constructor
-      this.dependencies = {
-        registerUseCase: new RegisterAIAgentUseCase(agentRepository, eventBus),
-        discoverUseCase: new DiscoverAgentsByCapabilityUseCase(agentRepository),
-        executeUseCase: new ExecuteAIAgentTaskUseCase(agentRepository, eventBus),
-        semanticSearchUseCase: new PerformSemanticAgentSearchUseCase(agentRepository),
-        workflowCoordinationUseCase: new CoordinateWorkflowAgentExecutionUseCase(
-          new ExecuteAIAgentTaskUseCase(agentRepository, eventBus),
-          eventBus
-        ),
-        agentRepository,
-        auditRepository: {} as any, // Will be passed separately
-        eventBus
-      };
-    }
+  constructor(dependencies: AIAgentManagementServiceDependencies) {
+    this.dependencies = dependencies;
   }
 
   // Expose dependencies for testing and architectural validation
@@ -1004,6 +982,78 @@ export class AIAgentManagementService {
 
     } catch (error) {
       return Result.fail(`Load balancing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Register a new AI agent
+   */
+  async registerAgent(request: AgentLifecycleRequest): Promise<Result<{ agentId: string; name: string; featureType: FeatureType; entityId: string; status: string }>> {
+    try {
+      const registrationResult = await this.dependencies.registerUseCase.execute({
+        name: request.name,
+        description: request.description,
+        featureType: request.featureType,
+        entityId: request.entityId,
+        instructions: request.instructions,
+        tools: request.tools,
+        capabilities: request.capabilities,
+        userId: request.userId
+      });
+
+      if (registrationResult.isFailure) {
+        return Result.fail(registrationResult.error);
+      }
+
+      return Result.ok({
+        agentId: registrationResult.value.agentId,
+        name: request.name,
+        featureType: request.featureType,
+        entityId: request.entityId,
+        status: 'registered'
+      });
+    } catch (error) {
+      return Result.fail(`Agent registration failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Update agent enabled status
+   */
+  async updateAgentEnabled(agentId: string, enabled: boolean, userId: string): Promise<Result<void>> {
+    try {
+      const validUUID = this.ensureValidUUID(agentId);
+      const nodeIdResult = NodeId.create(validUUID);
+      
+      if (nodeIdResult.isFailure) {
+        return Result.fail(`Invalid agent ID: ${nodeIdResult.error}`);
+      }
+
+      const updateResult = await this.dependencies.agentRepository.updateEnabled(nodeIdResult.value, enabled);
+      if (updateResult.isFailure) {
+        return Result.fail(updateResult.error);
+      }
+
+      // Create audit log
+      const auditLogResult = AuditLog.create({
+        auditId: this.generateAuditId(),
+        entityType: 'ai-agent',
+        entityId: agentId,
+        action: enabled ? 'AGENT_ENABLED' : 'AGENT_DISABLED',
+        userId: userId,
+        details: {
+          enabled: enabled,
+          previousState: !enabled
+        }
+      });
+
+      if (auditLogResult.isSuccess) {
+        await this.dependencies.auditRepository.save(auditLogResult.value);
+      }
+
+      return Result.ok();
+    } catch (error) {
+      return Result.fail(`Failed to update agent enabled status: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

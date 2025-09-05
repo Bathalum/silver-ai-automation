@@ -6,20 +6,9 @@ import { NodeId } from '../../domain/value-objects/node-id';
 import { ContainerNodeType, ExecutionMode, NodeStatus } from '../../domain/enums';
 import { Result } from '../../domain/shared/result';
 import { IFunctionModelRepository } from '../../domain/interfaces/function-model-repository';
-import { NodeRepository } from '../../domain/interfaces/node-repository';
 import { AddContainerNodeCommand } from '../commands/node-commands';
-
-export interface IEventBus {
-  publish(event: DomainEvent): Promise<void>;
-}
-
-export interface DomainEvent {
-  eventType: string;
-  aggregateId: string;
-  eventData: any;
-  userId?: string;
-  timestamp: Date;
-}
+import { NodeAdded, DomainEvent } from '../../infrastructure/events/domain-event';
+import { IEventBus } from '../../infrastructure/events/supabase-event-bus';
 
 export interface AddContainerNodeResult {
   nodeId: string;
@@ -33,7 +22,6 @@ export interface AddContainerNodeResult {
 export class AddContainerNodeUseCase {
   constructor(
     private modelRepository: IFunctionModelRepository,
-    private nodeRepository: NodeRepository,
     private eventBus: IEventBus
   ) {}
 
@@ -135,23 +123,30 @@ export class AddContainerNodeUseCase {
 
       // Publish domain event (failure should not fail the primary operation)
       try {
-        await this.eventBus.publish({
-          eventType: 'ContainerNodeAdded',
-          aggregateId: command.modelId,
-          eventData: {
+        const domainEvent = new NodeAdded(
+          crypto.randomUUID(), // eventId
+          command.modelId, // aggregateId
+          1, // aggregateVersion - should be retrieved from model
+          new Date(), // occurredOn
+          {
             modelId: command.modelId,
-            nodeId: node.nodeId.value,
-            nodeType: command.nodeType,
-            name: command.name,
-            position: command.position,
-            addedBy: command.userId
+            nodeId: node.nodeId.toString(),
+            nodeType: command.nodeType.toString(),
+            nodeName: command.name
           },
-          userId: command.userId,
-          timestamp: new Date()
-        });
+          {
+            addedBy: command.userId,
+            position: command.position
+          }
+        );
+
+        const publishResult = await this.eventBus.publish(domainEvent);
+        if (publishResult.isFailure) {
+          console.warn('Failed to publish NodeAdded event:', publishResult.error);
+        }
       } catch (eventError) {
         // Log event publishing failure but don't fail the operation
-        console.warn('Failed to publish ContainerNodeAdded event:', eventError);
+        console.warn('Failed to publish NodeAdded event:', eventError);
       }
 
       // Return success result

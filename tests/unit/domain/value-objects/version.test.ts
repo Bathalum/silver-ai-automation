@@ -1,422 +1,383 @@
-/**
- * Unit tests for Version value object
- * Tests semantic versioning business rules and operations
- */
-
 import { Version } from '@/lib/domain/value-objects/version';
-import { ResultTestHelpers, ValidationHelpers } from '../../../utils/test-helpers';
+import { Result } from '@/lib/domain/shared/result';
 
-describe('Version', () => {
-  describe('creation', () => {
-    it('should create valid semantic version', () => {
-      // Arrange
-      const validVersion = '1.0.0';
-      
-      // Act
-      const result = Version.create(validVersion);
-      
-      // Assert
-      expect(result).toBeValidResult();
-      expect(result.value.toString()).toBe(validVersion);
-    });
+describe('Version Value Object', () => {
+  describe('creation and validation', () => {
+    describe('valid versions', () => {
+      it('should create Version with basic semantic version', () => {
+        const result = Version.create('1.0.0');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.major).toBe(1);
+        expect(result.value!.minor).toBe(0);
+        expect(result.value!.patch).toBe(0);
+        expect(result.value!.prerelease).toBeUndefined();
+        expect(result.value!.value).toBe('1.0.0');
+      });
 
-    it('should create version with patch numbers', () => {
-      // Arrange
-      const patchVersion = '2.1.5';
-      
-      // Act
-      const result = Version.create(patchVersion);
-      
-      // Assert
-      expect(result).toBeValidResult();
-      expect(result.value.major).toBe(2);
-      expect(result.value.minor).toBe(1);
-      expect(result.value.patch).toBe(5);
-    });
+      it('should create Version with prerelease', () => {
+        const result = Version.create('2.1.3-beta.1');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.major).toBe(2);
+        expect(result.value!.minor).toBe(1);
+        expect(result.value!.patch).toBe(3);
+        expect(result.value!.prerelease).toBe('beta.1');
+        expect(result.value!.value).toBe('2.1.3-beta.1');
+      });
 
-    it('should create version with zero components', () => {
-      // Arrange
-      const zeroVersion = '0.0.1';
-      
-      // Act
-      const result = Version.create(zeroVersion);
-      
-      // Assert
-      expect(result).toBeValidResult();
-    });
+      it('should create Version with complex prerelease', () => {
+        const result = Version.create('1.0.0-alpha.1.2.3');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.prerelease).toBe('alpha.1.2.3');
+        expect(result.value!.value).toBe('1.0.0-alpha.1.2.3');
+      });
 
-    it('should handle large version numbers', () => {
-      // Arrange
-      const largeVersion = '999.999.999';
-      
-      // Act
-      const result = Version.create(largeVersion);
-      
-      // Assert
-      expect(result).toBeValidResult();
-    });
-  });
+      it('should trim whitespace from version', () => {
+        const result = Version.create('  2.0.0-rc.1  ');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe('2.0.0-rc.1');
+      });
 
-  describe('validation failures', () => {
-    it('should reject empty version string', () => {
-      // Act
-      const result = Version.create('');
-      
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Version cannot be empty');
-    });
-
-    it('should reject invalid semantic version format', () => {
-      // Arrange
-      const invalidVersions = [
-        '1.0',        // Missing patch
-        '1',          // Missing minor and patch
-        '1.0.0.0',    // Too many components
-        'v1.0.0',     // With 'v' prefix
-        '1.0.0+build' // With build metadata (not supported)
-      ];
-      
-      // Act & Assert
-      invalidVersions.forEach(version => {
-        const result = Version.create(version);
-        expect(result).toBeFailureResult();
-        // All invalid formats get the same general error message
-        expect(result.error).toContain('Version must follow semantic versioning format');
+      it('should handle large version numbers', () => {
+        const result = Version.create('999.999.999');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.major).toBe(999);
+        expect(result.value!.minor).toBe(999);
+        expect(result.value!.patch).toBe(999);
       });
     });
 
-    it('should accept valid prerelease versions', () => {
-      // Arrange
-      const validPrereleaseVersions = [
-        '1.0.0-beta',
-        '1.0.0-alpha.1',
-        '1.0.0-rc.1',
-        '2.0.0-beta.2'
-      ];
-      
-      // Act & Assert
-      validPrereleaseVersions.forEach(version => {
-        const result = Version.create(version);
-        expect(result).toBeValidResult();
-        expect(result.value.prerelease).toBeDefined();
+    describe('invalid versions', () => {
+      it('should fail with empty string', () => {
+        const result = Version.create('');
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Version cannot be empty');
       });
-    });
 
-    it('should reject non-numeric version components', () => {
-      // Arrange
-      const invalidVersions = [
-        'a.0.0',
-        '1.b.0',
-        '1.0.c',
-        'one.two.three'
-      ];
-      
-      // Act & Assert
-      invalidVersions.forEach(version => {
-        const result = Version.create(version);
-        expect(result).toBeFailureResult();
-        expect(result.error).toContain('Version must follow semantic versioning format');
+      it('should fail with null input', () => {
+        const result = Version.create(null as any);
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Version cannot be empty');
       });
-    });
 
-    it('should reject negative version numbers', () => {
-      // Arrange
-      const negativeVersions = [
-        '-1.0.0',
-        '1.-1.0',
-        '1.0.-1'
-      ];
-      
-      // Act & Assert
-      negativeVersions.forEach(version => {
-        const result = Version.create(version);
-        expect(result).toBeFailureResult();
-        expect(result.error).toContain('Version must follow semantic versioning format');
+      it('should fail with only whitespace', () => {
+        const result = Version.create('   ');
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Version cannot be empty');
       });
-    });
 
-    it('should handle versions with leading zeros', () => {
-      // Arrange - Leading zeros might be accepted by parseInt
-      const leadingZeroVersions = [
-        '01.0.0',
-        '1.01.0', 
-        '1.0.01'
-      ];
-      
-      // Act & Assert - These might be valid since parseInt handles leading zeros
-      leadingZeroVersions.forEach(version => {
-        const result = Version.create(version);
-        // Check if it's valid or invalid based on actual implementation
-        if (result.isSuccess) {
-          // Leading zeros are stripped by parseInt
-          expect(result.value.toString()).toMatch(/^\d+\.\d+\.\d+$/);
-        } else {
-          // Invalid format
-          expect(result.error).toContain('Version must follow semantic versioning format');
+      it('should fail with invalid format', () => {
+        const invalidVersions = [
+          '1',
+          '1.0',
+          '1.0.0.0',
+          'v1.0.0',
+          '1.0.0-',
+          '1.0.0-beta.',
+          'abc.def.ghi',
+          '1.0.0-beta@invalid'
+        ];
+        
+        for (const version of invalidVersions) {
+          const result = Version.create(version);
+          expect(result.isFailure).toBe(true);
+          expect(result.error).toBe('Version must follow semantic versioning format (e.g., 1.0.0 or 1.0.0-beta)');
         }
       });
     });
   });
 
-  describe('version comparison', () => {
-    it('should compare major versions correctly', () => {
-      // Arrange
-      const version1 = ResultTestHelpers.expectSuccess(Version.create('2.0.0'));
-      const version2 = ResultTestHelpers.expectSuccess(Version.create('1.9.9'));
+  describe('factory methods', () => {
+    it('should create initial version 1.0.0', () => {
+      const version = Version.initial();
       
-      // Act & Assert
-      expect(version1.compare(version2)).toBeGreaterThan(0);
-      expect(version2.compare(version1)).toBeLessThan(0);
-      expect(version1.equals(version2)).toBe(false);
-    });
-
-    it('should compare minor versions correctly', () => {
-      // Arrange
-      const version1 = ResultTestHelpers.expectSuccess(Version.create('1.2.0'));
-      const version2 = ResultTestHelpers.expectSuccess(Version.create('1.1.9'));
-      
-      // Act & Assert
-      expect(version1.compare(version2)).toBeGreaterThan(0);
-      expect(version2.compare(version1)).toBeLessThan(0);
-    });
-
-    it('should compare patch versions correctly', () => {
-      // Arrange
-      const version1 = ResultTestHelpers.expectSuccess(Version.create('1.0.2'));
-      const version2 = ResultTestHelpers.expectSuccess(Version.create('1.0.1'));
-      
-      // Act & Assert
-      expect(version1.compare(version2)).toBeGreaterThan(0);
-      expect(version2.compare(version1)).toBeLessThan(0);
-    });
-
-    it('should identify equal versions', () => {
-      // Arrange
-      const version1 = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
-      const version2 = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
-      
-      // Act & Assert
-      expect(version1.equals(version2)).toBe(true);
-      expect(version1.compare(version2)).toBe(0);
-      expect(version2.compare(version1)).toBe(0);
-    });
-
-    it('should handle complex version comparisons', () => {
-      // Arrange & Act & Assert
-      const versions = [
-        '0.0.1',
-        '0.1.0', 
-        '0.1.1',
-        '1.0.0',
-        '1.0.1',
-        '1.1.0',
-        '2.0.0'
-      ].map(v => ResultTestHelpers.expectSuccess(Version.create(v)));
-
-      // Test that each version is less than all subsequent versions
-      for (let i = 0; i < versions.length - 1; i++) {
-        for (let j = i + 1; j < versions.length; j++) {
-          expect(versions[i].compare(versions[j])).toBeLessThan(0);
-          expect(versions[j].compare(versions[i])).toBeGreaterThan(0);
-        }
-      }
+      expect(version.major).toBe(1);
+      expect(version.minor).toBe(0);
+      expect(version.patch).toBe(0);
+      expect(version.prerelease).toBeUndefined();
+      expect(version.value).toBe('1.0.0');
     });
   });
 
   describe('version increments', () => {
-    it('should increment patch version correctly', () => {
-      // Arrange
-      const version = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
-      
-      // Act
-      const result = version.incrementPatch();
-      
-      // Assert
-      expect(result.toString()).toBe('1.2.4');
-      expect(result.major).toBe(1);
-      expect(result.minor).toBe(2);
-      expect(result.patch).toBe(4);
+    let baseVersion: Version;
+    
+    beforeEach(() => {
+      baseVersion = Version.create('1.2.3').value!;
     });
 
-    it('should increment minor version and reset patch', () => {
-      // Arrange
-      const version = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
+    it('should increment major version', () => {
+      const newVersion = baseVersion.incrementMajor();
       
-      // Act
-      const result = version.incrementMinor();
-      
-      // Assert
-      expect(result.toString()).toBe('1.3.0');
-      expect(result.major).toBe(1);
-      expect(result.minor).toBe(3);
-      expect(result.patch).toBe(0);
+      expect(newVersion.major).toBe(2);
+      expect(newVersion.minor).toBe(0);
+      expect(newVersion.patch).toBe(0);
+      expect(newVersion.prerelease).toBeUndefined();
+      expect(newVersion.value).toBe('2.0.0');
     });
 
-    it('should increment major version and reset minor and patch', () => {
-      // Arrange
-      const version = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
+    it('should increment minor version', () => {
+      const newVersion = baseVersion.incrementMinor();
       
-      // Act
-      const result = version.incrementMajor();
-      
-      // Assert
-      expect(result.toString()).toBe('2.0.0');
-      expect(result.major).toBe(2);
-      expect(result.minor).toBe(0);
-      expect(result.patch).toBe(0);
+      expect(newVersion.major).toBe(1);
+      expect(newVersion.minor).toBe(3);
+      expect(newVersion.patch).toBe(0);
+      expect(newVersion.prerelease).toBeUndefined();
+      expect(newVersion.value).toBe('1.3.0');
     });
 
-    it('should handle large version numbers for increments', () => {
-      // Arrange
-      const largeVersion = ResultTestHelpers.expectSuccess(Version.create('999.999.999'));
+    it('should increment patch version', () => {
+      const newVersion = baseVersion.incrementPatch();
       
-      // Act
-      const patchResult = largeVersion.incrementPatch();
-      const minorResult = largeVersion.incrementMinor();
-      const majorResult = largeVersion.incrementMajor();
+      expect(newVersion.major).toBe(1);
+      expect(newVersion.minor).toBe(2);
+      expect(newVersion.patch).toBe(4);
+      expect(newVersion.prerelease).toBeUndefined();
+      expect(newVersion.value).toBe('1.2.4');
+    });
+
+    it('should create new immutable instances on increment', () => {
+      const majorVersion = baseVersion.incrementMajor();
       
-      // Assert - increments should work with large numbers
-      expect(patchResult.patch).toBe(1000);
-      expect(minorResult.minor).toBe(1000);
-      expect(minorResult.patch).toBe(0); // Reset to 0
-      expect(majorResult.major).toBe(1000);
-      expect(majorResult.minor).toBe(0); // Reset to 0
-      expect(majorResult.patch).toBe(0); // Reset to 0
+      // Original should be unchanged
+      expect(baseVersion.value).toBe('1.2.3');
+      // New version should be different
+      expect(majorVersion.value).toBe('2.0.0');
+      // They should be different instances
+      expect(baseVersion).not.toBe(majorVersion);
     });
   });
 
-  describe('version compatibility', () => {
-    it('should determine semantic compatibility using compare method', () => {
-      // Arrange
-      const baseVersion = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
-      
-      // Act & Assert
-      // Patch updates - same major.minor
-      const patchUpdate = ResultTestHelpers.expectSuccess(Version.create('1.2.4'));
-      expect(baseVersion.major).toBe(patchUpdate.major);
-      expect(baseVersion.minor).toBe(patchUpdate.minor);
-      expect(baseVersion.compare(patchUpdate)).toBeLessThan(0); // Base is older
-      
-      // Minor updates - same major
-      const minorUpdate = ResultTestHelpers.expectSuccess(Version.create('1.3.0'));
-      expect(baseVersion.major).toBe(minorUpdate.major);
-      expect(baseVersion.compare(minorUpdate)).toBeLessThan(0); // Base is older
-      
-      // Major updates - different major
-      const majorUpdate = ResultTestHelpers.expectSuccess(Version.create('2.0.0'));
-      expect(baseVersion.major).not.toBe(majorUpdate.major);
-      expect(baseVersion.compare(majorUpdate)).toBeLessThan(0); // Base is older
-    });
-
-    it('should handle breaking change detection using major version', () => {
-      // Arrange
-      const version1 = ResultTestHelpers.expectSuccess(Version.create('1.5.2'));
-      const version2 = ResultTestHelpers.expectSuccess(Version.create('2.0.0'));
-      
-      // Act & Assert
-      // Major version change indicates breaking changes
-      expect(version1.major).not.toBe(version2.major);
-      expect(version1.compare(version2)).toBeLessThan(0);
-    });
-  });
-
-  describe('version validation rules', () => {
-    it('should enforce business version increment rules', () => {
-      // Arrange
-      const currentVersion = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
-      
-      // Valid next versions
-      const validNextVersions = ['1.2.4', '1.3.0', '2.0.0'];
-      
-      // Invalid next versions (gaps not allowed)
-      const invalidNextVersions = ['1.2.5', '1.4.0', '3.0.0', '1.1.0'];
-      
-      // Act & Assert
-      validNextVersions.forEach(versionString => {
-        const nextVersion = ResultTestHelpers.expectSuccess(Version.create(versionString));
-        expect(currentVersion.compare(nextVersion)).toBeLessThan(0); // Current is less than next
+  describe('version comparison', () => {
+    describe('compare method', () => {
+      it('should compare major versions correctly', () => {
+        const v1 = Version.create('2.0.0').value!;
+        const v2 = Version.create('1.0.0').value!;
+        
+        expect(v1.compare(v2)).toBeGreaterThan(0);
+        expect(v2.compare(v1)).toBeLessThan(0);
       });
-      
-      invalidNextVersions.forEach(versionString => {
-        const nextVersion = ResultTestHelpers.expectSuccess(Version.create(versionString));
-        // These are either downgrades or skipping versions
-        const comparison = currentVersion.compare(nextVersion);
-        if (comparison > 0) {
-          // It's a downgrade (current > next)
-          expect(comparison).toBeGreaterThan(0);
-        } else {
-          // It's skipping versions - we can still compare but business logic would prevent it
-          expect(comparison).toBeLessThan(0);
-        }
+
+      it('should compare minor versions when major is same', () => {
+        const v1 = Version.create('1.2.0').value!;
+        const v2 = Version.create('1.1.0').value!;
+        
+        expect(v1.compare(v2)).toBeGreaterThan(0);
+        expect(v2.compare(v1)).toBeLessThan(0);
+      });
+
+      it('should compare patch versions when major and minor are same', () => {
+        const v1 = Version.create('1.1.2').value!;
+        const v2 = Version.create('1.1.1').value!;
+        
+        expect(v1.compare(v2)).toBeGreaterThan(0);
+        expect(v2.compare(v1)).toBeLessThan(0);
+      });
+
+      it('should return 0 for identical versions', () => {
+        const v1 = Version.create('1.2.3').value!;
+        const v2 = Version.create('1.2.3').value!;
+        
+        expect(v1.compare(v2)).toBe(0);
+      });
+
+      it('should handle prerelease versions correctly', () => {
+        const release = Version.create('1.0.0').value!;
+        const prerelease = Version.create('1.0.0-beta').value!;
+        
+        expect(release.compare(prerelease)).toBeGreaterThan(0);
+        expect(prerelease.compare(release)).toBeLessThan(0);
+      });
+
+      it('should compare prerelease versions alphabetically', () => {
+        const alpha = Version.create('1.0.0-alpha').value!;
+        const beta = Version.create('1.0.0-beta').value!;
+        
+        expect(beta.compare(alpha)).toBeGreaterThan(0);
+        expect(alpha.compare(beta)).toBeLessThan(0);
+      });
+
+      it('should throw error when comparing with non-Version object', () => {
+        const version = Version.create('1.0.0').value!;
+        
+        expect(() => version.compare(null as any)).toThrow('Cannot compare with non-Version object');
+        expect(() => version.compare({} as any)).toThrow('Cannot compare with non-Version object');
+        expect(() => version.compare('1.0.0' as any)).toThrow('Cannot compare with non-Version object');
       });
     });
-  });
 
-  describe('toString and serialization', () => {
-    it('should convert to string correctly', () => {
-      // Arrange
-      const version = ResultTestHelpers.expectSuccess(Version.create('1.2.3'));
-      
-      // Act
-      const result = version.toString();
-      
-      // Assert
-      expect(result).toBe('1.2.3');
+    describe('equals method', () => {
+      it('should return true for identical versions', () => {
+        const v1 = Version.create('1.2.3').value!;
+        const v2 = Version.create('1.2.3').value!;
+        
+        expect(v1.equals(v2)).toBe(true);
+        expect(v2.equals(v1)).toBe(true);
+      });
+
+      it('should return false for different versions', () => {
+        const v1 = Version.create('1.2.3').value!;
+        const v2 = Version.create('1.2.4').value!;
+        
+        expect(v1.equals(v2)).toBe(false);
+        expect(v2.equals(v1)).toBe(false);
+      });
+
+      it('should handle prerelease versions in equality', () => {
+        const v1 = Version.create('1.0.0-beta').value!;
+        const v2 = Version.create('1.0.0-beta').value!;
+        const v3 = Version.create('1.0.0').value!;
+        
+        expect(v1.equals(v2)).toBe(true);
+        expect(v1.equals(v3)).toBe(false);
+      });
+
+      it('should return false for non-Version objects', () => {
+        const version = Version.create('1.0.0').value!;
+        
+        expect(version.equals(null as any)).toBe(false);
+        expect(version.equals({} as any)).toBe(false);
+        expect(version.equals('1.0.0' as any)).toBe(false);
+      });
     });
 
-    it('should provide component access', () => {
-      // Arrange
-      const version = ResultTestHelpers.expectSuccess(Version.create('5.10.15'));
-      
-      // Act & Assert
-      expect(version.major).toBe(5);
-      expect(version.minor).toBe(10);
-      expect(version.patch).toBe(15);
+    describe('comparison helper methods', () => {
+      it('should check if version is greater than another', () => {
+        const v1 = Version.create('2.0.0').value!;
+        const v2 = Version.create('1.0.0').value!;
+        
+        expect(v1.isGreaterThan(v2)).toBe(true);
+        expect(v2.isGreaterThan(v1)).toBe(false);
+      });
+
+      it('should check if version is less than another', () => {
+        const v1 = Version.create('1.0.0').value!;
+        const v2 = Version.create('2.0.0').value!;
+        
+        expect(v1.isLessThan(v2)).toBe(true);
+        expect(v2.isLessThan(v1)).toBe(false);
+      });
+
+      it('should return false for greater than with invalid input', () => {
+        const version = Version.create('1.0.0').value!;
+        
+        expect(version.isGreaterThan(null as any)).toBe(false);
+        expect(version.isGreaterThan({} as any)).toBe(false);
+      });
+
+      it('should return false for less than with invalid input', () => {
+        const version = Version.create('1.0.0').value!;
+        
+        expect(version.isLessThan(null as any)).toBe(false);
+        expect(version.isLessThan({} as any)).toBe(false);
+      });
     });
   });
 
-  describe('edge cases and error conditions', () => {
-    it('should handle whitespace in version strings', () => {
-      // Arrange
-      const validVersionsWithWhitespace = [
-        ' 1.0.0',    // Leading whitespace - should be trimmed
-        '1.0.0 ',    // Trailing whitespace - should be trimmed
-        ' 1.0.0 '    // Both - should be trimmed
+  describe('immutability', () => {
+    it('should be immutable after creation', () => {
+      const version = Version.create('1.2.3-beta').value!;
+      
+      // Properties should be readonly and throw when attempting to modify
+      expect(() => {
+        (version as any).major = 999;
+      }).toThrow('Cannot set property major');
+      
+      // Values should remain unchanged
+      expect(version.major).toBe(1);
+      expect(version.minor).toBe(2);
+      expect(version.patch).toBe(3);
+      expect(version.prerelease).toBe('beta');
+    });
+
+    it('should be frozen to prevent modifications', () => {
+      const version = Version.create('1.0.0').value!;
+      
+      expect(Object.isFrozen(version)).toBe(true);
+    });
+
+    it('should create new instances on modification methods', () => {
+      const original = Version.create('1.0.0').value!;
+      const incremented = original.incrementPatch();
+      
+      expect(original).not.toBe(incremented);
+      expect(original.value).toBe('1.0.0');
+      expect(incremented.value).toBe('1.0.1');
+    });
+  });
+
+  describe('string representation', () => {
+    it('should return correct string for release version', () => {
+      const version = Version.create('1.2.3').value!;
+      
+      expect(version.toString()).toBe('1.2.3');
+      expect(version.value).toBe('1.2.3');
+    });
+
+    it('should return correct string for prerelease version', () => {
+      const version = Version.create('2.0.0-beta.1').value!;
+      
+      expect(version.toString()).toBe('2.0.0-beta.1');
+      expect(version.value).toBe('2.0.0-beta.1');
+    });
+  });
+
+  describe('business scenarios', () => {
+    it('should handle typical version progression', () => {
+      const initial = Version.initial();
+      expect(initial.value).toBe('1.0.0');
+      
+      const patch = initial.incrementPatch();
+      expect(patch.value).toBe('1.0.1');
+      
+      const minor = patch.incrementMinor();
+      expect(minor.value).toBe('1.1.0');
+      
+      const major = minor.incrementMajor();
+      expect(major.value).toBe('2.0.0');
+    });
+
+    it('should properly order versions in typical development cycle', () => {
+      const versions = [
+        Version.create('1.0.0-alpha').value!,
+        Version.create('1.0.0-beta').value!,
+        Version.create('1.0.0-rc.1').value!,
+        Version.create('1.0.0').value!,
+        Version.create('1.0.1').value!,
+        Version.create('1.1.0').value!,
+        Version.create('2.0.0-alpha').value!
       ];
       
-      const invalidVersionsWithWhitespace = [
-        '1. 0.0',    // Internal whitespace - invalid format
-        '1.0. 0'     // Internal whitespace - invalid format
-      ];
-      
-      // Act & Assert
-      validVersionsWithWhitespace.forEach(version => {
-        const result = Version.create(version);
-        expect(result).toBeValidResult();
-        expect(result.value.toString()).toBe('1.0.0');
-      });
-      
-      invalidVersionsWithWhitespace.forEach(version => {
-        const result = Version.create(version);
-        expect(result).toBeFailureResult();
-        expect(result.error).toContain('Version must follow semantic versioning format');
-      });
-    });
-
-    it('should handle extremely large numbers', () => {
-      // Arrange
-      const extremeVersion = '999999999.999999999.999999999';
-      
-      // Act
-      const result = Version.create(extremeVersion);
-      
-      // Assert - Should either succeed or fail gracefully
-      if (result.isSuccess) {
-        expect(result.value.major).toBe(999999999);
-      } else {
-        expect(result).toHaveErrorMessage('Version number too large');
+      for (let i = 0; i < versions.length - 1; i++) {
+        expect(versions[i].isLessThan(versions[i + 1])).toBe(true);
       }
+    });
+  });
+
+  describe('Result pattern compliance', () => {
+    it('should return Result.ok for valid versions', () => {
+      const result = Version.create('1.0.0');
+      
+      expect(result).toBeInstanceOf(Result);
+      expect(result.isSuccess).toBe(true);
+      expect(result.isFailure).toBe(false);
+      expect(result.value).toBeInstanceOf(Version);
+    });
+
+    it('should return Result.fail for invalid versions', () => {
+      const result = Version.create('invalid');
+      
+      expect(result).toBeInstanceOf(Result);
+      expect(result.isSuccess).toBe(false);
+      expect(result.isFailure).toBe(true);
+      expect(typeof result.error).toBe('string');
     });
   });
 });

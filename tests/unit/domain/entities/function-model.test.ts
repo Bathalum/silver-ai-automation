@@ -606,13 +606,13 @@ describe('FunctionModel', () => {
   });
 
   describe('timestamps and audit trail', () => {
-    it('should update timestamps on modifications', () => {
+    it('should update timestamps on modifications', async () => {
       // Arrange
       const model = TestFactories.createValidModel();
       const originalUpdatedAt = model.updatedAt;
       
       // Wait a bit to ensure timestamp difference
-      const dateNowSpy = DateTestHelpers.mockDateNow(Date.now() + 1000);
+      await new Promise(resolve => setTimeout(resolve, 10));
       
       const newNode = new IONodeBuilder()
         .withModelId(model.modelId)
@@ -623,9 +623,6 @@ describe('FunctionModel', () => {
       
       // Assert
       expect(model.updatedAt.getTime()).toBeGreaterThanOrEqual(originalUpdatedAt.getTime());
-      
-      // Cleanup
-      DateTestHelpers.restoreDateNow(dateNowSpy);
     });
 
     it('should track last saved timestamp', () => {

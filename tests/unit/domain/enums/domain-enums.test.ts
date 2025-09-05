@@ -17,14 +17,15 @@ describe('Domain Enumerations', () => {
       expect(FeatureType.KNOWLEDGE_BASE).toBe('knowledge-base');
       expect(FeatureType.SPINDLE).toBe('spindle');
       expect(FeatureType.EVENT_STORM).toBe('event-storm');
+      expect(FeatureType.AI_AGENT).toBe('ai-agent');
     });
 
-    it('should have exactly 4 feature types', () => {
-      expect(Object.keys(FeatureType)).toHaveLength(4);
+    it('should have exactly 5 feature types', () => {
+      expect(Object.keys(FeatureType)).toHaveLength(5);
     });
 
     it('should be consistent with domain model specification', () => {
-      const expectedTypes = ['function-model', 'knowledge-base', 'spindle', 'event-storm'];
+      const expectedTypes = ['function-model', 'knowledge-base', 'spindle', 'event-storm', 'ai-agent'];
       const actualTypes = Object.values(FeatureType);
       expect(actualTypes.sort()).toEqual(expectedTypes.sort());
     });
@@ -190,16 +191,18 @@ describe('Domain Enumerations', () => {
       expect(LinkType.TRIGGERS).toBe('triggers');
       expect(LinkType.CONSUMES).toBe('consumes');
       expect(LinkType.PRODUCES).toBe('produces');
+      expect(LinkType.DEPENDENCY).toBe('dependency');
+      expect(LinkType.REFERENCE).toBe('reference');
     });
 
-    it('should have exactly 8 link types', () => {
-      expect(Object.keys(LinkType)).toHaveLength(8);
+    it('should have exactly 10 link types', () => {
+      expect(Object.keys(LinkType)).toHaveLength(10);
     });
 
     it('should be consistent with domain model specification', () => {
       const expectedTypes = [
         'documents', 'implements', 'references', 'supports',
-        'nested', 'triggers', 'consumes', 'produces'
+        'nested', 'triggers', 'consumes', 'produces', 'dependency', 'reference'
       ];
       const actualTypes = Object.values(LinkType);
       expect(actualTypes.sort()).toEqual(expectedTypes.sort());
@@ -215,7 +218,9 @@ describe('Domain Enumerations', () => {
         [LinkType.NESTED]: 'Hierarchical relationship',
         [LinkType.TRIGGERS]: 'Event-driven activation',
         [LinkType.CONSUMES]: 'Data consumption',
-        [LinkType.PRODUCES]: 'Data production'
+        [LinkType.PRODUCES]: 'Data production',
+        [LinkType.DEPENDENCY]: 'General dependency relationship',
+        [LinkType.REFERENCE]: 'Reference relationship'
       };
 
       Object.keys(semanticMappings).forEach(linkType => {
