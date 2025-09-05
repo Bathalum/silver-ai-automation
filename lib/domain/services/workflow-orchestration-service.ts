@@ -155,7 +155,22 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
         }
 
         // Execute container node (orchestrate its actions)
-        const nodeResult = await this.executeContainerNode(node, model, context);
+        let nodeResult: NodeResult;
+        let wasException = false;
+        try {
+          nodeResult = await this.executeContainerNode(node, model, context);
+        } catch (error) {
+          // Handle execution exceptions - create failed node result
+          wasException = true;
+          nodeResult = {
+            nodeId,
+            success: false,
+            startTime: new Date(),
+            endTime: new Date(),
+            error: error instanceof Error ? error.message : String(error),
+            retryCount: 0
+          };
+        }
         nodeResults.set(nodeId, nodeResult);
 
         if (nodeResult.success) {
@@ -228,13 +243,19 @@ export class WorkflowOrchestrationService implements IWorkflowOrchestrationServi
               });
             }
             
-            return Result.ok<ExecutionResult>({
-              success: false,
-              completedNodes: executionStatus.completedNodes,
-              failedNodes: executionStatus.failedNodes,
-              executionTime: Date.now() - context.startTime.getTime(),
-              errors: [nodeResult.error || 'Critical node execution failed']
-            });
+            // For exception-based critical failures, return Result.fail
+            // For normal critical failures, return Result.ok with failure details
+            if (wasException) {
+              return Result.fail<ExecutionResult>(`Critical node failure: ${nodeResult.error || 'Unknown error'}`);
+            } else {
+              return Result.ok<ExecutionResult>({
+                success: false,
+                completedNodes: executionStatus.completedNodes,
+                failedNodes: executionStatus.failedNodes,
+                executionTime: Date.now() - context.startTime.getTime(),
+                errors: [nodeResult.error || 'Critical node failure']
+              });
+            }
           }
         }
       }

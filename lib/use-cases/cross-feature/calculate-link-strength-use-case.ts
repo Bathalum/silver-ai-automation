@@ -160,13 +160,19 @@ export class CalculateLinkStrengthUseCase {
 
       const calculation = calculationResult.value;
 
-      // Step 4: Update the persisted link
+      // Step 4: Update the link entity with new strength
+      const strengthUpdateResult = link.updateLinkStrength(calculation.finalStrength);
+      if (strengthUpdateResult.isFailure) {
+        return Result.fail<LinkStrengthCalculation>(strengthUpdateResult.error);
+      }
+
+      // Step 5: Update the persisted link
       const updateResult = await this.repository.update(link);
       if (updateResult.isFailure) {
         return Result.fail<LinkStrengthCalculation>(updateResult.error);
       }
 
-      // Step 5: Publish domain event
+      // Step 6: Publish domain event
       try {
         const event = {
           eventId: `link-strength-updated-${command.linkId}`,

@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Container, ServiceModule, ServiceTokens, ServiceRegistration } from './container';
 import { SupabaseFunctionModelRepository } from '../repositories/supabase-function-model-repository';
+import { SupabaseAuditLogRepository } from '../repositories/supabase-audit-log-repository';
 import { SupabaseEventBus } from '../events/supabase-event-bus';
 import { MemoryCacheService, FunctionModelCacheService } from '../cache/cache-service';
 import { OpenAIServiceAdapter } from '../external/ai-service-adapter';
@@ -142,6 +143,18 @@ export class FunctionModelModule implements ServiceModule {
           throw new Error(`Failed to resolve Supabase client: ${supabaseClientResult.error}`);
         }
         return new SupabaseFunctionModelRepository(supabaseClientResult.value);
+      }
+    ));
+
+    // Register audit log repository
+    container.register(ServiceRegistration.scoped(
+      ServiceTokens.AUDIT_LOG_REPOSITORY,
+      async (c) => {
+        const supabaseClientResult = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
+        if (supabaseClientResult.isFailure) {
+          throw new Error(`Failed to resolve Supabase client: ${supabaseClientResult.error}`);
+        }
+        return new SupabaseAuditLogRepository(supabaseClientResult.value);
       }
     ));
   }

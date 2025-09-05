@@ -332,7 +332,8 @@ describe('Business Rules Validation', () => {
             FeatureType.FUNCTION_MODEL,
             FeatureType.KNOWLEDGE_BASE,
             FeatureType.SPINDLE,
-            FeatureType.EVENT_STORM
+            FeatureType.EVENT_STORM,
+            FeatureType.AI_AGENT
           ]).toContain(featureType);
         });
       });

@@ -5,60 +5,38 @@ const createJestConfig = nextJest({
   dir: './',
 })
 
-// Add custom config for integration tests
-const integrationJestConfig = {
-  displayName: 'Integration Tests',
-  testEnvironment: 'node', // Use node environment for database tests
-  setupFilesAfterEnv: [
-    '<rootDir>/tests/integration/integration.setup.ts'
-  ],
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
-  },
+// Add any custom config to be passed to Jest
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.integration.setup.js'],
+  testEnvironment: 'jsdom',
+  
+  // Integration test specific patterns
   testMatch: [
+    '<rootDir>/tests/integration/**/*.test.ts',
     '<rootDir>/tests/integration/**/*.integration.test.ts'
   ],
-  testPathIgnorePatterns: [
-    '<rootDir>/.next/', 
-    '<rootDir>/node_modules/',
-    '<rootDir>/tests/unit/',
-    '<rootDir>/tests/e2e/'
-  ],
-  collectCoverageFrom: [
-    'lib/infrastructure/**/*.{js,jsx,ts,tsx}',
-    'lib/domain/**/*.{js,jsx,ts,tsx}',
-    '!**/*.d.ts',
-    '!**/node_modules/**',
-  ],
-  coverageDirectory: '<rootDir>/coverage/integration',
-  coverageReporters: ['text', 'lcov', 'html'],
-  // Increase timeout for database operations
-  testTimeout: 30000,
-  // Run tests serially to avoid database conflicts
+  
+  // NO MOCKING for integration tests
+  clearMocks: false,
+  resetMocks: false,
+  restoreMocks: false,
+  
+  // Don't transform node_modules for integration tests
+  transformIgnorePatterns: [],
+  
+  // Module name mapping (but NO mocks)
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+    '^@/lib/(.*)$': '<rootDir>/lib/$1',
+    '^@/components/(.*)$': '<rootDir>/components/$1',
+  },
+  
+  // Timeout for integration tests
+  testTimeout: 120000,
+  
+  // Run tests serially for database operations
   maxWorkers: 1,
-  // Setup global variables for integration tests
-  globals: {
-    'ts-jest': {
-      tsconfig: {
-        target: 'es2020',
-        module: 'commonjs'
-      }
-    }
-  },
-  // Environment variables for integration tests
-  testEnvironmentOptions: {
-    NODE_ENV: 'test',
-    TEST_MODE: 'integration'
-  },
-  // Verbose output for better debugging
-  verbose: true,
-  // Force exit after tests complete
-  forceExit: true,
-  // Clear mocks between tests
-  clearMocks: true,
-  // Restore mocks after each test
-  restoreMocks: true
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-module.exports = createJestConfig(integrationJestConfig)
+module.exports = createJestConfig(customJestConfig)

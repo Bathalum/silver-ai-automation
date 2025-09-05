@@ -88,6 +88,36 @@ class MockSupabaseCrossFeatureLinkRepository implements ICreateLinkRepository, I
     }
   }
 
+  async findBySourceAndTarget(sourceFeature: FeatureType, targetFeature: FeatureType, sourceId: string, targetId: string): Promise<Result<CrossFeatureLink | null>> {
+    try {
+      const result = await this.supabaseClient
+        .from('cross_feature_links')
+        .select('*')
+        .eq('source_feature', sourceFeature)
+        .eq('target_feature', targetFeature)
+        .eq('source_id', sourceId)
+        .eq('target_id', targetId)
+        .single();
+
+      if (result.error && result.error.code === 'PGRST116') {
+        return Result.ok(null);
+      }
+      
+      if (result.error) {
+        return Result.fail(`Database error: ${result.error.message}`);
+      }
+
+      const linkResult = this.mapRowToLink(result.data);
+      if (linkResult.isFailure) {
+        return Result.fail(linkResult.error);
+      }
+
+      return Result.ok(linkResult.value);
+    } catch (error) {
+      return Result.fail(`Failed to find cross-feature link: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async findById(linkId: NodeId): Promise<Result<CrossFeatureLink | null>> {
     try {
       const result = await this.supabaseClient
@@ -581,9 +611,13 @@ describe('Cross-Feature Workflows - TDD Integration Tests', () => {
       it('should handle repository failures gracefully without breaking domain consistency', async () => {
         // RED: Test error handling and recovery patterns
         const failingRepository = {
-          ...linkRepository,
+          save: jest.fn().mockResolvedValue(Result.fail('Database connection failed')),
           findBySourceAndTarget: jest.fn().mockResolvedValue(Result.ok(null)), // No duplicate found
-          save: jest.fn().mockResolvedValue(Result.fail('Database connection failed'))
+          findById: jest.fn().mockResolvedValue(Result.ok(null)),
+          update: jest.fn().mockResolvedValue(Result.ok()),
+          findAll: jest.fn().mockResolvedValue(Result.ok([])),
+          findByFeature: jest.fn().mockResolvedValue(Result.ok([])),
+          findByLinkType: jest.fn().mockResolvedValue(Result.ok([]))
         };
 
         const failingCreateUseCase = new CreateCrossFeatureLinkUseCase(failingRepository as any, eventBus, linkingService);
@@ -1317,7 +1351,6 @@ describe('Cross-Feature Workflows - TDD Integration Tests', () => {
         
         // Create failing repositories
         const failingLinkRepository = {
-          ...linkRepository,
           save: jest.fn().mockResolvedValue(Result.fail('Database write failed')),
           findBySourceAndTarget: jest.fn().mockResolvedValue(Result.ok(null)), // No duplicate found, let save operation fail
           findById: jest.fn().mockResolvedValue(Result.fail('Database read failed')),
@@ -1602,7 +1635,10 @@ describe('Cross-Feature Workflows - TDD Integration Tests', () => {
           expect(strengthResult).toHaveProperty('isSuccess');
           expect(strengthResult).toHaveProperty('isFailure');
           expect(strengthResult).toHaveProperty('value');
-          expect(strengthResult).toHaveProperty('error');
+          // Only failed results have error property
+          if (strengthResult.isFailure) {
+            expect(strengthResult).toHaveProperty('error');
+          }
 
           const cycleCommand: DetectRelationshipCyclesCommand = {
             includeAllFeatures: true
@@ -1612,7 +1648,10 @@ describe('Cross-Feature Workflows - TDD Integration Tests', () => {
           expect(cycleResult).toHaveProperty('isSuccess');
           expect(cycleResult).toHaveProperty('isFailure');
           expect(cycleResult).toHaveProperty('value');
-          expect(cycleResult).toHaveProperty('error');
+          // Only failed results have error property
+          if (cycleResult.isFailure) {
+            expect(cycleResult).toHaveProperty('error');
+          }
         }
       });
 

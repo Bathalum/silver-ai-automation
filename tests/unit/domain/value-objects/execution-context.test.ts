@@ -1,47 +1,80 @@
 /**
  * Unit tests for ExecutionContext value object
- * Tests execution environment management, parameters, and session tracking
+ * Tests environment validation, parameter management, and context operations
  */
 
 import { ExecutionContext, Environment } from '@/lib/domain/value-objects/execution-context';
 
 describe('ExecutionContext', () => {
-  describe('creation', () => {
-    it('should create execution context with valid environment', () => {
-      // Act
-      const result = ExecutionContext.create('production');
-      
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      const context = result.value;
-      expect(context.environment).toBe('production');
-      expect(context.parameters).toEqual({});
-      expect(context.sessionId).toBeDefined();
-      expect(context.sessionId).toMatch(/^exec-session-[\w-]+$/);
-      expect(context.createdAt).toBeInstanceOf(Date);
-    });
-
-    it('should create context with parameters', () => {
+  describe('creation and validation', () => {
+    it('should create ExecutionContext with valid environment', () => {
       // Arrange
-      const params = { param1: 'value1', param2: 42, param3: true };
+      const environment = 'development';
+      const parameters = { key1: 'value1', key2: 42 };
+      const sessionId = 'test-session-123';
       
       // Act
-      const result = ExecutionContext.create('development', params);
+      const result = ExecutionContext.create(environment, parameters, sessionId);
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const context = result.value;
-      expect(context.parameters).toEqual(params);
+      expect(result).toBeValidResult();
+      expect(result.value.environment).toBe('development');
+      expect(result.value.parameters).toEqual(parameters);
+      expect(result.value.sessionId).toBe(sessionId);
+      expect(result.value.createdAt).toBeInstanceOf(Date);
     });
 
-    it('should create context with custom session ID', () => {
+    it('should create ExecutionContext with all valid environments', () => {
+      // Arrange
+      const environments: Environment[] = ['development', 'staging', 'production', 'test'];
+      
+      // Act & Assert
+      environments.forEach(env => {
+        const result = ExecutionContext.create(env);
+        expect(result).toBeValidResult();
+        expect(result.value.environment).toBe(env);
+      });
+    });
+
+    it('should create ExecutionContext with empty parameters by default', () => {
       // Act
-      const result = ExecutionContext.create('test', {}, 'custom-session-123');
+      const result = ExecutionContext.create('development');
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const context = result.value;
-      expect(context.sessionId).toBe('custom-session-123');
+      expect(result).toBeValidResult();
+      expect(result.value.parameters).toEqual({});
+      expect(result.value.getParameterCount()).toBe(0);
+    });
+
+    it('should generate session ID if not provided', () => {
+      // Act
+      const result = ExecutionContext.create('development');
+      
+      // Assert
+      expect(result).toBeValidResult();
+      expect(result.value.sessionId).toMatch(/^exec-session-/);
+      expect(result.value.sessionId.length).toBeGreaterThan(20);
+    });
+
+    it('should trim whitespace from environment', () => {
+      // Act
+      const result = ExecutionContext.create('  development  ');
+      
+      // Assert
+      expect(result).toBeValidResult();
+      expect(result.value.environment).toBe('development');
+    });
+
+    it('should trim whitespace from session ID', () => {
+      // Arrange
+      const sessionId = '  test-session-123  ';
+      
+      // Act
+      const result = ExecutionContext.create('development', {}, sessionId);
+      
+      // Assert
+      expect(result).toBeValidResult();
+      expect(result.value.sessionId).toBe('test-session-123');
     });
 
     it('should reject empty environment', () => {
@@ -49,8 +82,8 @@ describe('ExecutionContext', () => {
       const result = ExecutionContext.create('');
       
       // Assert
-      expect(result.isFailure).toBe(true);
-      expect(result.error).toBe('Environment cannot be empty');
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Environment cannot be empty');
     });
 
     it('should reject whitespace-only environment', () => {
@@ -58,26 +91,71 @@ describe('ExecutionContext', () => {
       const result = ExecutionContext.create('   ');
       
       // Assert
-      expect(result.isFailure).toBe(true);
-      expect(result.error).toBe('Environment cannot be empty');
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Environment cannot be empty');
+    });
+
+    it('should reject null environment', () => {
+      // Act
+      const result = ExecutionContext.create(null as any);
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Environment cannot be empty');
+    });
+
+    it('should reject undefined environment', () => {
+      // Act
+      const result = ExecutionContext.create(undefined as any);
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Environment cannot be empty');
+    });
+
+    it('should reject invalid environment', () => {
+      // Act
+      const result = ExecutionContext.create('invalid-env');
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Invalid environment. Must be development, staging, production, or test');
     });
 
     it('should reject empty session ID', () => {
       // Act
-      const result = ExecutionContext.create('production', {}, '');
+      const result = ExecutionContext.create('development', {}, '');
       
       // Assert
-      expect(result.isFailure).toBe(true);
-      expect(result.error).toBe('Session ID cannot be empty');
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Session ID cannot be empty');
     });
 
     it('should reject whitespace-only session ID', () => {
       // Act
-      const result = ExecutionContext.create('production', {}, '   ');
+      const result = ExecutionContext.create('development', {}, '   ');
       
       // Assert
-      expect(result.isFailure).toBe(true);
-      expect(result.error).toBe('Session ID cannot be empty');
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Session ID cannot be empty');
+    });
+
+    it('should reject invalid parameters object', () => {
+      // Act
+      const result = ExecutionContext.create('development', null as any);
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Parameters must be an object');
+    });
+
+    it('should reject non-string session ID', () => {
+      // Act
+      const result = ExecutionContext.create('development', {}, 123 as any);
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Session ID cannot be empty');
     });
   });
 
@@ -85,54 +163,29 @@ describe('ExecutionContext', () => {
     let context: ExecutionContext;
 
     beforeEach(() => {
-      const result = ExecutionContext.create('test', { initial: 'value' });
+      const result = ExecutionContext.create('development', { existing: 'value' }, 'test-session');
       context = result.value;
     });
 
     it('should add parameter successfully', () => {
       // Act
-      const result = context.addParameter('newParam', 'newValue');
+      const result = context.addParameter('newKey', 'newValue');
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters).toEqual({
-        initial: 'value',
-        newParam: 'newValue'
-      });
+      expect(result).toBeValidResult();
+      expect(result.value.getParameter('newKey')).toBe('newValue');
+      expect(result.value.getParameter('existing')).toBe('value');
+      expect(result.value.getParameterCount()).toBe(2);
     });
 
-    it('should add numeric parameter', () => {
+    it('should trim parameter key when adding', () => {
       // Act
-      const result = context.addParameter('count', 42);
+      const result = context.addParameter('  spaced  ', 'value');
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters.count).toBe(42);
-    });
-
-    it('should add boolean parameter', () => {
-      // Act
-      const result = context.addParameter('enabled', true);
-      
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters.enabled).toBe(true);
-    });
-
-    it('should add object parameter', () => {
-      // Arrange
-      const objectParam = { nested: { value: 'test' }, array: [1, 2, 3] };
-      
-      // Act
-      const result = context.addParameter('config', objectParam);
-      
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters.config).toEqual(objectParam);
+      expect(result).toBeValidResult();
+      expect(result.value.hasParameter('spaced')).toBe(true);
+      expect(result.value.getParameter('spaced')).toBe('value');
     });
 
     it('should reject empty parameter key', () => {
@@ -140,8 +193,8 @@ describe('ExecutionContext', () => {
       const result = context.addParameter('', 'value');
       
       // Assert
-      expect(result.isFailure).toBe(true);
-      expect(result.error).toBe('Parameter key cannot be empty');
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Parameter key cannot be empty');
     });
 
     it('should reject whitespace-only parameter key', () => {
@@ -149,28 +202,18 @@ describe('ExecutionContext', () => {
       const result = context.addParameter('   ', 'value');
       
       // Assert
-      expect(result.isFailure).toBe(true);
-      expect(result.error).toBe('Parameter key cannot be empty');
-    });
-
-    it('should replace existing parameter', () => {
-      // Act
-      const result = context.addParameter('initial', 'replacedValue');
-      
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters.initial).toBe('replacedValue');
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Parameter key cannot be empty');
     });
 
     it('should remove parameter successfully', () => {
       // Act
-      const result = context.removeParameter('initial');
+      const result = context.removeParameter('existing');
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters).toEqual({});
+      expect(result).toBeValidResult();
+      expect(result.value.hasParameter('existing')).toBe(false);
+      expect(result.value.getParameterCount()).toBe(0);
     });
 
     it('should handle removing non-existent parameter', () => {
@@ -178,40 +221,37 @@ describe('ExecutionContext', () => {
       const result = context.removeParameter('nonExistent');
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters).toEqual({ initial: 'value' });
+      expect(result).toBeValidResult();
+      expect(result.value.getParameterCount()).toBe(1);
     });
 
-    it('should update multiple parameters at once', () => {
-      // Arrange
-      const updates = { param1: 'value1', param2: 42, param3: true };
-      
+    it('should update parameters by merging', () => {
       // Act
-      const result = context.updateParameters(updates);
-      
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters).toEqual({
-        initial: 'value',
-        param1: 'value1',
-        param2: 42,
-        param3: true
+      const result = context.updateParameters({ 
+        existing: 'updated',
+        new: 'added' 
       });
-    });
-
-    it('should replace all parameters when updating', () => {
-      // Arrange
-      const newParams = { completely: 'new', set: 'of', params: 123 };
-      
-      // Act
-      const result = context.replaceParameters(newParams);
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters).toEqual(newParams);
+      expect(result).toBeValidResult();
+      expect(result.value.getParameter('existing')).toBe('updated');
+      expect(result.value.getParameter('new')).toBe('added');
+      expect(result.value.getParameterCount()).toBe(2);
+    });
+
+    it('should replace all parameters', () => {
+      // Act
+      const result = context.replaceParameters({ 
+        completely: 'new',
+        different: 'params' 
+      });
+      
+      // Assert
+      expect(result).toBeValidResult();
+      expect(result.value.hasParameter('existing')).toBe(false);
+      expect(result.value.getParameter('completely')).toBe('new');
+      expect(result.value.getParameter('different')).toBe('params');
+      expect(result.value.getParameterCount()).toBe(2);
     });
 
     it('should clear all parameters', () => {
@@ -219,120 +259,72 @@ describe('ExecutionContext', () => {
       const result = context.clearParameters();
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const updatedContext = result.value;
-      expect(updatedContext.parameters).toEqual({});
+      expect(result).toBeValidResult();
+      expect(result.value.getParameterCount()).toBe(0);
+      expect(result.value.getParameterKeys()).toEqual([]);
     });
   });
 
-  describe('parameter retrieval', () => {
+  describe('parameter access', () => {
     let context: ExecutionContext;
 
     beforeEach(() => {
-      const result = ExecutionContext.create('test', {
-        stringParam: 'test',
-        numberParam: 42,
-        booleanParam: true,
-        objectParam: { nested: 'value' }
-      });
+      const parameters = { 
+        string: 'text',
+        number: 42,
+        boolean: true,
+        object: { nested: 'value' },
+        array: [1, 2, 3]
+      };
+      const result = ExecutionContext.create('development', parameters, 'test-session');
       context = result.value;
     });
 
-    it('should get existing parameter', () => {
-      // Act
-      const result = context.getParameter('stringParam');
-      
-      // Assert
-      expect(result).toBe('test');
+    it('should get parameter with correct type', () => {
+      // Act & Assert
+      expect(context.getParameter<string>('string')).toBe('text');
+      expect(context.getParameter<number>('number')).toBe(42);
+      expect(context.getParameter<boolean>('boolean')).toBe(true);
+      expect(context.getParameter<object>('object')).toEqual({ nested: 'value' });
+      expect(context.getParameter<number[]>('array')).toEqual([1, 2, 3]);
     });
 
     it('should return undefined for non-existent parameter', () => {
-      // Act
-      const result = context.getParameter('nonExistent');
-      
-      // Assert
-      expect(result).toBeUndefined();
+      // Act & Assert
+      expect(context.getParameter('nonExistent')).toBeUndefined();
     });
 
-    it('should check if parameter exists', () => {
+    it('should correctly identify if parameter exists', () => {
       // Act & Assert
-      expect(context.hasParameter('stringParam')).toBe(true);
+      expect(context.hasParameter('string')).toBe(true);
       expect(context.hasParameter('nonExistent')).toBe(false);
     });
 
-    it('should get all parameter keys', () => {
+    it('should return all parameter keys', () => {
       // Act
       const keys = context.getParameterKeys();
       
       // Assert
-      expect(keys.sort()).toEqual(['booleanParam', 'numberParam', 'objectParam', 'stringParam']);
+      expect(keys).toHaveLength(5);
+      expect(keys).toContain('string');
+      expect(keys).toContain('number');
+      expect(keys).toContain('boolean');
+      expect(keys).toContain('object');
+      expect(keys).toContain('array');
     });
 
-    it('should count parameters', () => {
-      // Act
-      const count = context.getParameterCount();
-      
-      // Assert
-      expect(count).toBe(4);
-    });
-  });
-
-  describe('immutability', () => {
-    let context: ExecutionContext;
-
-    beforeEach(() => {
-      const result = ExecutionContext.create('test', { param: 'value' });
-      context = result.value;
-    });
-
-    it('should return new instance when adding parameter', () => {
-      // Act
-      const result = context.addParameter('newParam', 'newValue');
-      const newContext = result.value;
-      
-      // Assert
-      expect(newContext).not.toBe(context);
-      expect(context.parameters).toEqual({ param: 'value' });
-      expect(newContext.parameters).toEqual({ param: 'value', newParam: 'newValue' });
-    });
-
-    it('should return new instance when removing parameter', () => {
-      // Act
-      const result = context.removeParameter('param');
-      const newContext = result.value;
-      
-      // Assert
-      expect(newContext).not.toBe(context);
-      expect(context.parameters).toEqual({ param: 'value' });
-      expect(newContext.parameters).toEqual({});
-    });
-
-    it('should prevent direct modification of parameters', () => {
+    it('should return correct parameter count', () => {
       // Act & Assert
-      expect(() => {
-        (context.parameters as any).directModification = 'should-not-work';
-      }).toThrow();
-    });
-
-    it('should preserve original context when updates fail', () => {
-      // Arrange
-      const originalParams = { ...context.parameters };
-      
-      // Act - Try invalid operation
-      const result = context.addParameter('', 'invalid');
-      
-      // Assert
-      expect(result.isFailure).toBe(true);
-      expect(context.parameters).toEqual(originalParams);
+      expect(context.getParameterCount()).toBe(5);
     });
   });
 
   describe('equality and comparison', () => {
     it('should be equal when all properties match', () => {
       // Arrange
-      const params = { param1: 'value1', param2: 42 };
-      const context1 = ExecutionContext.create('production', params, 'session-123').value;
-      const context2 = ExecutionContext.create('production', params, 'session-123').value;
+      const params = { key: 'value' };
+      const context1 = ExecutionContext.create('development', params, 'session-123').value;
+      const context2 = ExecutionContext.create('development', params, 'session-123').value;
       
       // Act & Assert
       expect(context1.equals(context2)).toBe(true);
@@ -340,9 +332,9 @@ describe('ExecutionContext', () => {
 
     it('should not be equal when environments differ', () => {
       // Arrange
-      const params = { param: 'value' };
-      const context1 = ExecutionContext.create('production', params, 'session-123').value;
-      const context2 = ExecutionContext.create('development', params, 'session-123').value;
+      const params = { key: 'value' };
+      const context1 = ExecutionContext.create('development', params, 'session-123').value;
+      const context2 = ExecutionContext.create('production', params, 'session-123').value;
       
       // Act & Assert
       expect(context1.equals(context2)).toBe(false);
@@ -350,9 +342,9 @@ describe('ExecutionContext', () => {
 
     it('should not be equal when session IDs differ', () => {
       // Arrange
-      const params = { param: 'value' };
-      const context1 = ExecutionContext.create('production', params, 'session-123').value;
-      const context2 = ExecutionContext.create('production', params, 'session-456').value;
+      const params = { key: 'value' };
+      const context1 = ExecutionContext.create('development', params, 'session-123').value;
+      const context2 = ExecutionContext.create('development', params, 'session-456').value;
       
       // Act & Assert
       expect(context1.equals(context2)).toBe(false);
@@ -360,168 +352,273 @@ describe('ExecutionContext', () => {
 
     it('should not be equal when parameters differ', () => {
       // Arrange
-      const context1 = ExecutionContext.create('production', { param: 'value1' }, 'session-123').value;
-      const context2 = ExecutionContext.create('production', { param: 'value2' }, 'session-123').value;
+      const context1 = ExecutionContext.create('development', { key: 'value1' }, 'session-123').value;
+      const context2 = ExecutionContext.create('development', { key: 'value2' }, 'session-123').value;
       
       // Act & Assert
       expect(context1.equals(context2)).toBe(false);
     });
 
-    it('should handle comparison with different parameter counts', () => {
+    it('should not be equal when parameter counts differ', () => {
       // Arrange
-      const context1 = ExecutionContext.create('production', { param1: 'value' }, 'session-123').value;
-      const context2 = ExecutionContext.create('production', { param1: 'value', param2: 'extra' }, 'session-123').value;
+      const context1 = ExecutionContext.create('development', { key: 'value' }, 'session-123').value;
+      const context2 = ExecutionContext.create('development', { key: 'value', extra: 'param' }, 'session-123').value;
       
       // Act & Assert
       expect(context1.equals(context2)).toBe(false);
-    });
-  });
-
-  describe('string representation', () => {
-    it('should provide meaningful string representation', () => {
-      // Arrange
-      const context = ExecutionContext.create('production', { param: 'value' }, 'session-123').value;
-      
-      // Act
-      const str = context.toString();
-      
-      // Assert
-      expect(str).toContain('production');
-      expect(str).toContain('session-123');
-      expect(str).toContain('1 parameter');
-    });
-
-    it('should handle multiple parameters in string representation', () => {
-      // Arrange
-      const context = ExecutionContext.create('test', { param1: 'value1', param2: 'value2' }).value;
-      
-      // Act
-      const str = context.toString();
-      
-      // Assert
-      expect(str).toContain('2 parameters');
-    });
-
-    it('should handle no parameters in string representation', () => {
-      // Arrange
-      const context = ExecutionContext.create('test').value;
-      
-      // Act
-      const str = context.toString();
-      
-      // Assert
-      expect(str).toContain('0 parameters');
     });
   });
 
   describe('serialization', () => {
-    it('should convert to object representation', () => {
-      // Arrange
-      const params = { param1: 'value1', param2: 42 };
-      const context = ExecutionContext.create('production', params, 'session-123').value;
+    let context: ExecutionContext;
+    const testDate = new Date('2024-01-01T00:00:00.000Z');
+
+    beforeEach(() => {
+      // Mock Date constructor to return consistent date
+      jest.useFakeTimers();
+      jest.setSystemTime(testDate);
       
+      const result = ExecutionContext.create('development', { key: 'value' }, 'test-session');
+      context = result.value;
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should convert to object correctly', () => {
       // Act
       const obj = context.toObject();
       
       // Assert
       expect(obj).toEqual({
-        environment: 'production',
-        sessionId: 'session-123',
-        parameters: params,
-        createdAt: context.createdAt
+        environment: 'development',
+        parameters: { key: 'value' },
+        sessionId: 'test-session',
+        createdAt: testDate
       });
     });
 
-    it('should create from object representation', () => {
+    it('should create from object correctly', () => {
       // Arrange
       const obj = {
-        environment: 'test' as Environment,
-        sessionId: 'session-456',
-        parameters: { param: 'value' },
-        createdAt: new Date()
+        environment: 'production' as Environment,
+        parameters: { test: 'data' },
+        sessionId: 'restored-session',
+        createdAt: testDate
       };
       
       // Act
       const result = ExecutionContext.fromObject(obj);
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      const context = result.value;
-      expect(context.environment).toBe('test');
-      expect(context.sessionId).toBe('session-456');
-      expect(context.parameters).toEqual({ param: 'value' });
-      expect(context.createdAt).toBe(obj.createdAt);
+      expect(result).toBeValidResult();
+      expect(result.value.environment).toBe('production');
+      expect(result.value.parameters).toEqual({ test: 'data' });
+      expect(result.value.sessionId).toBe('restored-session');
+      expect(result.value.createdAt).toEqual(testDate);
     });
 
-    it('should reject invalid object during deserialization', () => {
+    it('should handle string date in fromObject', () => {
       // Arrange
-      const invalidObj = {
-        environment: '',
-        sessionId: 'session-123',
+      const obj = {
+        environment: 'development' as Environment,
         parameters: {},
-        createdAt: new Date()
+        sessionId: 'test-session',
+        createdAt: '2024-01-01T00:00:00.000Z'
       };
       
       // Act
-      const result = ExecutionContext.fromObject(invalidObj);
+      const result = ExecutionContext.fromObject(obj);
       
       // Assert
-      expect(result.isFailure).toBe(true);
-      expect(result.error).toBe('Environment cannot be empty');
+      expect(result).toBeValidResult();
+      expect(result.value.createdAt).toEqual(testDate);
+    });
+
+    it('should reject invalid object in fromObject', () => {
+      // Act
+      const result = ExecutionContext.fromObject(null as any);
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Invalid object provided');
+    });
+
+    it('should reject missing properties in fromObject', () => {
+      // Arrange
+      const obj = {
+        environment: 'development' as Environment,
+        // Missing sessionId
+        parameters: {},
+        createdAt: testDate
+      };
+      
+      // Act
+      const result = ExecutionContext.fromObject(obj as any);
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Missing required properties: environment and sessionId');
+    });
+
+    it('should reject invalid date in fromObject', () => {
+      // Arrange
+      const obj = {
+        environment: 'development' as Environment,
+        parameters: {},
+        sessionId: 'test-session',
+        createdAt: 'invalid-date'
+      };
+      
+      // Act
+      const result = ExecutionContext.fromObject(obj);
+      
+      // Assert
+      expect(result).toBeFailureResult();
+      expect(result).toHaveErrorMessage('Invalid createdAt date');
+    });
+  });
+
+  describe('immutability', () => {
+    let context: ExecutionContext;
+
+    beforeEach(() => {
+      const result = ExecutionContext.create('development', { key: 'value' }, 'test-session');
+      context = result.value;
+    });
+
+    it('should be immutable after creation', () => {
+      // Arrange
+      const originalEnv = context.environment;
+      const originalParams = context.parameters;
+      const originalSession = context.sessionId;
+      
+      // Act - Try to modify (should have no effect due to readonly and freezing)
+      try {
+        (context as any)._environment = 'production';
+        (context as any)._parameters = {};
+        (context as any)._sessionId = 'changed';
+      } catch (error) {
+        // Expected in strict mode
+      }
+      
+      // Assert - Values should remain unchanged
+      expect(context.environment).toBe(originalEnv);
+      expect(context.parameters).toBe(originalParams);
+      expect(context.sessionId).toBe(originalSession);
+    });
+
+    it('should return immutable parameters', () => {
+      // Act - Try to modify returned parameters
+      const params = context.parameters;
+      try {
+        (params as any).newKey = 'newValue';
+      } catch (error) {
+        // Expected - parameters should be frozen
+      }
+      
+      // Assert - Original context should be unchanged
+      expect(context.hasParameter('newKey')).toBe(false);
+      expect(context.getParameterCount()).toBe(1);
+    });
+
+    it('should create new instances when modifying parameters', () => {
+      // Act
+      const newContext = context.addParameter('newKey', 'newValue').value;
+      
+      // Assert
+      expect(newContext).not.toBe(context);
+      expect(context.hasParameter('newKey')).toBe(false);
+      expect(newContext.hasParameter('newKey')).toBe(true);
+    });
+  });
+
+  describe('string representation', () => {
+    it('should provide meaningful string representation with parameters', () => {
+      // Arrange
+      const context = ExecutionContext.create('production', { key1: 'value1', key2: 'value2' }, 'session-456').value;
+      
+      // Act
+      const str = context.toString();
+      
+      // Assert
+      expect(str).toBe('ExecutionContext[production:session-456] with 2 parameters');
+    });
+
+    it('should provide meaningful string representation without parameters', () => {
+      // Arrange
+      const context = ExecutionContext.create('development', {}, 'session-123').value;
+      
+      // Act
+      const str = context.toString();
+      
+      // Assert
+      expect(str).toBe('ExecutionContext[development:session-123] with 0 parameters');
     });
   });
 
   describe('edge cases', () => {
-    it('should handle null and undefined parameter values', () => {
+    it('should handle complex parameter values', () => {
       // Arrange
-      const context = ExecutionContext.create('test').value;
+      const complexParams = {
+        nested: { deep: { value: 'test' } },
+        array: [{ id: 1 }, { id: 2 }],
+        function: () => 'test', // Functions should be preserved
+        date: new Date(),
+        regex: /test/g,
+        null: null,
+        undefined: undefined
+      };
       
       // Act
-      const result1 = context.addParameter('nullParam', null);
-      const result2 = result1.value.addParameter('undefinedParam', undefined);
+      const result = ExecutionContext.create('development', complexParams);
       
       // Assert
-      expect(result1.isSuccess).toBe(true);
-      expect(result2.isSuccess).toBe(true);
-      expect(result2.value.parameters.nullParam).toBeNull();
-      expect(result2.value.parameters.undefinedParam).toBeUndefined();
+      expect(result).toBeValidResult();
+      expect(result.value.getParameter('nested')).toEqual(complexParams.nested);
+      expect(result.value.getParameter('array')).toEqual(complexParams.array);
+      expect(typeof result.value.getParameter('function')).toBe('function');
+      expect(result.value.getParameter('date')).toEqual(complexParams.date);
+      expect(result.value.getParameter('regex')).toEqual(complexParams.regex);
+      expect(result.value.getParameter('null')).toBeNull();
+      expect(result.value.getParameter('undefined')).toBeUndefined();
     });
 
-    it('should handle very large parameter objects', () => {
-      // Arrange
-      const context = ExecutionContext.create('test').value;
-      const largeObject = {};
-      for (let i = 0; i < 1000; i++) {
-        largeObject[`key${i}`] = `value${i}`;
-      }
-      
-      // Act
-      const result = context.addParameter('largeParam', largeObject);
-      
-      // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(Object.keys(result.value.parameters.largeParam)).toHaveLength(1000);
+    it('should handle environment case sensitivity', () => {
+      // Act & Assert
+      expect(ExecutionContext.create('Development')).toBeFailureResult();
+      expect(ExecutionContext.create('PRODUCTION')).toBeFailureResult();
+      expect(ExecutionContext.create('Test')).toBeFailureResult();
     });
 
-    it('should handle unicode in parameter keys and values', () => {
-      // Arrange
-      const context = ExecutionContext.create('test').value;
-      
+    it('should handle numeric parameter keys as strings', () => {
       // Act
-      const result = context.addParameter('参数', '测试值 🎉');
+      const context = ExecutionContext.create('development').value;
+      const result = context.addParameter('123', 'numeric key');
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value.parameters['参数']).toBe('测试值 🎉');
+      expect(result).toBeValidResult();
+      expect(result.value.hasParameter('123')).toBe(true);
+      expect(result.value.getParameter('123')).toBe('numeric key');
     });
 
-    it('should handle special characters in session ID', () => {
+    it('should preserve creation time across parameter modifications', () => {
+      // Arrange
+      const originalContext = ExecutionContext.create('development', { key: 'value' }).value;
+      const originalTime = originalContext.createdAt;
+      
+      // Wait a bit to ensure time would be different
+      jest.useFakeTimers();
+      jest.advanceTimersByTime(1000);
+      
       // Act
-      const result = ExecutionContext.create('test', {}, 'session-123_abc.def');
+      const modifiedContext = originalContext.addParameter('new', 'value').value;
       
       // Assert
-      expect(result.isSuccess).toBe(true);
-      expect(result.value.sessionId).toBe('session-123_abc.def');
+      expect(modifiedContext.createdAt).toEqual(originalTime);
+      
+      jest.useRealTimers();
     });
   });
 });

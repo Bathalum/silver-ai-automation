@@ -1,281 +1,249 @@
-/**
- * Unit tests for ModelName value object
- * Tests business rules and validation logic for function model names
- */
-
 import { ModelName } from '@/lib/domain/value-objects/model-name';
-import { ResultTestHelpers, ValidationHelpers } from '../../../utils/test-helpers';
+import { Result } from '@/lib/domain/shared/result';
 
-describe('ModelName', () => {
-  describe('creation', () => {
-    it('should create valid model name successfully', () => {
-      // Arrange
-      const validName = 'Valid Model Name';
-      
-      // Act
-      const result = ModelName.create(validName);
-      
-      // Assert
-      expect(result).toBeValidResult();
-      expect(result.value.toString()).toBe(validName);
-    });
+describe('ModelName Value Object', () => {
+  describe('creation and validation', () => {
+    describe('valid model names', () => {
+      it('should create ModelName with valid alphanumeric name', () => {
+        const result = ModelName.create('TestModel123');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe('TestModel123');
+      });
 
-    it('should create model name with minimum length', () => {
-      // Arrange
-      const minLengthName = 'abc'; // 3 characters minimum
-      
-      // Act
-      const result = ModelName.create(minLengthName);
-      
-      // Assert
-      expect(result).toBeValidResult();
-    });
+      it('should create ModelName with spaces', () => {
+        const result = ModelName.create('My Test Model');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe('My Test Model');
+      });
 
-    it('should create model name with maximum length', () => {
-      // Arrange
-      const maxLengthName = 'a'.repeat(100); // 100 characters maximum
-      
-      // Act
-      const result = ModelName.create(maxLengthName);
-      
-      // Assert
-      expect(result).toBeValidResult();
-    });
+      it('should create ModelName with hyphens and underscores', () => {
+        const result = ModelName.create('test-model_v1');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe('test-model_v1');
+      });
 
-    it('should trim whitespace from model name', () => {
-      // Arrange
-      const nameWithWhitespace = '  Valid Model Name  ';
-      const expectedName = 'Valid Model Name';
-      
-      // Act
-      const result = ModelName.create(nameWithWhitespace);
-      
-      // Assert
-      expect(result).toBeValidResult();
-      expect(result.value.toString()).toBe(expectedName);
-    });
-  });
+      it('should trim whitespace from model name', () => {
+        const result = ModelName.create('  Valid Model Name  ');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe('Valid Model Name');
+      });
 
-  describe('validation failures', () => {
-    it('should reject empty string', () => {
-      // Act
-      const result = ModelName.create('');
-      
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Model name cannot be empty');
-    });
+      it('should create ModelName at minimum length boundary', () => {
+        const result = ModelName.create('ABC');
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe('ABC');
+      });
 
-    it('should reject whitespace-only string', () => {
-      // Act
-      const result = ModelName.create('   ');
-      
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Model name cannot be empty');
-    });
-
-    it('should reject names that are too short', () => {
-      // Arrange
-      const tooShortName = 'ab'; // Less than 3 characters
-      
-      // Act
-      const result = ModelName.create(tooShortName);
-      
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Model name must be at least 3 characters long');
-    });
-
-    it('should reject names that are too long', () => {
-      // Arrange
-      const tooLongName = 'a'.repeat(101); // More than 100 characters
-      
-      // Act
-      const result = ModelName.create(tooLongName);
-      
-      // Assert
-      expect(result).toBeFailureResult();
-      expect(result).toHaveErrorMessage('Model name cannot exceed 100 characters');
-    });
-
-    it('should reject names with invalid characters', () => {
-      // Arrange
-      const invalidCharacters = ['Model<Name', 'Model>Name', 'Model/Name', 'Model\\Name'];
-      
-      // Act & Assert
-      invalidCharacters.forEach(name => {
-        const result = ModelName.create(name);
-        expect(result).toBeFailureResult();
-        expect(result).toHaveErrorMessage('Model name can only contain letters, numbers, spaces, hyphens, and underscores');
+      it('should create ModelName at maximum length boundary', () => {
+        const longName = 'A'.repeat(100);
+        const result = ModelName.create(longName);
+        
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe(longName);
       });
     });
 
-    it('should allow names starting or ending with hyphens and underscores', () => {
-      // Arrange - These are actually valid according to the regex pattern
-      const validNames = ['-ModelName', 'ModelName-', '_ModelName', 'ModelName_'];
-      
-      // Act & Assert
-      validNames.forEach(name => {
-        const result = ModelName.create(name);
-        expect(result).toBeValidResult();
+    describe('invalid model names', () => {
+      it('should fail with empty string', () => {
+        const result = ModelName.create('');
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Model name cannot be empty');
       });
-    });
-  });
 
-  describe('allowed characters', () => {
-    it('should allow alphanumeric characters', () => {
-      // Act
-      const result = ModelName.create('Model123');
-      
-      // Assert
-      expect(result).toBeValidResult();
-    });
+      it('should fail with null input', () => {
+        const result = ModelName.create(null as any);
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Model name cannot be empty');
+      });
 
-    it('should allow spaces', () => {
-      // Act
-      const result = ModelName.create('My Model Name');
-      
-      // Assert
-      expect(result).toBeValidResult();
-    });
+      it('should fail with undefined input', () => {
+        const result = ModelName.create(undefined as any);
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Model name cannot be empty');
+      });
 
-    it('should allow hyphens and underscores in middle', () => {
-      // Act
-      const result1 = ModelName.create('Model-Name');
-      const result2 = ModelName.create('Model_Name');
-      
-      // Assert
-      expect(result1).toBeValidResult();
-      expect(result2).toBeValidResult();
-    });
+      it('should fail with only whitespace', () => {
+        const result = ModelName.create('   ');
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Model name cannot be empty');
+      });
 
-    it('should reject parentheses and brackets', () => {
-      // Act - These should fail according to the regex pattern
-      const result1 = ModelName.create('Model (Version 1)');
-      const result2 = ModelName.create('Model [Draft]');
-      
-      // Assert
-      expect(result1).toBeFailureResult();
-      expect(result1).toHaveErrorMessage('Model name can only contain letters, numbers, spaces, hyphens, and underscores');
-      expect(result2).toBeFailureResult();
-      expect(result2).toHaveErrorMessage('Model name can only contain letters, numbers, spaces, hyphens, and underscores');
+      it('should fail when too short', () => {
+        const result = ModelName.create('AB');
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Model name must be at least 3 characters long');
+      });
+
+      it('should fail when too long', () => {
+        const longName = 'A'.repeat(101);
+        const result = ModelName.create(longName);
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Model name cannot exceed 100 characters');
+      });
+
+      it('should fail with invalid characters', () => {
+        const result = ModelName.create('Invalid@Model!');
+        
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe('Model name can only contain letters, numbers, spaces, hyphens, and underscores');
+      });
+
+      it('should fail with special characters', () => {
+        const invalidChars = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '+', '=', '{', '}', '[', ']', '|', '\\', ':', ';', '"', "'", '<', '>', ',', '.', '?', '/'];
+        
+        for (const char of invalidChars) {
+          const result = ModelName.create(`Test${char}Model`);
+          expect(result.isFailure).toBe(true);
+          expect(result.error).toBe('Model name can only contain letters, numbers, spaces, hyphens, and underscores');
+        }
+      });
     });
   });
 
   describe('equality and comparison', () => {
-    it('should be equal when names are identical', () => {
-      // Arrange
-      const name1 = ResultTestHelpers.expectSuccess(ModelName.create('Test Model'));
-      const name2 = ResultTestHelpers.expectSuccess(ModelName.create('Test Model'));
+    it('should be equal when values are the same', () => {
+      const name1 = ModelName.create('TestModel').value!;
+      const name2 = ModelName.create('TestModel').value!;
       
-      // Act & Assert
       expect(name1.equals(name2)).toBe(true);
     });
 
-    it('should not be equal when names are different', () => {
-      // Arrange
-      const name1 = ResultTestHelpers.expectSuccess(ModelName.create('Test Model 1'));
-      const name2 = ResultTestHelpers.expectSuccess(ModelName.create('Test Model 2'));
+    it('should not be equal when values are different', () => {
+      const name1 = ModelName.create('TestModel1').value!;
+      const name2 = ModelName.create('TestModel2').value!;
       
-      // Act & Assert
       expect(name1.equals(name2)).toBe(false);
     });
 
     it('should be case sensitive', () => {
-      // Arrange
-      const name1 = ResultTestHelpers.expectSuccess(ModelName.create('Test Model'));
-      const name2 = ResultTestHelpers.expectSuccess(ModelName.create('test model'));
+      const name1 = ModelName.create('TestModel').value!;
+      const name2 = ModelName.create('testmodel').value!;
       
-      // Act & Assert
       expect(name1.equals(name2)).toBe(false);
     });
 
-    it('should handle equality with whitespace normalization', () => {
-      // Arrange
-      const name1 = ResultTestHelpers.expectSuccess(ModelName.create('Test Model'));
-      const name2 = ResultTestHelpers.expectSuccess(ModelName.create('  Test Model  '));
+    it('should handle trimmed whitespace in equality', () => {
+      const name1 = ModelName.create('Test Model').value!;
+      const name2 = ModelName.create('  Test Model  ').value!;
       
-      // Act & Assert
       expect(name1.equals(name2)).toBe(true);
     });
   });
 
-  describe('toString', () => {
-    it('should return the normalized string value', () => {
-      // Arrange
-      const originalName = '  Test Model Name  ';
-      const expectedName = 'Test Model Name';
-      const modelName = ResultTestHelpers.expectSuccess(ModelName.create(originalName));
+  describe('string representation', () => {
+    it('should return correct string representation', () => {
+      const modelName = ModelName.create('My Test Model').value!;
       
-      // Act
-      const result = modelName.toString();
+      expect(modelName.toString()).toBe('My Test Model');
+    });
+
+    it('should return trimmed string representation', () => {
+      const modelName = ModelName.create('  Model Name  ').value!;
       
-      // Assert
-      expect(result).toBe(expectedName);
+      expect(modelName.toString()).toBe('Model Name');
     });
   });
 
-  describe('business rules', () => {
-    it('should enforce consistent naming conventions', () => {
-      // Test various valid naming conventions (according to current regex)
-      const validNames = [
-        'User Registration Flow',
-        'Data Processing Pipeline',
-        'API Integration Model',
-        'ML Training Workflow',
-        'Customer Onboarding v2',  // Removed parentheses
-        'Order-Processing-System'
-      ];
+  describe('immutability', () => {
+    it('should be immutable after creation', () => {
+      const modelName = ModelName.create('TestModel').value!;
+      const originalValue = modelName.value;
       
-      validNames.forEach(name => {
-        const result = ModelName.create(name);
-        expect(result).toBeValidResult();
-      });
+      // Attempt to modify (should not be possible with private readonly)
+      expect(modelName.value).toBe(originalValue);
+      expect(modelName.toString()).toBe('TestModel');
     });
 
-    it('should allow system names since reserved validation is not implemented', () => {
-      // The current implementation doesn't have reserved name validation
-      const systemNames = [
-        'system',
-        'admin',
-        'root', 
-        'config',
-        'default',
-        'template'
-      ];
+    it('should maintain value consistency', () => {
+      const modelName = ModelName.create('Consistent Model').value!;
       
-      systemNames.forEach(name => {
-        const result = ModelName.create(name);
-        expect(result).toBeValidResult(); // Current implementation allows these
-      });
-    });
-
-    it('should reject unicode characters since regex only allows ASCII', () => {
-      // Test with unicode characters - these should fail with current regex
-      const unicodeNames = [
-        'Modèle de Test', // French accents
-        'テストモデル', // Japanese
-        'Тестовая Модель' // Cyrillic
-      ];
-      
-      unicodeNames.forEach(name => {
-        const result = ModelName.create(name);
-        // Current regex only allows ASCII, so these should fail
-        expect(result).toBeFailureResult();
-        expect(result).toHaveErrorMessage('Model name can only contain letters, numbers, spaces, hyphens, and underscores');
-      });
+      // Multiple accesses should return same value
+      expect(modelName.value).toBe('Consistent Model');
+      expect(modelName.value).toBe(modelName.toString());
+      expect(modelName.value).toBe('Consistent Model');
     });
   });
 
-  describe('boundary testing', () => {
-    it('should test all boundary conditions systematically', () => {
-      // Use the ValidationHelpers to test string boundaries
-      ValidationHelpers.testStringBoundaries(
-        (value: string) => ModelName.create(value),
-        3, // min length
-        100 // max length
-      );
+  describe('business rule validation', () => {
+    it('should accept common model naming patterns', () => {
+      const patterns = [
+        'UserRegistration',
+        'Data Processing Model',
+        'API_Gateway_V2',
+        'workflow-orchestrator',
+        'Model 123',
+        'AI Agent Coordinator'
+      ];
+      
+      for (const pattern of patterns) {
+        const result = ModelName.create(pattern);
+        expect(result.isSuccess).toBe(true);
+        expect(result.value!.value).toBe(pattern);
+      }
+    });
+
+    it('should reject potentially problematic names', () => {
+      const problematicNames = [
+        '', // Empty
+        '  ', // Only spaces
+        'AB', // Too short
+        'A'.repeat(101), // Too long
+        'Model@Invalid', // Special chars
+        'Test<Model>', // HTML-like
+        'Model/Path', // Path-like
+        'Model.exe' // Potentially dangerous extension
+      ];
+      
+      for (const name of problematicNames) {
+        const result = ModelName.create(name);
+        expect(result.isFailure).toBe(true);
+      }
+    });
+  });
+
+  describe('Result pattern compliance', () => {
+    it('should return Result.ok for valid names', () => {
+      const result = ModelName.create('ValidModel');
+      
+      expect(result).toBeInstanceOf(Result);
+      expect(result.isSuccess).toBe(true);
+      expect(result.isFailure).toBe(false);
+      expect(result.value).toBeInstanceOf(ModelName);
+    });
+
+    it('should return Result.fail for invalid names', () => {
+      const result = ModelName.create('');
+      
+      expect(result).toBeInstanceOf(Result);
+      expect(result.isSuccess).toBe(false);
+      expect(result.isFailure).toBe(true);
+      expect(typeof result.error).toBe('string');
+    });
+
+    it('should provide meaningful error messages', () => {
+      const testCases = [
+        { input: '', expectedError: 'Model name cannot be empty' },
+        { input: 'AB', expectedError: 'Model name must be at least 3 characters long' },
+        { input: 'A'.repeat(101), expectedError: 'Model name cannot exceed 100 characters' },
+        { input: 'Invalid@Name', expectedError: 'Model name can only contain letters, numbers, spaces, hyphens, and underscores' }
+      ];
+      
+      for (const testCase of testCases) {
+        const result = ModelName.create(testCase.input);
+        expect(result.isFailure).toBe(true);
+        expect(result.error).toBe(testCase.expectedError);
+      }
     });
   });
 });

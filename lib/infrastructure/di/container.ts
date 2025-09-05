@@ -396,6 +396,8 @@ export class ServiceRegistration {
 export const ServiceTokens = {
   // Repository tokens
   FUNCTION_MODEL_REPOSITORY: Symbol('IFunctionModelRepository'),
+  AUDIT_LOG_REPOSITORY: Symbol('IAuditLogRepository'),
+  AI_AGENT_REPOSITORY: Symbol('AIAgentRepository'),
   
   // Event bus tokens
   EVENT_BUS: Symbol('IEventBus'),
@@ -412,6 +414,16 @@ export const ServiceTokens = {
   CREATE_FUNCTION_MODEL_USE_CASE: Symbol('CreateFunctionModelUseCase'),
   UPDATE_FUNCTION_MODEL_USE_CASE: Symbol('UpdateFunctionModelUseCase'),
   PUBLISH_FUNCTION_MODEL_USE_CASE: Symbol('PublishFunctionModelUseCase'),
+  
+  // AI Agent use case tokens
+  REGISTER_AI_AGENT_USE_CASE: Symbol('RegisterAIAgentUseCase'),
+  DISCOVER_AGENTS_BY_CAPABILITY_USE_CASE: Symbol('DiscoverAgentsByCapabilityUseCase'),
+  EXECUTE_AI_AGENT_TASK_USE_CASE: Symbol('ExecuteAIAgentTaskUseCase'),
+  PERFORM_SEMANTIC_AGENT_SEARCH_USE_CASE: Symbol('PerformSemanticAgentSearchUseCase'),
+  COORDINATE_WORKFLOW_AGENT_EXECUTION_USE_CASE: Symbol('CoordinateWorkflowAgentExecutionUseCase'),
+  
+  // Application service tokens
+  AI_AGENT_MANAGEMENT_SERVICE: Symbol('AIAgentManagementService'),
   
   // Query handler tokens
   GET_FUNCTION_MODEL_QUERY_HANDLER: Symbol('GetFunctionModelQueryHandler'),
