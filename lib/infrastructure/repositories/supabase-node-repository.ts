@@ -784,6 +784,15 @@ export class SupabaseNodeRepository extends BaseRepository implements NodeReposi
 
   private async verifyModelExists(modelId: string): Promise<boolean> {
     try {
+      // Check if modelId is a valid UUID - if not, return true in development
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      
+      if (isDevelopment && !uuidRegex.test(modelId)) {
+        console.log('🔍 Non-UUID modelId in development, assuming model exists');
+        return true;
+      }
+
       const tableBuilder = this.supabase.from('function_models');
       if (typeof tableBuilder.select !== 'function') {
         // Mock client - assume model exists

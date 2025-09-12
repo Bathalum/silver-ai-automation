@@ -113,20 +113,31 @@ export async function POST(
             );
           }
 
-          // Add node to model (this would typically involve a use case)
-          // For now, we'll directly manipulate the model - in a real implementation,
-          // you'd have an AddContainerNodeUseCase
-          const nodeResult = model.addContainerNode(
-            nodeRequest.nodeType as any,
-            nodeRequest.name,
-            {
+          // Add node using proper Clean Architecture flow through use case
+          const createUnifiedNodeUseCaseResult = await container.resolve(ServiceTokens.CREATE_UNIFIED_NODE_USE_CASE);
+          if (createUnifiedNodeUseCaseResult.isFailure) {
+            return createErrorResponse(
+              ApiErrorCode.INTERNAL_ERROR,
+              'Failed to initialize node creation service',
+              HttpStatus.INTERNAL_SERVER_ERROR
+            );
+          }
+
+          const createUnifiedNodeUseCase = createUnifiedNodeUseCaseResult.value;
+
+          const nodeResult = await createUnifiedNodeUseCase.execute({
+            modelId,
+            nodeType: nodeRequest.nodeType,
+            name: nodeRequest.name,
+            position: {
               x: nodeRequest.position.x,
               y: nodeRequest.position.y
             },
-            nodeRequest.description,
-            nodeRequest.metadata || {},
-            nodeRequest.typeSpecificData || {}
-          );
+            description: nodeRequest.description,
+            metadata: nodeRequest.metadata || {},
+            typeSpecificData: nodeRequest.typeSpecificData || {},
+            userId: user.id
+          });
 
           if (nodeResult.isFailure) {
             return createErrorResponse(
@@ -136,17 +147,7 @@ export async function POST(
             );
           }
 
-          // Save the updated model
-          const saveResult = await repository.save(model);
-          if (saveResult.isFailure) {
-            return createErrorResponse(
-              ApiErrorCode.INTERNAL_ERROR,
-              'Failed to save node changes',
-              HttpStatus.INTERNAL_SERVER_ERROR
-            );
-          }
-
-          // Get the added node
+          // Get the created node from the use case result
           const addedNode = nodeResult.value;
           
           // Convert to DTO

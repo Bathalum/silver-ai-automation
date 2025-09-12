@@ -1,15 +1,7 @@
-import { ContainerNodeType, ActionNodeType, ExecutionMode } from '../../domain/enums';
+import { ContainerNodeType, ActionNodeType, ExecutionMode, NodeType } from '../../domain/enums';
 import { RetryPolicy } from '../../domain/value-objects/retry-policy';
 import { RACI } from '../../domain/value-objects/raci';
 
-export interface AddContainerNodeCommand {
-  modelId: string;
-  nodeType: ContainerNodeType;
-  name: string;
-  description?: string;
-  position: { x: number; y: number };
-  userId: string;
-}
 
 export interface AddActionNodeCommand {
   modelId: string;
@@ -83,3 +75,16 @@ export interface RemoveNodeDependencyCommand {
   dependencyNodeId: string;
   userId: string;
 }
+
+// UNIFIED NODE CREATION COMMAND - TDD Specification
+// This command interface is defined by the tests and replaces the fragmented system
+export interface CreateNodeCommand {
+  modelId: string;
+  nodeType: NodeType; // Uses unified NodeType enum
+  name: string;
+  position: { x: number; y: number };
+  userId: string;
+  description?: string;
+  typeSpecificData?: Record<string, any>; // Type-specific configuration data
+}
+

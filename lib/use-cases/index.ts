@@ -11,7 +11,7 @@ export {
 } from './commands/model-commands';
 
 export {
-  type AddContainerNodeCommand,
+  type CreateNodeCommand,
   type AddActionNodeCommand,
   type UpdateNodeCommand,
   type UpdateActionNodeCommand,

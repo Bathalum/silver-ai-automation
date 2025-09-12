@@ -2,6 +2,7 @@ import { Result } from '../shared/result';
 import { FunctionModel } from '../entities/function-model';
 import { Node } from '../entities/node';
 import { ActionNode } from '../entities/action-node';
+import { UnifiedNode } from '../entities/unified-node';
 import { ModelStatus } from '../enums';
 
 export interface IFunctionModelRepository {
@@ -27,6 +28,10 @@ export interface IFunctionModelRepository {
   // Enhanced methods for Phase 2
   addNode(modelId: string, node: Node): Promise<Result<void>>;
   addActionNode(modelId: string, actionNode: ActionNode): Promise<Result<void>>;
+  
+  // UNIFIED NODE SUPPORT - TDD Specification
+  // This method is defined by the tests to support unified node creation
+  addUnifiedNode(modelId: string, node: import('../entities/unified-node').UnifiedNode): Promise<Result<void>>;
   searchModelsByNodeContent(query: string): Promise<Result<FunctionModel[]>>;
   findModelsWithComplexFilters(filters: {
     status?: ModelStatus[];

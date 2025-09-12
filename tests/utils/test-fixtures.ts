@@ -1117,7 +1117,7 @@ export function createMockSupabaseClient() {
   const mockFrom = (table: string) => {
     const mockSelect = (columns = '*', options?: any) => {
       const tableData = mockData[table] || {};
-      const allData = Object.values(tableData);
+      const allData = Object.values(tableData).filter(item => !Array.isArray(item));
       
       // Handle count queries
       if (options?.count === 'exact') {
@@ -1256,7 +1256,21 @@ export function createMockSupabaseClient() {
       const records = Array.isArray(data) ? data : [data];
       records.forEach(record => {
         const id = record.model_id || record.node_id || record.action_id || record.link_id || record.agent_id || record.log_id || crypto.randomUUID();
+        // Store both with the computed ID and with a more searchable structure
         mockData[table][id] = { ...record, id };
+        
+        // Also create direct lookups for common query patterns
+        if (record.model_id) {
+          const modelKey = `model_${record.model_id}`;
+          if (!mockData[table][modelKey]) mockData[table][modelKey] = [];
+          if (!Array.isArray(mockData[table][modelKey])) mockData[table][modelKey] = [mockData[table][modelKey]];
+          mockData[table][modelKey].push({ ...record, id });
+        }
+        
+        if (record.node_id) {
+          const nodeKey = `node_${record.node_id}`;
+          mockData[table][nodeKey] = { ...record, id };
+        }
       });
       return Promise.resolve({ data: records, error: null });
     };

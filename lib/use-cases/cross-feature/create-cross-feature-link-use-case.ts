@@ -53,8 +53,10 @@ export class CreateCrossFeatureLinkUseCase {
    */
   public async execute(command: CreateCrossFeatureLinkCommand): Promise<Result<CrossFeatureLink>> {
     try {
+      
       // Input validation
       if (!command.sourceId || command.sourceId.trim() === '') {
+        console.log('Validation failed: Source entity ID cannot be empty');
         return Result.fail<CrossFeatureLink>('Source entity ID cannot be empty');
       }
       
@@ -83,7 +85,7 @@ export class CreateCrossFeatureLinkUseCase {
         command.initialStrength,
         command.nodeContext
       ));
-
+      
       if (!linkResult || linkResult.isFailure) {
         return Result.fail<CrossFeatureLink>(linkResult?.error || 'Unknown error creating link');
       }

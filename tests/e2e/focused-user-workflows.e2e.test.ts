@@ -17,7 +17,7 @@
  */
 
 import { CreateFunctionModelUseCase } from '../../lib/use-cases/function-model/create-function-model-use-case';
-import { AddContainerNodeUseCase } from '../../lib/use-cases/function-model/add-container-node-use-case';
+import { CreateUnifiedNodeUseCase } from '../../lib/use-cases/function-model/create-unified-node-use-case';
 import { AddActionNodeToContainerUseCase } from '../../lib/use-cases/function-model/add-action-node-to-container-use-case';
 import { PublishFunctionModelUseCase } from '../../lib/use-cases/function-model/publish-function-model-use-case';
 import { ExecuteFunctionModelUseCase } from '../../lib/use-cases/function-model/execute-function-model-use-case';
@@ -306,7 +306,7 @@ describe('Focused User Workflows - E2E Test Suite', () => {
 
   // Core Use Cases (Real instances - testing ACTUAL implementations)
   let createModelUseCase: CreateFunctionModelUseCase;
-  let addContainerUseCase: AddContainerNodeUseCase;
+  let createUnifiedNodeUseCase: CreateUnifiedNodeUseCase;
   let addActionUseCase: AddActionNodeToContainerUseCase;
   let publishModelUseCase: PublishFunctionModelUseCase;
   let executeModelUseCase: ExecuteFunctionModelUseCase;
@@ -325,7 +325,7 @@ describe('Focused User Workflows - E2E Test Suite', () => {
 
     // Initialize Use Cases with REAL business logic
     createModelUseCase = new CreateFunctionModelUseCase(mockModelRepository, mockEventBus);
-    addContainerUseCase = new AddContainerNodeUseCase(mockModelRepository, mockEventBus);
+    createUnifiedNodeUseCase = new CreateUnifiedNodeUseCase(mockModelRepository, mockEventBus);
     addActionUseCase = new AddActionNodeToContainerUseCase(mockModelRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockModelRepository, mockEventBus);
     executeModelUseCase = new ExecuteFunctionModelUseCase(mockModelRepository, mockEventBus);
@@ -410,7 +410,7 @@ describe('Focused User Workflows - E2E Test Suite', () => {
         expect(createdModel.value.modelId).toBe(modelId);
 
         // UC-002: Add Container Node 
-        const containerResult = await addContainerUseCase.execute({
+        const containerResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Test Stage',
@@ -506,7 +506,7 @@ describe('Focused User Workflows - E2E Test Suite', () => {
         // Test adding container to non-existent model
         const nonExistentModelId = getTestUUID('non-existent');
         
-        const addContainerResult = await addContainerUseCase.execute({
+        const addContainerResult = await createUnifiedNodeUseCase.execute({
           modelId: nonExistentModelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Invalid Container',

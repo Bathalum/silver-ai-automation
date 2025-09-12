@@ -11,7 +11,7 @@
  */
 
 import { CreateFunctionModelUseCase } from '../../lib/use-cases/function-model/create-function-model-use-case';
-import { AddContainerNodeUseCase } from '../../lib/use-cases/function-model/add-container-node-use-case';
+import { CreateUnifiedNodeUseCase } from '../../lib/use-cases/function-model/create-unified-node-use-case';
 import { AddActionNodeToContainerUseCase } from '../../lib/use-cases/function-model/add-action-node-to-container-use-case';
 import { PublishFunctionModelUseCase } from '../../lib/use-cases/function-model/publish-function-model-use-case';
 import { ExecuteFunctionModelUseCase } from '../../lib/use-cases/function-model/execute-function-model-use-case';
@@ -304,7 +304,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
 
   // Use Cases (Real instances - no mocking)
   let createModelUseCase: CreateFunctionModelUseCase;
-  let addContainerUseCase: AddContainerNodeUseCase;
+  let createUnifiedNodeUseCase: CreateUnifiedNodeUseCase;
   let addActionUseCase: AddActionNodeToContainerUseCase;
   let publishModelUseCase: PublishFunctionModelUseCase;
   let executeModelUseCase: ExecuteFunctionModelUseCase;
@@ -329,7 +329,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
 
     // Initialize Use Cases with real business logic
     createModelUseCase = new CreateFunctionModelUseCase(mockRepository, mockEventBus);
-    addContainerUseCase = new AddContainerNodeUseCase(mockRepository, mockEventBus);
+    createUnifiedNodeUseCase = new CreateUnifiedNodeUseCase(mockRepository, mockEventBus);
     addActionUseCase = new AddActionNodeToContainerUseCase(mockRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockRepository, mockEventBus);
     // Create required domain services for execution
@@ -394,7 +394,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         expect(createdModel.value.name.toString()).toBe(workflowName);
 
         // UC-002: Add Container Node (must create model before adding nodes)
-        const addContainerResult = await addContainerUseCase.execute({
+        const addContainerResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Processing Stage',
@@ -436,7 +436,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         expect(addActionResult.value.parentNodeId).toBe(stageNodeId);
 
         // Add input IO node to make workflow valid
-        const addInputResult = await addContainerUseCase.execute({
+        const addInputResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.IO_NODE,
           name: 'Input Boundary',
@@ -448,7 +448,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         expect(addInputResult.isSuccess).toBe(true);
 
         // Add output IO node to make workflow valid  
-        const addOutputResult = await addContainerUseCase.execute({
+        const addOutputResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.IO_NODE,
           name: 'Output Boundary', 
@@ -510,7 +510,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         const nonExistentModelId = getTestUUID('non-existent');
 
         // Act: Try to add container node to non-existent model
-        const addContainerResult = await addContainerUseCase.execute({
+        const addContainerResult = await createUnifiedNodeUseCase.execute({
           modelId: nonExistentModelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Invalid Stage',
@@ -609,7 +609,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         const modelId = createResult.value.modelId;
 
         // Create multiple container nodes
-        const inputStageResult = await addContainerUseCase.execute({
+        const inputStageResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.IO_NODE,
           name: 'Input Stage',
@@ -618,7 +618,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
           userId: testUserId
         });
 
-        const processingStageResult = await addContainerUseCase.execute({
+        const processingStageResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Processing Stage',
@@ -627,7 +627,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
           userId: testUserId
         });
 
-        const outputStageResult = await addContainerUseCase.execute({
+        const outputStageResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.IO_NODE,
           name: 'Output Stage',
@@ -745,7 +745,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         const modelId = createResult.value.modelId;
 
         // Add container and action with failure simulation
-        const stageResult = await addContainerUseCase.execute({
+        const stageResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Recovery Stage',
@@ -823,7 +823,7 @@ describe('Primary User Workflow Chain - E2E Test Suite', () => {
         const modelId = createResult.value.modelId;
 
         // Act: Execute complete workflow
-        const containerResult = await addContainerUseCase.execute({
+        const containerResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Compliance Test Stage',

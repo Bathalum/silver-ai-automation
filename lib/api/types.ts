@@ -82,7 +82,7 @@ export type PublishModelRequest = z.infer<typeof PublishModelRequestSchema>;
 // Search Models Query
 export const SearchModelsQuerySchema = z.object({
   query: z.string().optional(),
-  status: z.enum(['draft', 'published', 'archived']).optional(),
+  status: z.enum(['draft', 'published', 'archived', 'running', 'completed', 'error']).optional(),
   tags: z.array(z.string()).optional(),
   createdAfter: z.string().optional(),
   createdBefore: z.string().optional(),
@@ -158,13 +158,16 @@ export interface WorkflowExecutionDto {
   errorDetails?: Record<string, any>;
 }
 
+// Model Status Type
+export type ModelStatus = 'draft' | 'published' | 'archived' | 'running' | 'completed' | 'error';
+
 // Model Response DTO
 export interface ModelDto {
   modelId: string;
   name: string;
   description?: string;
   version: string;
-  status: string;
+  status: ModelStatus;
   currentVersion: string;
   versionCount: number;
   metadata: Record<string, any>;

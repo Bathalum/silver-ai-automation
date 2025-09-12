@@ -414,6 +414,10 @@ export const ServiceTokens = {
   CREATE_FUNCTION_MODEL_USE_CASE: Symbol('CreateFunctionModelUseCase'),
   UPDATE_FUNCTION_MODEL_USE_CASE: Symbol('UpdateFunctionModelUseCase'),
   PUBLISH_FUNCTION_MODEL_USE_CASE: Symbol('PublishFunctionModelUseCase'),
+  ARCHIVE_FUNCTION_MODEL_USE_CASE: Symbol('ArchiveFunctionModelUseCase'),
+  EXECUTE_FUNCTION_MODEL_USE_CASE: Symbol('ExecuteFunctionModelUseCase'),
+  MANAGE_WORKFLOW_NODES_USE_CASE: Symbol('ManageWorkflowNodesUseCase'),
+  CREATE_UNIFIED_NODE_USE_CASE: Symbol('CreateUnifiedNodeUseCase'),
   
   // AI Agent use case tokens
   REGISTER_AI_AGENT_USE_CASE: Symbol('RegisterAIAgentUseCase'),
@@ -427,6 +431,8 @@ export const ServiceTokens = {
   
   // Query handler tokens
   GET_FUNCTION_MODEL_QUERY_HANDLER: Symbol('GetFunctionModelQueryHandler'),
+  LIST_FUNCTION_MODELS_QUERY_HANDLER: Symbol('ListFunctionModelsQueryHandler'),
+  GET_MODEL_NODES_QUERY_HANDLER: Symbol('GetModelNodesQueryHandler'),
   
   // Domain service tokens
   WORKFLOW_ORCHESTRATION_SERVICE: Symbol('IWorkflowOrchestrationService'),
@@ -448,7 +454,14 @@ export const ServiceTokens = {
   // Configuration tokens
   CACHE_CONFIG: Symbol('CacheConfig'),
   NOTIFICATION_CONFIG: Symbol('NotificationConfig'),
-  AI_CONFIG: Symbol('AIConfig')
+  AI_CONFIG: Symbol('AIConfig'),
+  
+  // Real-time service tokens
+  REALTIME_SERVICE: Symbol('IRealtimeService'),
+  REALTIME_MODEL_ADAPTER: Symbol('IRealtimeModelAdapter'),
+  REALTIME_EXECUTION_ADAPTER: Symbol('IRealtimeExecutionAdapter'),
+  REALTIME_STATISTICS_ADAPTER: Symbol('IRealtimeStatisticsAdapter'),
+  COLLABORATION_MANAGER: Symbol('ICollaborationManager')
 } as const;
 
 /**

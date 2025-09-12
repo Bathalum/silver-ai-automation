@@ -21,7 +21,7 @@
  */
 
 import { CreateFunctionModelUseCase } from '../../use-cases/function-model/create-function-model-use-case';
-import { AddContainerNodeUseCase } from '../../use-cases/function-model/add-container-node-use-case';
+import { CreateUnifiedNodeUseCase } from '../../use-cases/function-model/create-unified-node-use-case';
 import { AddActionNodeToContainerUseCase } from '../../use-cases/function-model/add-action-node-to-container-use-case';
 import { PublishFunctionModelUseCase } from '../../use-cases/function-model/publish-function-model-use-case';
 import { ExecuteFunctionModelUseCase } from '../../use-cases/function-model/execute-function-model-use-case';
@@ -39,7 +39,7 @@ import { AuditLog } from '../../domain/entities/audit-log';
 // Service interfaces and types
 export interface FunctionModelManagementServiceDependencies {
   createUseCase: CreateFunctionModelUseCase;
-  addContainerUseCase: AddContainerNodeUseCase;
+  createUnifiedNodeUseCase: CreateUnifiedNodeUseCase;
   addActionUseCase: AddActionNodeToContainerUseCase;
   publishUseCase: PublishFunctionModelUseCase;
   executeUseCase: ExecuteFunctionModelUseCase;
@@ -165,7 +165,8 @@ export interface DataIntegrityTestRequest {
   modelId: string;
   userId: string;
   operations: readonly {
-    type: 'addContainer' | 'addAction' | 'validateIntegrity';
+    type: 'createNode' | 'addAction' | 'validateIntegrity';
+    nodeType?: string; // For createNode operations
     name?: string;
     parentNodeId?: string;
     level?: string;
@@ -208,7 +209,7 @@ export class FunctionModelManagementService {
 
   // Expose use cases for architectural validation
   public readonly createUseCase: CreateFunctionModelUseCase;
-  public readonly addContainerUseCase: AddContainerNodeUseCase;
+  public readonly createUnifiedNodeUseCase: CreateUnifiedNodeUseCase;
   public readonly publishUseCase: PublishFunctionModelUseCase;
   public readonly auditRepository: IAuditLogRepository;
   public readonly eventBus: IEventBus;
@@ -223,14 +224,14 @@ export class FunctionModelManagementService {
     if (dependencies) {
       // Full dependencies provided - use them
       this.createUseCase = dependencies.createUseCase;
-      this.addContainerUseCase = dependencies.addContainerUseCase;
+      this.createUnifiedNodeUseCase = dependencies.createUnifiedNodeUseCase;
       this.publishUseCase = dependencies.publishUseCase;
       this.auditRepository = dependencies.auditRepository;
       this.eventBus = dependencies.eventBus;
     } else {
       // Legacy initialization - create use cases internally
       this.createUseCase = new CreateFunctionModelUseCase(modelRepository, eventBus);
-      this.addContainerUseCase = new AddContainerNodeUseCase(modelRepository, eventBus);
+      this.createUnifiedNodeUseCase = new CreateUnifiedNodeUseCase(modelRepository, eventBus);
       this.publishUseCase = new PublishFunctionModelUseCase(modelRepository, eventBus);
       this.auditRepository = auditRepository;
       this.eventBus = eventBus;
@@ -239,7 +240,7 @@ export class FunctionModelManagementService {
     // Set up internal dependencies structure for access
     this.dependencies = {
       createUseCase: this.createUseCase,
-      addContainerUseCase: this.addContainerUseCase,
+      createUnifiedNodeUseCase: this.createUnifiedNodeUseCase,
       addActionUseCase: new AddActionNodeToContainerUseCase(modelRepository, eventBus),
       publishUseCase: this.publishUseCase,
       executeUseCase: {
@@ -349,7 +350,7 @@ export class FunctionModelManagementService {
         if (request.workflowStructure.inputNodes) {
           for (let i = 0; i < request.workflowStructure.inputNodes.length; i++) {
             const inputNode = request.workflowStructure.inputNodes[i];
-            const nodeResult = await this.dependencies.addContainerUseCase.execute({
+            const nodeResult = await this.dependencies.createUnifiedNodeUseCase.execute({
               modelId,
               nodeType: inputNode.type === 'io' ? 'ioNode' : inputNode.type,
               name: inputNode.name,
@@ -370,7 +371,7 @@ export class FunctionModelManagementService {
         if (request.workflowStructure.processingStages) {
           for (let i = 0; i < request.workflowStructure.processingStages.length; i++) {
             const stage = request.workflowStructure.processingStages[i];
-            const stageResult = await this.dependencies.addContainerUseCase.execute({
+            const stageResult = await this.dependencies.createUnifiedNodeUseCase.execute({
               modelId,
               nodeType: stage.type === 'stage' ? 'stageNode' : stage.type,
               name: stage.name,
@@ -391,7 +392,7 @@ export class FunctionModelManagementService {
         if (request.workflowStructure.outputNodes) {
           for (let i = 0; i < request.workflowStructure.outputNodes.length; i++) {
             const outputNode = request.workflowStructure.outputNodes[i];
-            const nodeResult = await this.dependencies.addContainerUseCase.execute({
+            const nodeResult = await this.dependencies.createUnifiedNodeUseCase.execute({
               modelId,
               nodeType: outputNode.type === 'io' ? 'ioNode' : outputNode.type,
               name: outputNode.name,
@@ -460,7 +461,7 @@ export class FunctionModelManagementService {
         }
       } else {
         // Legacy simple workflow creation
-        const containerResult = await this.dependencies.addContainerUseCase.execute({
+        const containerResult = await this.dependencies.createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: 'stageNode',
           name: 'Processing Stage',
@@ -831,7 +832,7 @@ export class FunctionModelManagementService {
 
     // Execute the add container use case with queuing for resource contention
     return await this.queueOperation(request.modelId, async () => {
-      return await this.dependencies.addContainerUseCase.execute({
+      return await this.dependencies.createUnifiedNodeUseCase.execute({
         modelId: request.modelId,
         nodeType: request.nodeType,
         name: request.nodeName,
@@ -877,7 +878,7 @@ export class FunctionModelManagementService {
       for (const operation of request.operations) {
         switch (operation.type) {
           case 'addNode':
-            const nodeResult = await this.dependencies.addContainerUseCase.execute({
+            const nodeResult = await this.dependencies.createUnifiedNodeUseCase.execute({
               modelId: request.modelId,
               nodeType: operation.nodeType!,
               name: operation.nodeName!,
@@ -1173,17 +1174,18 @@ export class FunctionModelManagementService {
       // Execute test operations
       for (const operation of request.operations) {
         switch (operation.type) {
-          case 'addContainer':
-            const containerResult = await this.dependencies.addContainerUseCase.execute({
+          case 'createNode':
+            const nodeResult = await this.dependencies.createUnifiedNodeUseCase.execute({
               modelId: request.modelId,
-              nodeType: 'stage',
+              nodeType: operation.nodeType || 'stageNode', // Support all NodeTypes, default to stage
               name: operation.name!,
-              userId: request.userId
+              userId: request.userId,
+              position: { x: 0, y: 0 } // Default position for test operations
             });
-            if (containerResult.isFailure) {
+            if (nodeResult.isFailure) {
               integrityViolations.push({
-                type: 'CONTAINER_CREATION_FAILED',
-                description: `Failed to create container: ${containerResult.error}`,
+                type: 'NODE_CREATION_FAILED',
+                description: `Failed to create node: ${nodeResult.error}`,
                 severity: 'error'
               });
             }
@@ -1442,7 +1444,7 @@ export class FunctionModelManagementService {
             break;
 
           case 'addNode':
-            const nodeResult = await this.dependencies.addContainerUseCase.execute({
+            const nodeResult = await this.dependencies.createUnifiedNodeUseCase.execute({
               modelId: request.modelId,
               nodeType: step.nodeType!,
               name: step.nodeName!,

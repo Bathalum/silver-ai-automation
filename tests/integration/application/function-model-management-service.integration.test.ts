@@ -21,7 +21,7 @@
 
 import { FunctionModelManagementService } from '../../../lib/application/services/function-model-management-service';
 import { CreateFunctionModelUseCase } from '../../../lib/use-cases/function-model/create-function-model-use-case';
-import { AddContainerNodeUseCase } from '../../../lib/use-cases/function-model/add-container-node-use-case';
+import { CreateUnifiedNodeUseCase } from '../../../lib/use-cases/function-model/create-unified-node-use-case';
 import { AddActionNodeToContainerUseCase } from '../../../lib/use-cases/function-model/add-action-node-to-container-use-case';
 import { PublishFunctionModelUseCase } from '../../../lib/use-cases/function-model/publish-function-model-use-case';
 import { ExecuteFunctionModelUseCase } from '../../../lib/use-cases/function-model/execute-function-model-use-case';
@@ -46,7 +46,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
   
   // Use case mocks for service coordination
   let mockCreateUseCase: jest.Mocked<CreateFunctionModelUseCase>;
-  let mockAddContainerUseCase: jest.Mocked<AddContainerNodeUseCase>;
+  let mockCreateUnifiedNodeUseCase: jest.Mocked<CreateUnifiedNodeUseCase>;
   let mockAddActionUseCase: jest.Mocked<AddActionNodeToContainerUseCase>;
   let mockPublishUseCase: jest.Mocked<PublishFunctionModelUseCase>;
   let mockExecuteUseCase: jest.Mocked<ExecuteFunctionModelUseCase>;
@@ -63,7 +63,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
 
     // Initialize use case mocks
     mockCreateUseCase = createMockCreateUseCase();
-    mockAddContainerUseCase = createMockAddContainerUseCase();
+    mockCreateUnifiedNodeUseCase = createMockCreateUnifiedNodeUseCase();
     mockAddActionUseCase = createMockAddActionUseCase();
     mockPublishUseCase = createMockPublishUseCase();
     mockExecuteUseCase = createMockExecuteUseCase();
@@ -75,7 +75,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
     // Initialize management service with use case dependencies
     managementService = new FunctionModelManagementService({
       createUseCase: mockCreateUseCase,
-      addContainerUseCase: mockAddContainerUseCase,
+      createUnifiedNodeUseCase: mockCreateUnifiedNodeUseCase,
       addActionUseCase: mockAddActionUseCase,
       publishUseCase: mockPublishUseCase,
       executeUseCase: mockExecuteUseCase,
@@ -110,12 +110,12 @@ describe('FunctionModelManagementService Integration Tests', () => {
           createdAt: new Date()
         }));
 
-        // Mock successful container node addition
+        // Mock successful unified node creation
         const stageNodeId = 'stage-node-id';
-        mockAddContainerUseCase.execute.mockResolvedValue(Result.ok({
+        mockCreateUnifiedNodeUseCase.execute.mockResolvedValue(Result.ok({
           nodeId: stageNodeId,
           modelId,
-          nodeType: 'stage',
+          nodeType: 'STAGE_NODE',
           name: 'Processing Stage'
         }));
 
@@ -154,7 +154,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
         
         // Verify service coordination - all use cases should be called in correct order
         expect(mockCreateUseCase.execute).toHaveBeenCalledTimes(1);
-        expect(mockAddContainerUseCase.execute).toHaveBeenCalledTimes(1);
+        expect(mockCreateUnifiedNodeUseCase.execute).toHaveBeenCalledTimes(1);
         expect(mockAddActionUseCase.execute).toHaveBeenCalledTimes(1);
         expect(mockValidateUseCase.execute).toHaveBeenCalledTimes(1);
         expect(mockPublishUseCase.execute).toHaveBeenCalledTimes(1);
@@ -190,9 +190,9 @@ describe('FunctionModelManagementService Integration Tests', () => {
           createdAt: new Date()
         }));
 
-        // Mock failure at container node addition
-        mockAddContainerUseCase.execute.mockResolvedValue(
-          Result.fail('Failed to add container node')
+        // Mock failure at unified node creation
+        mockCreateUnifiedNodeUseCase.execute.mockResolvedValue(
+          Result.fail('Failed to create unified node')
         );
 
         // Act: Execute workflow that should fail and rollback
@@ -200,11 +200,11 @@ describe('FunctionModelManagementService Integration Tests', () => {
 
         // Assert: Verify rollback behavior
         expect(result.isFailure).toBe(true);
-        expect(result.error).toContain('Failed to add container node');
+        expect(result.error).toContain('Failed to create unified node');
 
         // Verify create was called but subsequent steps were not
         expect(mockCreateUseCase.execute).toHaveBeenCalledTimes(1);
-        expect(mockAddContainerUseCase.execute).toHaveBeenCalledTimes(1);
+        expect(mockCreateUnifiedNodeUseCase.execute).toHaveBeenCalledTimes(1);
         expect(mockAddActionUseCase.execute).not.toHaveBeenCalled();
         expect(mockValidateUseCase.execute).not.toHaveBeenCalled();
         expect(mockPublishUseCase.execute).not.toHaveBeenCalled();
@@ -222,7 +222,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
         const auditCalls = mockAuditRepository.save.mock.calls;
         const rollbackCall = auditCalls.find(call => call[0].action === 'WORKFLOW_ROLLBACK');
         expect(rollbackCall).toBeDefined();
-        expect(rollbackCall![0].details.error).toContain('Failed to add container node');
+        expect(rollbackCall![0].details.error).toContain('Failed to create unified node');
       });
     });
 
@@ -354,10 +354,10 @@ describe('FunctionModelManagementService Integration Tests', () => {
         const modelId = TestData.VALID_UUID;
 
         // Mock successful operations
-        mockAddContainerUseCase.execute.mockResolvedValue(Result.ok({
+        mockCreateUnifiedNodeUseCase.execute.mockResolvedValue(Result.ok({
           nodeId: 'node-1',
           modelId,
-          nodeType: 'stage',
+          nodeType: 'STAGE_NODE',
           name: 'Stage 1'
         }));
 
@@ -418,17 +418,17 @@ describe('FunctionModelManagementService Integration Tests', () => {
           modelId,
           userId,
           operations: [
-            { type: 'addNode', nodeType: 'stage', nodeName: 'Stage 1' },
+            { type: 'addNode', nodeType: 'STAGE_NODE', nodeName: 'Stage 1' },
             { type: 'addAction', parentNodeId: 'stage-1', actionType: 'tether' },
             { type: 'validate', level: 'structural' }
           ] as const
         };
 
         // Mock: First two operations succeed, third fails
-        mockAddContainerUseCase.execute.mockResolvedValueOnce(Result.ok({
+        mockCreateUnifiedNodeUseCase.execute.mockResolvedValueOnce(Result.ok({
           nodeId: 'stage-1',
           modelId,
-          nodeType: 'stage',
+          nodeType: 'STAGE_NODE',
           name: 'Stage 1'
         }));
 
@@ -620,7 +620,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
         expect(result.error).toContain('BUSINESS_RULE_VIOLATION');
 
         // Verify use case was not executed after validation failure
-        expect(mockAddContainerUseCase.execute).not.toHaveBeenCalled();
+        expect(mockCreateUnifiedNodeUseCase.execute).not.toHaveBeenCalled();
 
         // Verify audit logging for validation failure
         const auditCalls = mockAuditRepository.save.mock.calls;
@@ -740,10 +740,10 @@ describe('FunctionModelManagementService Integration Tests', () => {
           createdAt: new Date()
         }));
 
-        mockAddContainerUseCase.execute.mockResolvedValue(Result.ok({
+        mockCreateUnifiedNodeUseCase.execute.mockResolvedValue(Result.ok({
           nodeId: 'stage-123',
           modelId,
-          nodeType: 'stage',
+          nodeType: 'STAGE_NODE',
           name: 'Process Stage'
         }));
 
@@ -851,7 +851,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
 
         // Mock slow operation to create contention
         let operationOrder: number[] = [];
-        mockAddContainerUseCase.execute.mockImplementation(async () => {
+        mockCreateUnifiedNodeUseCase.execute.mockImplementation(async () => {
           const operationId = operationOrder.length + 1;
           operationOrder.push(operationId);
           
@@ -861,7 +861,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
           return Result.ok({
             nodeId: `node-${operationId}`,
             modelId,
-            nodeType: 'stage',
+            nodeType: 'STAGE_NODE',
             name: `Stage ${operationId}`
           });
         });
@@ -900,10 +900,10 @@ describe('FunctionModelManagementService Integration Tests', () => {
         const modelId = TestData.VALID_UUID;
 
         // Mock successful operations with data integrity checks
-        mockAddContainerUseCase.execute.mockResolvedValue(Result.ok({
+        mockCreateUnifiedNodeUseCase.execute.mockResolvedValue(Result.ok({
           nodeId: 'node-integrity-1',
           modelId,
-          nodeType: 'stage',
+          nodeType: 'STAGE_NODE',
           name: 'Integrity Stage'
         }));
 
@@ -926,7 +926,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
           modelId,
           userId,
           operations: [
-            { type: 'addContainer', name: 'Container 1' },
+            { type: 'addNode', nodeType: 'STAGE_NODE', name: 'Container 1' },
             { type: 'addAction', parentNodeId: 'container-1', name: 'Action 1' },
             { type: 'validateIntegrity', level: 'referential' }
           ]
@@ -1038,7 +1038,7 @@ describe('FunctionModelManagementService Integration Tests', () => {
 
         // Assert: Verify service only depends on use cases and infrastructure
         expect(serviceInstance.createUseCase).toBeDefined();
-        expect(serviceInstance.addContainerUseCase).toBeDefined();
+        expect(serviceInstance.createUnifiedNodeUseCase).toBeDefined();
         expect(serviceInstance.publishUseCase).toBeDefined();
         expect(serviceInstance.auditRepository).toBeDefined();
         expect(serviceInstance.eventBus).toBeDefined();
@@ -1117,10 +1117,10 @@ describe('FunctionModelManagementService Integration Tests', () => {
     } as jest.Mocked<CreateFunctionModelUseCase>;
   }
 
-  function createMockAddContainerUseCase(): jest.Mocked<AddContainerNodeUseCase> {
+  function createMockCreateUnifiedNodeUseCase(): jest.Mocked<CreateUnifiedNodeUseCase> {
     return {
       execute: jest.fn()
-    } as jest.Mocked<AddContainerNodeUseCase>;
+    } as jest.Mocked<CreateUnifiedNodeUseCase>;
   }
 
   function createMockAddActionUseCase(): jest.Mocked<AddActionNodeToContainerUseCase> {

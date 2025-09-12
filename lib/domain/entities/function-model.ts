@@ -188,8 +188,16 @@ export class FunctionModel {
   }
 
   public addNode(node: Node): Result<void> {
+    if (this.isDeleted()) {
+      return Result.fail<void>('Cannot modify deleted model');
+    }
+
     if (this.props.status === ModelStatus.PUBLISHED) {
       return Result.fail<void>('Cannot modify published model');
+    }
+
+    if (this.props.status === ModelStatus.ARCHIVED) {
+      return Result.fail<void>('Cannot modify archived model');
     }
 
     if (this.props.nodes.has(node.nodeId.toString())) {
@@ -550,32 +558,6 @@ export class FunctionModel {
     return Result.ok<void>(undefined);
   }
 
-  public addContainerNode(node: Node): Result<void> {
-    if (this.isDeleted()) {
-      return Result.fail<void>('Cannot modify deleted model');
-    }
-
-    if (this.props.status === ModelStatus.PUBLISHED) {
-      return Result.fail<void>('Cannot modify published model');
-    }
-
-    if (this.props.status === ModelStatus.ARCHIVED) {
-      return Result.fail<void>('Cannot modify archived model');
-    }
-
-    if (this.props.nodes.has(node.nodeId.toString())) {
-      return Result.fail<void>('Node with this ID already exists');
-    }
-
-    // Validate node belongs to this model
-    if (node.modelId !== this.modelId) {
-      return Result.fail<void>('Node belongs to different model');
-    }
-
-    this.props.nodes.set(node.nodeId.toString(), node);
-    this.props.updatedAt = new Date();
-    return Result.ok<void>(undefined);
-  }
 
 
   public updateContainerNode(nodeId: string, updates: Partial<{ name: string; description: string; metadata: Record<string, any> }>): Result<void> {

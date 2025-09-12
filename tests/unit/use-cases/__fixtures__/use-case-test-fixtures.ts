@@ -44,7 +44,7 @@ export class UseCaseTestFixtures {
     };
   }
 
-  static createValidAddContainerNodeCommand() {
+  static createValidCreateNodeCommand() {
     return {
       modelId: 'test-model-123', // Match the model ID from createValidFunctionModel
       nodeType: ContainerNodeType.IO_NODE,

@@ -141,6 +141,46 @@ export class NodeAdded implements DomainEvent {
   ) {}
 }
 
+export class NodeUpdated implements DomainEvent {
+  readonly eventType = 'NodeUpdated';
+  readonly aggregateType = 'FunctionModel';
+
+  constructor(
+    public readonly eventId: string,
+    public readonly aggregateId: string,
+    public readonly aggregateVersion: number,
+    public readonly occurredOn: Date,
+    public readonly data: {
+      modelId: string;
+      nodeId: string;
+      changes: string[];
+      previousValues: Record<string, any>;
+      newValues: Record<string, any>;
+    },
+    public readonly metadata?: Record<string, any>
+  ) {}
+}
+
+export class NodeDeleted implements DomainEvent {
+  readonly eventType = 'NodeDeleted';
+  readonly aggregateType = 'FunctionModel';
+
+  constructor(
+    public readonly eventId: string,
+    public readonly aggregateId: string,
+    public readonly aggregateVersion: number,
+    public readonly occurredOn: Date,
+    public readonly data: {
+      modelId: string;
+      nodeId: string;
+      nodeName: string;
+      nodeType: string;
+      softDelete: boolean;
+    },
+    public readonly metadata?: Record<string, any>
+  ) {}
+}
+
 export class ActionNodeAdded implements DomainEvent {
   readonly eventType = 'ActionNodeAdded';
   readonly aggregateType = 'FunctionModel';
@@ -195,6 +235,31 @@ export class WorkflowExecutionCompleted implements DomainEvent {
       result: 'success' | 'failure' | 'cancelled';
       duration: number;
       summary: Record<string, any>;
+    },
+    public readonly metadata?: Record<string, any>
+  ) {}
+}
+
+/**
+ * NodeCreated event - for unified node creation system
+ * This event is published when a unified node is successfully created
+ */
+export class NodeCreated implements DomainEvent {
+  readonly eventType = 'NodeCreated';
+  readonly aggregateType = 'FunctionModel';
+
+  constructor(
+    public readonly eventId: string,
+    public readonly aggregateId: string,
+    public readonly aggregateVersion: number,
+    public readonly occurredOn: Date,
+    public readonly data: {
+      nodeId: string;
+      nodeType: string;
+      nodeName: string;
+      position: { x: number; y: number };
+      createdAt: Date;
+      typeSpecificData?: Record<string, any>;
     },
     public readonly metadata?: Record<string, any>
   ) {}

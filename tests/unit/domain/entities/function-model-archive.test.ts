@@ -240,9 +240,9 @@ describe('FunctionModel - Archive Lifecycle', () => {
 
     it('should prevent node additions to archived model', () => {
       // Act - This would require a valid Node instance
-      // Testing the pattern with addContainerNode which has explicit archived check
+      // Testing the pattern with addNode which has explicit archived check
       const mockNode = {} as any; // Simplified for test structure
-      const result = model.addContainerNode(mockNode);
+      const result = model.addNode(mockNode);
 
       // Assert
       expect(result.isFailure).toBe(true);

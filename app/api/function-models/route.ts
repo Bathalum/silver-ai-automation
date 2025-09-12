@@ -120,9 +120,7 @@ export const POST = withErrorHandling(
  * GET /api/function-models
  * List function models for the authenticated user
  */
-export const GET = withErrorHandling(
-  withRateLimit(
-    withAuth(async (request: NextRequest, user: AuthenticatedUser) => {
+const getHandler = withAuth(async (request: NextRequest, user: AuthenticatedUser) => {
       try {
         // Parse and validate query parameters
         const url = new URL(request.url);
@@ -144,9 +142,9 @@ export const GET = withErrorHandling(
         const supabase = await createClient();
         const container = await createFunctionModelContainer(supabase);
 
-        // Resolve repository
-        const repositoryResult = await container.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
-        if (repositoryResult.isFailure) {
+        // Resolve list query handler
+        const queryHandlerResult = await container.resolve(ServiceTokens.LIST_FUNCTION_MODELS_QUERY_HANDLER);
+        if (queryHandlerResult.isFailure) {
           return createErrorResponse(
             ApiErrorCode.INTERNAL_ERROR,
             'Failed to initialize service',
@@ -154,12 +152,12 @@ export const GET = withErrorHandling(
           );
         }
 
-        const repository = repositoryResult.value;
+        const queryHandler = queryHandlerResult.value;
 
-        // Build filter
-        const filter = {
+        // Build query
+        const listQuery = {
           userId: user.id,
-          status: query.status,
+          status: query.status ? [query.status] : undefined,
           searchTerm: query.search,
           limit: query.pageSize,
           offset: (query.page - 1) * query.pageSize,
@@ -168,7 +166,7 @@ export const GET = withErrorHandling(
         };
 
         // Execute query
-        const result = await repository.list(filter);
+        const result = await queryHandler.handle(listQuery);
         if (result.isFailure) {
           return createErrorResponse(
             ApiErrorCode.DATABASE_ERROR,
@@ -177,44 +175,29 @@ export const GET = withErrorHandling(
           );
         }
 
-        const models = result.value;
+        const queryResult = result.value;
+        const models = queryResult.models;
 
         // Convert to DTOs
         const modelDtos: ModelDto[] = models.map(model => ({
           modelId: model.modelId,
-          name: model.name.toString(),
+          name: model.name,
           description: model.description,
-          version: model.version.toString(),
+          version: model.version,
           status: model.status,
-          currentVersion: model.currentVersion.toString(),
+          currentVersion: model.currentVersion,
           versionCount: model.versionCount,
           metadata: model.metadata,
-          permissions: {
-            owner: model.permissions.owner as string,
-            editors: (model.permissions.editors as string[]) || [],
-            viewers: (model.permissions.viewers as string[]) || []
-          },
+          permissions: model.permissions,
           createdAt: model.createdAt.toISOString(),
           updatedAt: model.updatedAt.toISOString(),
           lastSavedAt: model.lastSavedAt.toISOString()
         }));
 
-        // Calculate pagination metadata
-        // Note: This is a simplified implementation
-        // In production, you'd get total count from repository
-        const totalItems = models.length; // This should come from a separate count query
-        const totalPages = Math.ceil(totalItems / query.pageSize);
-
-        return createSuccessResponse(modelDtos, HttpStatus.OK, {
-          pagination: {
-            page: query.page,
-            pageSize: query.pageSize,
-            totalItems,
-            totalPages,
-            hasNextPage: query.page < totalPages,
-            hasPreviousPage: query.page > 1
-          }
-        });
+        return createSuccessResponse({
+          models: modelDtos,
+          pagination: queryResult.pagination
+        }, HttpStatus.OK);
 
       } catch (error) {
         console.error('List models error:', error);
@@ -224,7 +207,11 @@ export const GET = withErrorHandling(
           HttpStatus.INTERNAL_SERVER_ERROR
         );
       }
-    }),
-    { maxRequests: 100, windowMs: 60000 } // 100 requests per minute
+    });
+
+export const GET = withErrorHandling(
+  withRateLimit(
+    getHandler,
+    { maxRequests: 100, windowMs: 60000 } // 100 reads per minute
   )
 );

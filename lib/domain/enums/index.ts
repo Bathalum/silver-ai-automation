@@ -6,6 +6,15 @@ export enum FeatureType {
   AI_AGENT = 'ai-agent'
 }
 
+// UNIFIED NODE TYPE SYSTEM - Replaces fragmented ContainerNodeType/ActionNodeType
+export enum NodeType {
+  IO_NODE = 'ioNode',
+  STAGE_NODE = 'stageNode',
+  TETHER_NODE = 'tetherNode',
+  KB_NODE = 'kbNode',
+  FUNCTION_MODEL_CONTAINER = 'functionModelContainer'
+}
+
 export enum ContainerNodeType {
   IO_NODE = 'ioNode',
   STAGE_NODE = 'stageNode'

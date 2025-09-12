@@ -1,188 +1,213 @@
-'use client'
+/**
+ * Function Models Dashboard - Main List Page
+ * Shows all function models and allows navigation to individual models
+ */
 
-import React from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Workflow, FileText, Settings, Search, Filter } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import Link from 'next/link'
+import React from 'react';
+import { createClient } from '@/lib/supabase/server';
+import { createFunctionModelContainer } from '@/lib/infrastructure/di/function-model-module';
+import { ServiceTokens } from '@/lib/infrastructure/di/container';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Plus } from 'lucide-react';
+import FunctionModelTabs from './components/function-model-tabs';
 
-// Mock data for demonstration - replace with actual data fetching
-const mockWorkflows = [
-  {
-    id: '1',
-    name: 'Customer Onboarding Process',
-    description: 'Complete workflow for new customer account setup and verification',
-    status: 'active',
-    nodeCount: 12,
-    lastModified: '2025-01-15',
-    version: '1.2.0',
-    category: 'Customer Service'
-  },
-  {
-    id: '2',
-    name: 'Order Fulfillment Pipeline',
-    description: 'Automated order processing from receipt to delivery',
-    status: 'draft',
-    nodeCount: 8,
-    lastModified: '2025-01-10',
-    version: '0.9.1',
-    category: 'Operations'
-  },
-  {
-    id: '3',
-    name: 'Data Processing Workflow',
-    description: 'ETL pipeline for customer analytics and reporting',
-    status: 'archived',
-    nodeCount: 15,
-    lastModified: '2024-12-20',
-    version: '2.1.0',
-    category: 'Analytics'
+
+export interface Model {
+  id: string;
+  name: string;
+  status: 'draft' | 'published' | 'archived';
+  nodeCount: number;
+  lastUpdated: string;
+  description: string;
+}
+
+async function getAuthenticatedUser() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) {
+    throw new Error('Authentication required');
   }
-]
+  
+  return user;
+}
 
-export default function FunctionModelPage() {
+async function loadModels(): Promise<{ active: Model[], archived: Model[] }> {
+  try {
+    // Get authenticated user
+    const user = await getAuthenticatedUser();
+    
+    // Setup DI container
+    const supabase = await createClient();
+    const container = await createFunctionModelContainer(supabase);
+    
+    // Resolve list query handler
+    const queryHandlerResult = await container.resolve(ServiceTokens.LIST_FUNCTION_MODELS_QUERY_HANDLER);
+    if (queryHandlerResult.isFailure) {
+      throw new Error('Failed to initialize service');
+    }
+    
+    const queryHandler = queryHandlerResult.value;
+    
+    // Build single query to get all models
+    const listQuery = {
+      userId: user.id,
+      status: undefined, // Get all models regardless of status
+      searchTerm: undefined,
+      limit: 100, // Increase limit to get all models
+      offset: 0,
+      sortBy: 'updated_at',
+      sortOrder: 'desc'
+    };
+    
+    // Execute query
+    const result = await queryHandler.handle(listQuery);
+    if (result.isFailure) {
+      throw new Error('Failed to retrieve function models');
+    }
+    
+    const allModels = result.value?.models || [];
+    
+    // Transform to UI format
+    const transformModel = (model: any) => ({
+      id: model.modelId,
+      name: model.name,
+      status: model.status.toLowerCase() as 'draft' | 'published' | 'archived',
+      nodeCount: model.metadata?.nodeCount || 0,
+      lastUpdated: model.updatedAt.toISOString(),
+      description: model.description || 'No description available'
+    });
+    
+    const transformedModels = allModels.map(transformModel);
+    
+    // Separate active and archived models
+    const active = transformedModels.filter(model => model.status !== 'archived');
+    const archived = transformedModels.filter(model => model.status === 'archived');
+    
+    return { active, archived };
+    
+  } catch (error) {
+    console.error('Failed to load models:', error);
+    return { active: [], archived: [] };
+  }
+}
+
+export default async function FunctionModelDashboard() {
+  const { active, archived } = await loadModels();
+  const allModels = [...active, ...archived];
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-8">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Function Models</h1>
-            <p className="text-gray-600">Create and manage process workflows and business models</p>
-          </div>
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Function Models</h1>
+          <p className="text-muted-foreground">
+            Design and manage your workflow automation models
+          </p>
+        </div>
+        
+        <Button asChild>
           <Link href="/dashboard/function-model/new">
-            <Button className="flex items-center space-x-2">
-              <Plus className="h-4 w-4" />
-              <span>Create New Model</span>
-            </Button>
+            <Plus className="w-4 h-4 mr-2" />
+            New Model
           </Link>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search workflows..."
-            className="pl-10"
-          />
-        </div>
-        <Button variant="outline" className="flex items-center space-x-2">
-          <Filter className="h-4 w-4" />
-          <span>Filters</span>
         </Button>
       </div>
 
-      {/* Workflow Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {mockWorkflows.map((workflow) => (
-          <Card key={workflow.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <CardTitle className="text-lg mb-2">{workflow.name}</CardTitle>
-                  <CardDescription className="mb-3">
-                    {workflow.description}
-                  </CardDescription>
-                </div>
-                <Badge 
-                  variant={
-                    workflow.status === 'active' ? 'default' : 
-                    workflow.status === 'draft' ? 'secondary' : 'outline'
-                  }
-                >
-                  {workflow.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Nodes: {workflow.nodeCount}</span>
-                  <span>v{workflow.version}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>{workflow.category}</span>
-                  <span>Modified: {workflow.lastModified}</span>
-                </div>
-                <div className="flex space-x-2 pt-2">
-                  <Link href={`/dashboard/function-model/${workflow.id}`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full">
-                      Open
-                    </Button>
-                  </Link>
-                  <Link href={`/dashboard/function-model/${workflow.id}/edit`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full">
-                      Edit
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Tabbed Interface */}
+      <FunctionModelTabs active={active} archived={archived} />
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
+      {/* Empty State - Only show when no models at all */}
+      {active.length === 0 && archived.length === 0 && (
+        <div className="text-center py-12">
+          <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
+            <Plus className="w-6 h-6 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">No models yet</h3>
+          <p className="text-muted-foreground mb-4">
+            Get started by creating your first function model
+          </p>
+          <Button asChild>
+            <Link href="/dashboard/function-model/new">
+              Create Function Model
+            </Link>
+          </Button>
+        </div>
+      )}
+
+      {/* Quick Stats */}
+      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
+        <Card>
+          <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <Workflow className="h-5 w-5 text-green-600" />
-              <CardTitle>Browse Templates</CardTitle>
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {allModels.filter(m => m.status === 'published').length}
+                </p>
+                <p className="text-xs text-muted-foreground">Published</p>
+              </div>
             </div>
-            <CardDescription>
-              Start with pre-built workflow templates
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" variant="outline">
-              <Workflow className="h-4 w-4 mr-2" />
-              View Templates
-            </Button>
           </CardContent>
         </Card>
-
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
+        
+        <Card>
+          <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <FileText className="h-5 w-5 text-purple-600" />
-              <CardTitle>Documentation</CardTitle>
+              <div className="w-2 h-2 rounded-full bg-yellow-500" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {allModels.filter(m => m.status === 'draft').length}
+                </p>
+                <p className="text-xs text-muted-foreground">Drafts</p>
+              </div>
             </div>
-            <CardDescription>
-              Learn how to use the Function Model feature
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              View Docs
-            </Button>
           </CardContent>
         </Card>
-
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
+        
+        <Card>
+          <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <Settings className="h-5 w-5 text-gray-600" />
-              <CardTitle>Settings</CardTitle>
+              <div className="w-2 h-2 rounded-full bg-gray-500" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {archived.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Archived</p>
+              </div>
             </div>
-            <CardDescription>
-              Configure Function Model preferences and options
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" variant="outline">
-              <Settings className="h-4 w-4 mr-2" />
-              Configure
-            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {allModels.reduce((acc, m) => acc + m.nodeCount, 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Nodes</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-purple-500" />
+              <div>
+                <p className="text-2xl font-bold">{allModels.length}</p>
+                <p className="text-xs text-muted-foreground">Total Models</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
-
-

@@ -11,7 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Principle
 Always enforce **Clean Architecture** and the **Test-Driven Development (TDD) loop**.  
 ➡️ **Code must follow the passing test — never the other way around.**
+NEVER IMPLEMENT DUMB TEMPORARY FIXES ALWAYS BEST PRACTICES FOR CLEAN ARCHITECTURE.
 
+ALWAYS BACKTRACE THROUGH THE DATA FLOW, LAYERS TO PROPERLY ROOT CAUSE AND RESOLVE
 ---
 
 ## Scope

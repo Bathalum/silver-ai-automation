@@ -27,7 +27,7 @@ import {
   ManageErrorHandlingAndRecoveryUseCase
 } from '../../lib/use-cases';
 
-import { AddContainerNodeUseCase } from '../../lib/use-cases/function-model/add-container-node-use-case';
+import { CreateUnifiedNodeUseCase } from '../../lib/use-cases/function-model/create-unified-node-use-case';
 import { AddActionNodeToContainerUseCase } from '../../lib/use-cases/function-model/add-action-node-to-container-use-case';
 import { ExecuteFunctionModelUseCase } from '../../lib/use-cases/function-model/execute-function-model-use-case';
 import { ArchiveFunctionModelUseCase } from '../../lib/use-cases/function-model/archive-function-model-use-case';
@@ -446,7 +446,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
 
   // Use Cases (Real instances - no mocking)
   let createModelUseCase: CreateFunctionModelUseCase;
-  let addContainerUseCase: AddContainerNodeUseCase;
+  let createUnifiedNodeUseCase: CreateUnifiedNodeUseCase;
   let addActionUseCase: AddActionNodeToContainerUseCase;
   let publishModelUseCase: PublishFunctionModelUseCase;
   let executeModelUseCase: ExecuteFunctionModelUseCase;
@@ -475,7 +475,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
 
     // Initialize Use Cases with real business logic
     createModelUseCase = new CreateFunctionModelUseCase(mockRepository, mockEventBus);
-    addContainerUseCase = new AddContainerNodeUseCase(mockRepository, mockEventBus);
+    createUnifiedNodeUseCase = new CreateUnifiedNodeUseCase(mockRepository, mockEventBus);
     addActionUseCase = new AddActionNodeToContainerUseCase(mockRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockRepository, mockEventBus);
     // Create required domain services for execution
@@ -545,7 +545,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         expect(createdModel.value.props.name._value).toBe(workflowName);
 
         // UC-002: Add Container Node (must create model before adding nodes)
-        const addContainerResult = await addContainerUseCase.execute({
+        const addContainerResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Processing Stage',
@@ -633,7 +633,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const nonExistentModelId = getTestUUID('non-existent');
 
         // Act: Try to add container node to non-existent model
-        const addContainerResult = await addContainerUseCase.execute({
+        const addContainerResult = await createUnifiedNodeUseCase.execute({
           modelId: nonExistentModelId,
           nodeType: 'stage',
           nodeName: 'Invalid Stage',
@@ -691,7 +691,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const modelId = createResult.value.modelId;
 
         // Add container and action
-        const containerResult = await addContainerUseCase.execute({
+        const containerResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: 'stage',
           nodeName: 'Version Stage',
@@ -758,7 +758,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const mainModelId = mainModelResult.value.modelId;
 
         // Add hierarchical container structure
-        const stageResult = await addContainerUseCase.execute({
+        const stageResult = await createUnifiedNodeUseCase.execute({
           modelId: mainModelId,
           nodeType: 'stage',
           nodeName: 'Orchestration Stage',
@@ -902,7 +902,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const modelId = modelResult.value.modelId;
 
         // Add container with failing action
-        const containerResult = await addContainerUseCase.execute({
+        const containerResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: 'stage',
           nodeName: 'Failure Test Stage',
@@ -981,7 +981,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const modelId = modelResult.value.modelId;
 
         // Add container for AI agent
-        const containerResult = await addContainerUseCase.execute({
+        const containerResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: 'stage',
           nodeName: 'AI Processing Stage',
@@ -1170,7 +1170,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         expect(errorHandlingResult.isSuccess).toBe(true);
 
         // Act: Execute with agent failure simulation
-        const containerResult = await addContainerUseCase.execute({
+        const containerResult = await createUnifiedNodeUseCase.execute({
           modelId, nodeType: 'stage', nodeName: 'Resilience Test', userId: testUserId
         });
 
@@ -1233,7 +1233,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const secondaryModelId = secondaryModelResult.value.modelId;
 
         // Set up primary model structure
-        const primaryStageResult = await addContainerUseCase.execute({
+        const primaryStageResult = await createUnifiedNodeUseCase.execute({
           modelId: primaryModelId,
           nodeType: 'stage',
           nodeName: 'Cross-Feature Integration Stage',
@@ -1242,7 +1242,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const primaryStageId = primaryStageResult.value.nodeId;
 
         // Set up secondary model structure
-        const secondaryStageResult = await addContainerUseCase.execute({
+        const secondaryStageResult = await createUnifiedNodeUseCase.execute({
           modelId: secondaryModelId,
           nodeType: 'stage',
           nodeName: 'Referenced Integration Stage',
@@ -1377,14 +1377,14 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const targetModelId = targetModelResult.value.modelId;
 
         // Create containers
-        const sourceStageResult = await addContainerUseCase.execute({
+        const sourceStageResult = await createUnifiedNodeUseCase.execute({
           modelId: sourceModelId,
           nodeType: 'stage',
           nodeName: 'Error Source Stage',
           userId: testUserId
         });
 
-        const targetStageResult = await addContainerUseCase.execute({
+        const targetStageResult = await createUnifiedNodeUseCase.execute({
           modelId: targetModelId,
           nodeType: 'stage',
           nodeName: 'Error Target Stage',
@@ -1522,7 +1522,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         const dataModelId = dataModelResult.value.modelId;
 
         // Set up orchestrator layer
-        const orchestratorStageResult = await addContainerUseCase.execute({
+        const orchestratorStageResult = await createUnifiedNodeUseCase.execute({
           modelId: orchestratorModelId,
           nodeType: 'stage',
           nodeName: 'System Orchestration Stage',
@@ -1688,21 +1688,21 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         // Build comprehensive workflow structure
         
         // Input/Output Layer
-        const inputStageResult = await addContainerUseCase.execute({
+        const inputStageResult = await createUnifiedNodeUseCase.execute({
           modelId: masterWorkflowId,
           nodeType: 'stage',
           nodeName: 'System Input Processing',
           userId: testUserId
         });
 
-        const processingStageResult = await addContainerUseCase.execute({
+        const processingStageResult = await createUnifiedNodeUseCase.execute({
           modelId: masterWorkflowId,
           nodeType: 'stage', 
           nodeName: 'Core Processing Orchestration',
           userId: testUserId
         });
 
-        const outputStageResult = await addContainerUseCase.execute({
+        const outputStageResult = await createUnifiedNodeUseCase.execute({
           modelId: masterWorkflowId,
           nodeType: 'stage',
           nodeName: 'System Output Generation',
@@ -2058,7 +2058,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         // Build realistic business process structure
 
         // Order Validation Stage
-        const orderValidationStageResult = await addContainerUseCase.execute({
+        const orderValidationStageResult = await createUnifiedNodeUseCase.execute({
           modelId: workflowModelId,
           nodeType: 'stage',
           nodeName: 'Order Validation and Processing',
@@ -2067,7 +2067,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         });
 
         // Inventory Management Stage
-        const inventoryStageResult = await addContainerUseCase.execute({
+        const inventoryStageResult = await createUnifiedNodeUseCase.execute({
           modelId: workflowModelId,
           nodeType: 'stage',
           nodeName: 'Inventory Management and Allocation',
@@ -2076,7 +2076,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         });
 
         // Payment Processing Stage
-        const paymentStageResult = await addContainerUseCase.execute({
+        const paymentStageResult = await createUnifiedNodeUseCase.execute({
           modelId: workflowModelId,
           nodeType: 'stage',
           nodeName: 'Payment Processing and Verification',
@@ -2085,7 +2085,7 @@ describe('Complete User Workflows - E2E Test Suite', () => {
         });
 
         // Fulfillment Stage
-        const fulfillmentStageResult = await addContainerUseCase.execute({
+        const fulfillmentStageResult = await createUnifiedNodeUseCase.execute({
           modelId: workflowModelId,
           nodeType: 'stage',
           nodeName: 'Order Fulfillment and Shipping',

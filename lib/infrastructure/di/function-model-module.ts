@@ -9,15 +9,26 @@ import { SupabaseNotificationServiceAdapter } from '../external/notification-ser
 import { CreateFunctionModelUseCase } from '../../use-cases/function-model/create-function-model-use-case';
 import { UpdateFunctionModelUseCase } from '../../use-cases/function-model/update-function-model-use-case';
 import { PublishFunctionModelUseCase } from '../../use-cases/function-model/publish-function-model-use-case';
+import { ArchiveFunctionModelUseCase } from '../../use-cases/function-model/archive-function-model-use-case';
+import { ExecuteFunctionModelUseCase } from '../../use-cases/function-model/execute-function-model-use-case';
+import { ManageWorkflowNodesUseCase } from '../../use-cases/function-model/manage-workflow-nodes-use-case';
 import { GetFunctionModelQueryHandler } from '../../use-cases/queries/get-function-model-query';
+import { ListFunctionModelsQueryHandler } from '../../use-cases/queries/list-function-models-query';
+import { GetModelNodesQueryHandler } from '../../use-cases/queries/get-model-nodes-query';
 import { WorkflowOrchestrationService } from '../../domain/services/workflow-orchestration-service';
 import { NodeDependencyService } from '../../domain/services/node-dependency-service';
+import { CrossFeatureLinkingService } from '../../domain/services/cross-feature-linking-service';
+import { ActionNodeExecutionService } from '../../domain/services/action-node-execution-service';
+import { FractalOrchestrationService } from '../../domain/services/fractal-orchestration-service';
+import { ActionNodeOrchestrationService } from '../../domain/services/action-node-orchestration-service';
+import { NodeContextAccessService } from '../../domain/services/node-context-access-service';
 import { WorkflowStructuralValidationService } from '../../domain/services/workflow-structural-validation-service';
 import { BusinessRuleValidationService } from '../../domain/services/business-rule-validation-service';
 import { ExecutionReadinessValidationService } from '../../domain/services/execution-readiness-validation-service';
 import { ContextValidationService } from '../../domain/services/context-validation-service';
 import { CrossFeatureValidationService } from '../../domain/services/cross-feature-validation-service';
 import { ValidateWorkflowStructureUseCase } from '../../use-cases/function-model/validate-workflow-structure-use-case';
+import { CreateUnifiedNodeUseCase } from '../../use-cases/function-model/create-unified-node-use-case';
 
 /**
  * Service module for Function Model feature registration
@@ -134,8 +145,8 @@ export class FunctionModelModule implements ServiceModule {
   }
 
   private registerRepositories(container: Container): void {
-    // Register function model repository
-    container.register(ServiceRegistration.scoped(
+    // Register function model repository (transient for per-request lifecycle)
+    container.register(ServiceRegistration.transient(
       ServiceTokens.FUNCTION_MODEL_REPOSITORY,
       async (c) => {
         const supabaseClientResult = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
@@ -147,7 +158,7 @@ export class FunctionModelModule implements ServiceModule {
     ));
 
     // Register audit log repository
-    container.register(ServiceRegistration.scoped(
+    container.register(ServiceRegistration.transient(
       ServiceTokens.AUDIT_LOG_REPOSITORY,
       async (c) => {
         const supabaseClientResult = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
@@ -205,6 +216,46 @@ export class FunctionModelModule implements ServiceModule {
       ServiceTokens.NODE_DEPENDENCY_SERVICE,
       async (c) => {
         return new NodeDependencyService();
+      }
+    ));
+
+    // Register cross-feature linking service
+    container.register(ServiceRegistration.transient(
+      'CrossFeatureLinkingService',
+      async (c) => {
+        return new CrossFeatureLinkingService();
+      }
+    ));
+
+    // Register action node execution service
+    container.register(ServiceRegistration.transient(
+      'ActionNodeExecutionService',
+      async (c) => {
+        return new ActionNodeExecutionService();
+      }
+    ));
+
+    // Register fractal orchestration service
+    container.register(ServiceRegistration.transient(
+      'FractalOrchestrationService',
+      async (c) => {
+        return new FractalOrchestrationService();
+      }
+    ));
+
+    // Register action node orchestration service
+    container.register(ServiceRegistration.transient(
+      'ActionNodeOrchestrationService',
+      async (c) => {
+        return new ActionNodeOrchestrationService();
+      }
+    ));
+
+    // Register node context access service
+    container.register(ServiceRegistration.transient(
+      'NodeContextAccessService',
+      async (c) => {
+        return new NodeContextAccessService();
       }
     ));
 
@@ -300,6 +351,102 @@ export class FunctionModelModule implements ServiceModule {
       }
     ));
 
+    // Register archive function model use case
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.ARCHIVE_FUNCTION_MODEL_USE_CASE,
+      async (c) => {
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
+        const nodeDependencyServiceResult = await c.resolve(ServiceTokens.NODE_DEPENDENCY_SERVICE);
+        const crossFeatureLinkingServiceResult = await c.resolve('CrossFeatureLinkingService');
+        
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
+        }
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
+        }
+        if (nodeDependencyServiceResult.isFailure) {
+          throw new Error(`Failed to resolve node dependency service: ${nodeDependencyServiceResult.error}`);
+        }
+        if (crossFeatureLinkingServiceResult.isFailure) {
+          throw new Error(`Failed to resolve cross feature linking service: ${crossFeatureLinkingServiceResult.error}`);
+        }
+        
+        return new ArchiveFunctionModelUseCase(
+          repositoryResult.value,
+          eventBusResult.value,
+          nodeDependencyServiceResult.value,
+          crossFeatureLinkingServiceResult.value
+        );
+      }
+    ));
+
+    // Register execute function model use case
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.EXECUTE_FUNCTION_MODEL_USE_CASE,
+      async (c) => {
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
+        const workflowOrchestrationServiceResult = await c.resolve(ServiceTokens.WORKFLOW_ORCHESTRATION_SERVICE);
+        const actionNodeExecutionServiceResult = await c.resolve('ActionNodeExecutionService');
+        const fractalOrchestrationServiceResult = await c.resolve('FractalOrchestrationService');
+        const actionNodeOrchestrationServiceResult = await c.resolve('ActionNodeOrchestrationService');
+        const nodeContextAccessServiceResult = await c.resolve('NodeContextAccessService');
+        
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
+        }
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
+        }
+        if (workflowOrchestrationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve workflow orchestration service: ${workflowOrchestrationServiceResult.error}`);
+        }
+        if (actionNodeExecutionServiceResult.isFailure) {
+          throw new Error(`Failed to resolve action node execution service: ${actionNodeExecutionServiceResult.error}`);
+        }
+        if (fractalOrchestrationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve fractal orchestration service: ${fractalOrchestrationServiceResult.error}`);
+        }
+        if (actionNodeOrchestrationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve action node orchestration service: ${actionNodeOrchestrationServiceResult.error}`);
+        }
+        if (nodeContextAccessServiceResult.isFailure) {
+          throw new Error(`Failed to resolve node context access service: ${nodeContextAccessServiceResult.error}`);
+        }
+        
+        return new ExecuteFunctionModelUseCase(
+          repositoryResult.value,
+          eventBusResult.value,
+          workflowOrchestrationServiceResult.value,
+          actionNodeExecutionServiceResult.value,
+          fractalOrchestrationServiceResult.value,
+          actionNodeOrchestrationServiceResult.value,
+          nodeContextAccessServiceResult.value
+        );
+      }
+    ));
+
+
+    // Register manage workflow nodes use case
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.MANAGE_WORKFLOW_NODES_USE_CASE,
+      async (c) => {
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
+        
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
+        }
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
+        }
+        
+        return new ManageWorkflowNodesUseCase(repositoryResult.value, eventBusResult.value);
+      }
+    ));
+
     // Register validate workflow structure use case
     container.register(ServiceRegistration.transient(
       ServiceTokens.VALIDATE_WORKFLOW_STRUCTURE_USE_CASE,
@@ -340,6 +487,24 @@ export class FunctionModelModule implements ServiceModule {
         );
       }
     ));
+
+    // Register create unified node use case (TDD specification)
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.CREATE_UNIFIED_NODE_USE_CASE,
+      async (c) => {
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
+        
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
+        }
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
+        }
+        
+        return new CreateUnifiedNodeUseCase(repositoryResult.value, eventBusResult.value);
+      }
+    ));
   }
 
   private registerQueryHandlers(container: Container): void {
@@ -354,6 +519,34 @@ export class FunctionModelModule implements ServiceModule {
         }
         
         return new GetFunctionModelQueryHandler(repositoryResult.value);
+      }
+    ));
+
+    // Register list function models query handler
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.LIST_FUNCTION_MODELS_QUERY_HANDLER,
+      async (c) => {
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
+        }
+        
+        return new ListFunctionModelsQueryHandler(repositoryResult.value);
+      }
+    ));
+
+    // Register get model nodes query handler
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.GET_MODEL_NODES_QUERY_HANDLER,
+      async (c) => {
+        const repositoryResult = await c.resolve(ServiceTokens.FUNCTION_MODEL_REPOSITORY);
+        
+        if (repositoryResult.isFailure) {
+          throw new Error(`Failed to resolve function model repository: ${repositoryResult.error}`);
+        }
+        
+        return new GetModelNodesQueryHandler(repositoryResult.value);
       }
     ));
   }

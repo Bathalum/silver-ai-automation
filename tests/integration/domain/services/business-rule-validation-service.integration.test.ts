@@ -36,7 +36,7 @@ import { ModelStatus, ActionStatus, NodeStatus } from '../../../../lib/domain/en
 
 // Import all 24 use cases for integration testing
 import { CreateFunctionModelUseCase } from '../../../../lib/use-cases/function-model/create-function-model-use-case';
-import { AddContainerNodeUseCase } from '../../../../lib/use-cases/function-model/add-container-node-use-case';
+import { CreateUnifiedNodeUseCase } from '../../../../lib/use-cases/function-model/create-unified-node-use-case';
 import { AddActionNodeToContainerUseCase } from '../../../../lib/use-cases/function-model/add-action-node-to-container-use-case';
 import { UpdateFunctionModelUseCase } from '../../../../lib/use-cases/function-model/update-function-model-use-case';
 import { PublishFunctionModelUseCase } from '../../../../lib/use-cases/function-model/publish-function-model-use-case';

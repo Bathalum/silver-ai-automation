@@ -32,9 +32,9 @@ export type ApiHandler<T = any> = (
 /**
  * Authentication middleware
  */
-export async function withAuth<T>(
+export function withAuth<T>(
   handler: AuthenticatedApiHandler<T>
-): Promise<ApiHandler<T>> {
+): ApiHandler<T> {
   return async (request: NextRequest, params?: Record<string, string>) => {
     try {
       // Get user from Supabase auth

@@ -45,17 +45,22 @@ export class CrossFeatureLinkingService {
     initialStrength: number = 0.5,
     nodeContext?: Record<string, any>
   ): Result<CrossFeatureLink> {
-    // Validate the link creation
-    const validationResult = this.validateCrossFeatureLinkCreation(
-      sourceFeature,
-      targetFeature,
-      sourceId,
-      targetId,
-      linkType
-    );
+    try {
+      // Validate the link creation
+      const validationResult = this.validateCrossFeatureLinkCreation(
+        sourceFeature,
+        targetFeature,
+        sourceId,
+        targetId,
+        linkType
+      );
 
-    if (validationResult.isFailure) {
-      return Result.fail<CrossFeatureLink>(validationResult.error);
+      if (validationResult.isFailure) {
+        return Result.fail<CrossFeatureLink>(validationResult.error);
+      }
+    } catch (error) {
+      console.error('Error in createCrossFeatureLink:', error);
+      return Result.fail<CrossFeatureLink>(`Service error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     // Create the link

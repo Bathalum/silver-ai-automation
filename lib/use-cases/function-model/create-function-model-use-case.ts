@@ -56,22 +56,41 @@ export class CreateFunctionModelUseCase {
         return Result.fail<CreateModelResult>(validationResult.error);
       }
 
-      // Create model name value object
+      // Create model name value object (will be updated with final unique name later)
       const modelNameResult = ModelName.create(command.name);
       if (modelNameResult.isFailure) {
         return Result.fail<CreateModelResult>(modelNameResult.error);
       }
 
-      const modelName = modelNameResult.value;
-
-      // Check if model with same name already exists
-      const existingModelResult = await this.modelRepository.findByName(
-        command.name, 
-        command.organizationId
-      );
+      // Check if model with same name already exists and generate unique name if needed
+      let finalName = command.name;
+      let counter = 1;
       
-      if (existingModelResult.isSuccess) {
-        return Result.fail<CreateModelResult>('A model with this name already exists');
+      while (true) {
+        const existingModelResult = await this.modelRepository.findByName(
+          finalName, 
+          command.organizationId
+        );
+        
+        // If no models found, we can use this name
+        if (existingModelResult.isFailure || !existingModelResult.value || existingModelResult.value.length === 0) {
+          break;
+        }
+        
+        // Generate next candidate name (using domain-compliant format)
+        finalName = `${command.name}-${counter}`;
+        counter++;
+        
+        // Safety check to prevent infinite loop
+        if (counter > 100) {
+          return Result.fail<CreateModelResult>('Unable to generate unique model name');
+        }
+      }
+
+      // Create final model name value object with unique name
+      const finalModelNameResult = ModelName.create(finalName);
+      if (finalModelNameResult.isFailure) {
+        return Result.fail<CreateModelResult>(finalModelNameResult.error);
       }
 
       // Generate unique model ID
@@ -80,7 +99,7 @@ export class CreateFunctionModelUseCase {
       // Create the function model
       const modelResult = FunctionModel.create({
         modelId,
-        name: modelName,
+        name: finalModelNameResult.value,
         description: command.description?.trim(),
         version: Version.initial(),
         status: ModelStatus.DRAFT,
@@ -135,7 +154,7 @@ export class CreateFunctionModelUseCase {
       // Return success result
       return Result.ok<CreateModelResult>({
         modelId,
-        name: command.name,
+        name: finalName,
         version: model.version.toString(),
         status: model.status,
         createdAt: model.createdAt

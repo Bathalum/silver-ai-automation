@@ -91,7 +91,7 @@ describe('FunctionModel', () => {
         .build();
       
       // Act
-      const result = model.addContainerNode(ioNode);
+      const result = model.addNode(ioNode);
       
       // Assert
       expect(result).toBeValidResult();
@@ -115,8 +115,8 @@ describe('FunctionModel', () => {
         .build();
       
       // Act
-      model.addContainerNode(node1);
-      const result = model.addContainerNode(node2);
+      model.addNode(node1);
+      const result = model.addNode(node2);
       
       // Assert
       expect(result).toBeFailureResult();
@@ -132,7 +132,7 @@ describe('FunctionModel', () => {
         .build();
       
       // Act
-      const result = model.addContainerNode(nodeFromOtherModel);
+      const result = model.addNode(nodeFromOtherModel);
       
       // Assert
       expect(result).toBeFailureResult();
@@ -291,7 +291,7 @@ describe('FunctionModel', () => {
       const stageNode = new StageNodeBuilder()
         .withModelId(model.modelId)
         .build();
-      model.addContainerNode(stageNode);
+      model.addNode(stageNode);
       
       // Act
       const result = model.validateWorkflow();
@@ -324,8 +324,8 @@ describe('FunctionModel', () => {
       nodeA.addDependency(nodeB.nodeId);
       nodeB.addDependency(nodeA.nodeId);
       
-      model.addContainerNode(nodeA);
-      model.addContainerNode(nodeB);
+      model.addNode(nodeA);
+      model.addNode(nodeB);
       
       // Act
       const result = model.validateWorkflow();
@@ -347,7 +347,7 @@ describe('FunctionModel', () => {
         .withPosition(1000, 1000) // Far from others
         .build();
       
-      model.addContainerNode(orphanedNode);
+      model.addNode(orphanedNode);
       
       // Act
       const result = model.validateWorkflow();
@@ -542,7 +542,7 @@ describe('FunctionModel', () => {
         .build();
       
       // Act
-      const result = model.addContainerNode(newNode);
+      const result = model.addNode(newNode);
       
       // Assert
       expect(result).toBeFailureResult();
@@ -619,7 +619,7 @@ describe('FunctionModel', () => {
         .build();
       
       // Act
-      model.addContainerNode(newNode);
+      model.addNode(newNode);
       
       // Assert
       expect(model.updatedAt.getTime()).toBeGreaterThanOrEqual(originalUpdatedAt.getTime());
@@ -671,7 +671,7 @@ describe('FunctionModel', () => {
         .build();
       
       // Act
-      const result = publishedModel.addContainerNode(newNode);
+      const result = publishedModel.addNode(newNode);
       
       // Assert
       expect(result).toBeFailureResult();
@@ -693,7 +693,7 @@ describe('FunctionModel', () => {
         .withModelId(archivedModel.modelId)
         .build();
       
-      const result = archivedModel.addContainerNode(newNode);
+      const result = archivedModel.addNode(newNode);
       
       // Assert
       expect(result).toBeFailureResult();

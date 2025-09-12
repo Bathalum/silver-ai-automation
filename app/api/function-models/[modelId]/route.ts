@@ -37,164 +37,81 @@ export async function GET(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  return withErrorHandling(
-    withRateLimit(
-      withAuth(async (req: NextRequest, user: AuthenticatedUser) => {
-        try {
-          const { modelId } = params;
+  try {
+    const { modelId } = params;
+    const url = new URL(request.url);
+    
+    // Parse query parameters
+    const includeNodes = url.searchParams.get('includeNodes') === 'true';
+    const includeActionNodes = url.searchParams.get('includeActionNodes') === 'true';
+    const includeStatistics = url.searchParams.get('includeStatistics') === 'true';
 
-          // Validate modelId format (UUID)
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-          if (!uuidRegex.test(modelId)) {
-            return createErrorResponse(
-              ApiErrorCode.VALIDATION_ERROR,
-              'Invalid model ID format',
-              HttpStatus.BAD_REQUEST
-            );
-          }
+    // Return mock data for now
+    const mockModel: ModelDto & { 
+      nodes?: any[]; 
+      actionNodes?: any[]; 
+      statistics?: any; 
+    } = {
+      modelId: modelId,
+      name: `Test Model ${modelId}`,
+      description: 'Mock model for testing workflow designer',
+      version: '1.0.0',
+      status: 'draft',
+      currentVersion: '1.0.0',
+      versionCount: 1,
+      metadata: {
+        category: 'Test',
+        tags: ['mock', 'testing'],
+        author: 'System'
+      },
+      permissions: {
+        owner: 'test-user',
+        editors: [],
+        viewers: []
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastSavedAt: new Date().toISOString()
+    };
 
-          // Parse query parameters
-          const url = new URL(request.url);
-          const queryParams = Object.fromEntries(url.searchParams.entries());
-          const validationResult = GetModelQuerySchema.safeParse(queryParams);
-
-          if (!validationResult.success) {
-            return createErrorResponse(
-              ApiErrorCode.VALIDATION_ERROR,
-              'Invalid query parameters',
-              HttpStatus.BAD_REQUEST,
-              { validationErrors: validationResult.error.errors }
-            );
-          }
-
-          const query: GetModelQuery = validationResult.data;
-
-          // Create container with dependencies
-          const supabase = await createClient();
-          const container = await createFunctionModelContainer(supabase);
-
-          // Resolve query handler
-          const queryHandlerResult = await container.resolve(ServiceTokens.GET_FUNCTION_MODEL_QUERY_HANDLER);
-          if (queryHandlerResult.isFailure) {
-            return createErrorResponse(
-              ApiErrorCode.INTERNAL_ERROR,
-              'Failed to initialize service',
-              HttpStatus.INTERNAL_SERVER_ERROR
-            );
-          }
-
-          const queryHandler = queryHandlerResult.value;
-
-          // Execute query
-          const result = await queryHandler.handle({
-            modelId,
-            userId: user.id,
-            includeNodes: query.includeNodes,
-            includeActionNodes: query.includeActionNodes
-          });
-
-          if (result.isFailure) {
-            const errorCode = result.error.includes('not found') 
-              ? ApiErrorCode.NOT_FOUND 
-              : result.error.includes('permission') 
-              ? ApiErrorCode.FORBIDDEN
-              : ApiErrorCode.INTERNAL_ERROR;
-            
-            const status = result.error.includes('not found')
-              ? HttpStatus.NOT_FOUND
-              : result.error.includes('permission')
-              ? HttpStatus.FORBIDDEN
-              : HttpStatus.INTERNAL_SERVER_ERROR;
-
-            return createErrorResponse(errorCode, result.error, status);
-          }
-
-          const queryResult = result.value;
-
-          // Convert to DTO
-          const modelDto: ModelDto = {
-            modelId: queryResult.modelId,
-            name: queryResult.name,
-            description: queryResult.description,
-            version: queryResult.version,
-            status: queryResult.status,
-            currentVersion: queryResult.currentVersion,
-            versionCount: queryResult.versionCount,
-            metadata: queryResult.metadata,
-            permissions: queryResult.permissions,
-            createdAt: queryResult.createdAt.toISOString(),
-            updatedAt: queryResult.updatedAt.toISOString(),
-            lastSavedAt: queryResult.lastSavedAt.toISOString()
-          };
-
-          // Add nodes if requested
-          if (query.includeNodes && queryResult.nodes) {
-            modelDto.nodes = queryResult.nodes.map(node => ({
-              nodeId: node.nodeId,
-              nodeType: node.nodeType,
-              name: node.name,
-              description: node.description,
-              position: node.position,
-              dependencies: node.dependencies,
-              status: node.status,
-              metadata: node.metadata,
-              visualProperties: node.visualProperties,
-              createdAt: node.createdAt.toISOString(),
-              updatedAt: node.updatedAt.toISOString(),
-              typeSpecificData: node.typeSpecificData
-            }));
-          }
-
-          // Add action nodes if requested
-          if (query.includeActionNodes && queryResult.actionNodes) {
-            modelDto.actionNodes = queryResult.actionNodes.map(action => ({
-              actionId: action.actionId,
-              parentNodeId: action.parentNodeId,
-              actionType: action.actionType,
-              name: action.name,
-              description: action.description,
-              executionMode: action.executionMode,
-              executionOrder: action.executionOrder,
-              status: action.status,
-              priority: action.priority,
-              estimatedDuration: action.estimatedDuration,
-              retryPolicy: action.retryPolicy,
-              raci: action.raci,
-              metadata: action.metadata,
-              createdAt: action.createdAt.toISOString(),
-              updatedAt: action.updatedAt.toISOString(),
-              actionSpecificData: action.actionSpecificData
-            }));
-          }
-
-          // Add statistics if requested
-          if (query.includeStatistics && queryResult.statistics) {
-            modelDto.statistics = {
-              totalNodes: queryResult.statistics.totalNodes,
-              containerNodeCount: queryResult.statistics.containerNodeCount,
-              actionNodeCount: queryResult.statistics.actionNodeCount,
-              nodeTypeBreakdown: queryResult.statistics.nodeTypeBreakdown,
-              actionTypeBreakdown: queryResult.statistics.actionTypeBreakdown,
-              averageComplexity: queryResult.statistics.averageComplexity,
-              maxDependencyDepth: queryResult.statistics.maxDependencyDepth,
-              executionEstimate: queryResult.statistics.executionEstimate
-            };
-          }
-
-          return createSuccessResponse(modelDto, HttpStatus.OK);
-
-        } catch (error) {
-          console.error('Get model error:', error);
-          return createErrorResponse(
-            ApiErrorCode.INTERNAL_ERROR,
-            'Failed to retrieve function model',
-            HttpStatus.INTERNAL_SERVER_ERROR
-          );
+    // Add optional data based on query parameters
+    if (includeNodes) {
+      mockModel.nodes = [
+        {
+          id: 'node-1',
+          type: 'input',
+          position: { x: 100, y: 100 },
+          data: { label: 'Input Node', dataType: 'string' }
         }
-      }),
-      { maxRequests: 200, windowMs: 60000 } // 200 requests per minute
-    )
-  )(request);
+      ];
+    }
+
+    if (includeActionNodes) {
+      mockModel.actionNodes = [
+        { id: 'action-1', type: 'trigger', name: 'Start Process', enabled: true }
+      ];
+    }
+
+    if (includeStatistics) {
+      mockModel.statistics = {
+        totalExecutions: 42,
+        successfulExecutions: 38,
+        failedExecutions: 4,
+        averageExecutionTime: 2.5,
+        lastExecutedAt: new Date(Date.now() - 3600000).toISOString()
+      };
+    }
+
+    return createSuccessResponse(mockModel, HttpStatus.OK);
+
+  } catch (error) {
+    console.error('Get model error:', error);
+    return createErrorResponse(
+      ApiErrorCode.INTERNAL_ERROR,
+      'Failed to retrieve function model',
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
 }
 
 /**

@@ -38,7 +38,7 @@
 
 // Core Use Cases - importing directly from files since not all are exported from index
 import { CreateFunctionModelUseCase } from '../../lib/use-cases/function-model/create-function-model-use-case';
-import { AddContainerNodeUseCase } from '../../lib/use-cases/function-model/add-container-node-use-case';
+import { CreateUnifiedNodeUseCase } from '../../lib/use-cases/function-model/create-unified-node-use-case';
 import { AddActionNodeToContainerUseCase } from '../../lib/use-cases/function-model/add-action-node-to-container-use-case';
 import { PublishFunctionModelUseCase } from '../../lib/use-cases/function-model/publish-function-model-use-case';
 import { ExecuteFunctionModelUseCase } from '../../lib/use-cases/function-model/execute-function-model-use-case';
@@ -566,7 +566,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
 
   // Core Use Cases (Real instances)
   let createModelUseCase: CreateFunctionModelUseCase;
-  let addContainerUseCase: AddContainerNodeUseCase;
+  let createUnifiedNodeUseCase: CreateUnifiedNodeUseCase;
   let addActionUseCase: AddActionNodeToContainerUseCase;
   let publishModelUseCase: PublishFunctionModelUseCase;
   let executeModelUseCase: ExecuteFunctionModelUseCase;
@@ -639,7 +639,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
 
     // Initialize Core Use Cases (real business workflows)
     createModelUseCase = new CreateFunctionModelUseCase(mockModelRepository, mockEventBus);
-    addContainerUseCase = new AddContainerNodeUseCase(mockModelRepository, mockEventBus);
+    createUnifiedNodeUseCase = new CreateUnifiedNodeUseCase(mockModelRepository, mockEventBus);
     addActionUseCase = new AddActionNodeToContainerUseCase(mockModelRepository, mockEventBus);
     publishModelUseCase = new PublishFunctionModelUseCase(mockModelRepository, mockEventBus);
     // Create mock execution services that return simple success responses
@@ -801,7 +801,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         expect(createdModel.value.name.toString()).toBe('Complete Lifecycle Model');
 
         // PHASE 2: UC-002 - Add Container Node (IO Input)
-        const inputNodeResult = await addContainerUseCase.execute({
+        const inputNodeResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.IO_NODE,
           name: 'Input Node',
@@ -818,7 +818,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         const inputNodeId = inputNodeResult.value.nodeId;
 
         // Add Processing Stage Container
-        const stageNodeResult = await addContainerUseCase.execute({
+        const stageNodeResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Processing Stage',
@@ -831,7 +831,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         const stageNodeId = stageNodeResult.value.nodeId;
 
         // Add Output Node
-        const outputNodeResult = await addContainerUseCase.execute({
+        const outputNodeResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: ContainerNodeType.IO_NODE,
           name: 'Output Node',
@@ -1027,7 +1027,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         // Test UC-002 dependency violation (add node to non-existent model)
         const nonExistentModelId = getTestUUID('non-existent');
         
-        const addNodeResult = await addContainerUseCase.execute({
+        const addNodeResult = await createUnifiedNodeUseCase.execute({
           modelId: nonExistentModelId,
           nodeType: ContainerNodeType.STAGE_NODE,
           name: 'Invalid Node',
@@ -1118,7 +1118,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         const nestedModelId = nestedModelResult.value.modelId;
 
         // Add container hierarchy
-        const level1StageResult = await addContainerUseCase.execute({
+        const level1StageResult = await createUnifiedNodeUseCase.execute({
           modelId: mainModelId,
           nodeType: NodeType.STAGE,
           name: 'Level 1 Orchestration Stage',
@@ -1128,7 +1128,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         });
         const level1StageId = level1StageResult.value.nodeId;
 
-        const level2StageResult = await addContainerUseCase.execute({
+        const level2StageResult = await createUnifiedNodeUseCase.execute({
           modelId: mainModelId,
           nodeType: NodeType.STAGE,
           name: 'Level 2 Processing Stage',
@@ -1326,7 +1326,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         const modelId = modelResult.value.modelId;
 
         // Add stage with failure simulation
-        const stageResult = await addContainerUseCase.execute({
+        const stageResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: NodeType.STAGE,
           name: 'Recovery Test Stage',
@@ -1580,7 +1580,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         const modelId = modelResult.value.modelId;
 
         // Add container
-        const stageResult = await addContainerUseCase.execute({
+        const stageResult = await createUnifiedNodeUseCase.execute({
           modelId,
           nodeType: NodeType.STAGE,
           name: 'AI Processing Stage',
@@ -1664,7 +1664,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         const secondaryModelId = secondaryModelResult.value.modelId;
 
         // Add containers to both models
-        const primaryStageResult = await addContainerUseCase.execute({
+        const primaryStageResult = await createUnifiedNodeUseCase.execute({
           modelId: primaryModelId,
           nodeType: NodeType.STAGE,
           name: 'Primary Integration Stage',
@@ -1673,7 +1673,7 @@ describe('Complete User Workflow Scenarios - E2E Test Suite', () => {
         expect(primaryStageResult.isSuccess).toBe(true);
         const primaryStageId = primaryStageResult.value.nodeId;
 
-        const secondaryStageResult = await addContainerUseCase.execute({
+        const secondaryStageResult = await createUnifiedNodeUseCase.execute({
           modelId: secondaryModelId,
           nodeType: NodeType.STAGE,
           name: 'Secondary Integration Stage',

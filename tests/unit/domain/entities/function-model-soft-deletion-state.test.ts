@@ -100,11 +100,11 @@ describe('FunctionModel - Soft Deletion State Management', () => {
 
     // Add nodes while model is in DRAFT state
     DomainTestHelpers.unwrapResult(
-      testModel.addContainerNode(inputNode),
+      testModel.addNode(inputNode),
       'Adding input node to test model'
     );
     DomainTestHelpers.unwrapResult(
-      testModel.addContainerNode(outputNode),
+      testModel.addNode(outputNode),
       'Adding output node to test model'
     );
     
@@ -278,7 +278,7 @@ describe('FunctionModel - Soft Deletion State Management', () => {
         );
 
         // Act
-        const addResult = testModel.addContainerNode(stageNode);
+        const addResult = testModel.addNode(stageNode);
 
         // Assert
         expect(addResult.isFailure).toBe(true);

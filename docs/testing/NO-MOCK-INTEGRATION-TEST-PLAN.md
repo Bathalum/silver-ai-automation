@@ -1,333 +1,281 @@
-# Complete No-Mock Integration Test Plan
+# No-Mock Integration Test Plan
 
 ## Overview
 
-This document outlines the comprehensive transformation of mock-heavy integration tests into production-ready integration tests using **ZERO mocks**. The transformation follows Clean Architecture TDD principles and validates real production behavior.
+This document outlines the comprehensive integration testing strategy for connecting UI components to production-ready use cases and database systems **WITHOUT ANY MOCKS**.
 
-## Problem Statement
+## Current Problem
 
-The original integration test (`ai-agent-management-service.integration.test.ts`) violated the user's explicit requirement:
+The UI components are currently using:
+- **Fake ID generation**: `'new-' + Date.now()` instead of real UUIDs
+- **Mock data arrays**: Static `mockWorkflows` instead of real API calls
+- **Disconnected operations**: UI operations don't persist to database
+- **No real validation**: Client-side validation disconnected from domain rules
 
-> "I don't want any mocks anymore since we have all the layers we need, if its not ui, then no mock"
+## Expected Solution
 
-**Original Issues:**
-- Used `jest.Mocked<AIAgentRepository>`
-- Used `jest.Mocked<IAuditLogRepository>`
-- Used `jest.Mocked<IEventBus>`
-- Used `jest.Mocked<UseCase>` implementations
-- No actual database operations
-- No validation of real architectural boundaries
-- Could not verify audit repository fix in production
+Complete integration where:
+- **Form submission** → **Server Actions** → **Use Cases** → **Repository** → **Database**
+- **Real UUID generation** via `crypto.randomUUID()`
+- **Real API calls** to fetch and manage data
+- **Consistent validation** across all layers
+- **Database persistence** with proper error handling
 
-## Solution Architecture
+## Integration Test Suite Architecture
 
-### 1. Real Infrastructure Components
+### 1. Form Submission Integration Tests
+**File**: `tests/integration/ui/form-submission-to-use-case.integration.test.ts`
 
-**Replaced mocks with real implementations:**
+**Purpose**: Test that form submissions create real models via CreateFunctionModelUseCase
 
-```typescript
-// OLD (Mocked)
-let mockAgentRepository: jest.Mocked<AIAgentRepository>;
-let mockAuditRepository: jest.Mocked<IAuditLogRepository>;
-let mockEventBus: jest.Mocked<IEventBus>;
+**Key Tests**:
+- ✅ Real model creation with UUID (not fake timestamp ID)
+- ✅ Validation error handling matches domain rules
+- ✅ Duplicate name detection via use case
+- ✅ Database constraint enforcement
+- ✅ Real persistence verification
 
-// NEW (Real Implementations)
-let realAgentRepository: AIAgentRepository;        // SupabaseAIAgentRepository
-let realAuditRepository: IAuditLogRepository;      // SupabaseAuditLogRepository  
-let realEventBus: IEventBus;                      // SupabaseEventBus
-```
+**Current State**: FAILING - Tests expect functionality that doesn't exist yet
 
-### 2. Dependency Injection Container
+### 2. React Hooks Integration Tests
+**File**: `tests/integration/ui/api-hooks-real-data.integration.test.ts`
 
-**Created AI Agent Module (`ai-agent-module.ts`):**
-- Registers all AI Agent use cases with real dependencies
-- Configures SupabaseAIAgentRepository with real Supabase client
-- Configures SupabaseAuditLogRepository with real Supabase client
-- Configures SupabaseEventBus with real Supabase client
-- Provides AIAgentManagementService with all real dependencies
+**Purpose**: Test that React hooks fetch real data from API routes
 
-**Service Tokens:**
-```typescript
-export const AIAgentServiceTokens = {
-  AI_AGENT_REPOSITORY: Symbol('AIAgentRepository'),
-  REGISTER_AI_AGENT_USE_CASE: Symbol('RegisterAIAgentUseCase'),
-  DISCOVER_AGENTS_BY_CAPABILITY_USE_CASE: Symbol('DiscoverAgentsByCapabilityUseCase'),
-  EXECUTE_AI_AGENT_TASK_USE_CASE: Symbol('ExecuteAIAgentTaskUseCase'),
-  PERFORM_SEMANTIC_AGENT_SEARCH_USE_CASE: Symbol('PerformSemanticAgentSearchUseCase'),
-  COORDINATE_WORKFLOW_AGENT_EXECUTION_USE_CASE: Symbol('CoordinateWorkflowAgentExecutionUseCase'),
-  AI_AGENT_MANAGEMENT_SERVICE: Symbol('AIAgentManagementService')
-} as const;
-```
+**Key Tests**:
+- ✅ `useModels` hook fetches real data from API
+- ✅ API error handling in hooks
+- ✅ Real model creation via `useModelOperations` 
+- ✅ Loading state management with real API calls
+- ✅ Refresh functionality triggers new API requests
+- ✅ Pagination parameters passed correctly
 
-### 3. Real Database Operations
+**Current State**: FAILING - Hooks don't exist yet
 
-**Integration Test Database (`integration-test-database.ts`):**
-- Real Supabase client connection
-- Test data isolation using `test_run_id`
-- Automatic cleanup between tests
-- Transaction support
-- Real table operations
+### 3. End-to-End Workflow Integration Tests  
+**File**: `tests/integration/ui/end-to-end-form-workflow.integration.test.ts`
 
-**Key Features:**
-```typescript
-export class IntegrationTestDatabase {
-  private client: SupabaseClient;                    // Real Supabase client
-  private container: Container | null = null;       // Real DI container
-  private testRunId: string;                        // Unique test isolation
-  
-  async createTestData<T>(tableName: string, data: Partial<T>[]): Promise<Result<void>>
-  async cleanupTestData(): Promise<void>
-  async withTransaction<T>(operation: (client: SupabaseClient) => Promise<T>): Promise<Result<T>>
+**Purpose**: Test complete user workflow from form to database to list view
+
+**Key Tests**:
+- ✅ Complete workflow: Form → Database → List availability
+- ✅ Multi-step form validation consistency across layers
+- ✅ Concurrent form submissions without data corruption  
+- ✅ Database transaction integrity
+- ✅ Real-time data consistency after operations
+
+**Current State**: FAILING - End-to-end integration doesn't exist yet
+
+### 4. Server Actions Integration Tests
+**File**: `tests/integration/ui/server-actions-integration.test.ts`
+
+**Purpose**: Test Next.js Server Actions replacing fake client operations
+
+**Key Tests**:
+- ✅ Server action creates real model and redirects properly
+- ✅ Form data validation before use case execution
+- ✅ Use case failure handling in server actions
+- ✅ Authentication integration with server actions
+- ✅ Complex form data handling (files, nested objects)
+- ✅ CRUD operations via server actions
+
+**Current State**: FAILING - Server actions don't exist yet
+
+## Test Infrastructure
+
+### Integration Test Database Utils
+**File**: `tests/utils/integration-test-database.ts`
+
+**Features**:
+- Real Supabase database connections
+- Test data isolation with unique prefixes
+- Automatic cleanup after tests
+- Transaction support for atomic operations
+- Database constraint testing utilities
+- Performance monitoring for operations
+- Real data assertion helpers
+
+### Real Test Data Factory
+**File**: `tests/utils/real-test-data-factory.ts`
+
+**Purpose**: Create standardized test data for integration tests
+
+## Implementation Strategy
+
+### Phase 1: Server Actions (CRITICAL)
+Replace the fake `handleCreate` behavior:
+
+**Current Code** (in `app/(private)/dashboard/function-model/new/page.tsx`):
+```javascript
+const handleCreate = () => {
+  const newWorkflowId = 'new-' + Date.now()  // FAKE ID!
+  router.push(`/dashboard/function-model/${newWorkflowId}`)
 }
 ```
 
-### 4. Real Test Data Factory
-
-**Real Test Data Factory (`real-test-data-factory.ts`):**
-- Creates real domain entities using `AIAgent.create()`
-- Persists entities to real database using repositories
-- Validates entities exist in database
-- Records real execution metrics
-- Creates real audit logs
-
-**Example:**
-```typescript
-async createRealAgent(name: string, capabilities: Partial<AIAgentCapabilities>): Promise<Result<AIAgent>> {
-  // Create real domain entity
-  const agentResult = AIAgent.create({
-    agentId: NodeId.generate(),
-    featureType,
-    entityId,
-    name,
-    capabilities,
-    tools,
-    isEnabled: true
-  });
-
-  // Persist to real database
-  const repositoryResult = await container.resolve<AIAgentRepository>(AI_AGENT_REPOSITORY);
-  const saveResult = await repositoryResult.value.save(agentResult.value);
+**Expected Implementation**:
+```javascript
+// app/actions/model-actions.ts
+export async function createModelAction(formData: FormData) {
+  'use server'
   
-  return Result.ok(agentResult.value);
-}
-```
-
-## Test Structure Transformation
-
-### Before: Mock-Heavy Integration Test
-
-```typescript
-describe('AI Agent Management Service', () => {
-  let mockAgentRepository: jest.Mocked<AIAgentRepository>;
-  
-  beforeEach(() => {
-    mockAgentRepository = createMockAgentRepository();
-    mockAgentRepository.save.mockResolvedValue(Result.ok());
+  const result = await createUseCase.execute({
+    name: formData.get('name'),
+    description: formData.get('description'),
+    userId: getCurrentUser().id
   });
   
-  it('should register agent', async () => {
-    mockRegisterUseCase.execute.mockResolvedValue(Result.ok({
-      agentId: 'mocked-id',
-      status: 'registered'
-    }));
-    
-    const result = await agentService.registerAgent(request);
-    expect(mockRegisterUseCase.execute).toHaveBeenCalled();
-  });
-});
-```
-
-### After: Real Integration Test
-
-```typescript
-describe('AI Agent Management Service - REAL Integration Tests', () => {
-  let testDb: IntegrationTestDatabase;
-  let dataFactory: RealTestDataFactory;
-  let agentService: AIAgentManagementService;
-  let realAgentRepository: AIAgentRepository;
-  
-  beforeAll(async () => {
-    testDb = await IntegrationTestSetup.setupTestSuite();
-    dataFactory = new RealTestDataFactory(testDb);
-  });
-  
-  beforeEach(async () => {
-    const container = testDb.getContainer();
-    
-    // Resolve REAL implementations
-    const serviceResult = await container.resolve<AIAgentManagementService>(
-      AIAgentServiceTokens.AI_AGENT_MANAGEMENT_SERVICE
-    );
-    agentService = serviceResult.value;
-  });
-  
-  it('should_RegisterAgentAndVerifyInDatabase_WhenValidAgentProvided', async () => {
-    // Act: Register agent using REAL service and repository
-    const result = await agentService.registerAgent(agentRequest);
-    
-    // Assert: Verify agent exists in REAL database
-    const existsResult = await dataFactory.verifyAgentExists(agentId);
-    expect(existsResult.value).toBe(true);
-    
-    // Verify REAL audit log was created
-    const auditResult = await dataFactory.verifyAuditLogExists('AGENT_REGISTERED', agentId);
-    expect(auditResult.value.length).toBeGreaterThan(0);
-  });
-});
-```
-
-## Key Validation Tests
-
-### 1. Audit Repository Fix Verification
-
-**Test:** `should_VerifyAuditRepositoryFix_WorksInProductionScenario`
-
-This test specifically validates the audit repository fix by:
-- Creating real agents in the database
-- Performing operations that generate audit logs
-- Verifying audit logs are correctly created and structured
-- Proving the fix works in production scenarios
-
-```typescript
-it('should_VerifyAuditRepositoryFix_WorksInProductionScenario', async () => {
-  // Create real agent
-  const agent = await dataFactory.createRealAgent('Audit Fix Validation Agent');
-  
-  // Perform operations that create audit logs
-  await agentService.updateAgentEnabled(agent.agentId.value, false, TEST_USER_ID);
-  await agentService.updateAgentEnabled(agent.agentId.value, true, TEST_USER_ID);
-  
-  // Verify audit logs exist with correct structure
-  const auditActions = ['AGENT_REGISTERED', 'AGENT_DISABLED', 'AGENT_ENABLED'];
-  for (const action of auditActions) {
-    const auditResult = await dataFactory.verifyAuditLogExists(action, agent.agentId.value);
-    expect(auditResult.value.length).toBeGreaterThan(0);
+  if (result.isSuccess) {
+    redirect(`/dashboard/function-model/${result.value.modelId}`);
   }
-});
+  
+  return { error: result.error };
+}
 ```
 
-### 2. Real Database Integration
+### Phase 2: React Hooks for API Integration
+Replace mock data with real API calls:
 
-**Test:** `should_DiscoverAgentsFromRealDatabase_WhenCapabilitySearchExecuted`
-
-Validates:
-- Real agent creation and persistence
-- Real capability-based discovery using database queries
-- Real audit logging for discovery operations
-- Database consistency validation
-
-### 3. Transaction and Consistency
-
-**Test:** `should_MaintainDataConsistency_WhenMultipleOperationsExecuted`
-
-Validates:
-- Concurrent real database operations
-- Data consistency across operations
-- Transaction behavior
-- Real audit trail for all operations
-
-### 4. Performance with Real Database
-
-**Test:** `should_HandleMultipleAgentsEfficiently_WithRealDatabase`
-
-Validates:
-- Performance with real database operations
-- Scale handling with multiple agents
-- Real query performance
-- Database cleanup efficiency
-
-## Test Isolation Strategy
-
-### Test Run Isolation
-```typescript
-private testRunId: string = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-// All test data tagged with testRunId
-const testData = data.map(item => ({
-  ...item,
-  test_run_id: this.testRunId
-}));
-
-// Cleanup by test run ID
-await this.client.from(table).delete().eq('test_run_id', this.testRunId);
+**Current Code** (in `app/(private)/dashboard/function-model/list/page.tsx`):
+```javascript
+const mockWorkflows = [  // MOCK DATA!
+  { id: '1', name: 'Customer Onboarding Process', ... }
+]
 ```
 
-### Setup and Teardown
-```typescript
-beforeAll(async () => {
-  testDb = await IntegrationTestSetup.setupTestSuite();
-});
-
-beforeEach(async () => {
-  await IntegrationTestSetup.setupTest(); // Clean slate
-});
-
-afterEach(async () => {
-  await IntegrationTestSetup.teardownTest(); // Clean test data
-});
-
-afterAll(async () => {
-  await IntegrationTestSetup.teardownTestSuite(); // Final cleanup
-});
+**Expected Implementation**:
+```javascript
+// hooks/useModels.ts
+export function useModels() {
+  const [models, setModels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    fetchModels();
+  }, []);
+  
+  const fetchModels = async () => {
+    const response = await fetch('/api/function-models');
+    const data = await response.json();
+    setModels(data.models);
+    setLoading(false);
+  };
+  
+  return { models, loading, refresh: fetchModels };
+}
 ```
 
-## Benefits of Real Integration Testing
+### Phase 3: Form Integration
+Connect forms to server actions:
 
-### 1. Production Confidence
-- Tests actual database operations
-- Validates real architectural boundaries
-- Catches integration issues that mocks hide
-- Proves audit repository fix works
+**Expected Implementation**:
+```javascript
+// In form component
+<form action={createModelAction}>
+  <input name="name" />
+  <input name="description" />
+  <button type="submit">Create</button>
+</form>
+```
 
-### 2. Clean Architecture Compliance
-- Tests actual dependency flow (inward only)
-- Validates real repository implementations
-- Ensures use cases work with real infrastructure
-- Proves service coordination works
+### Phase 4: Error Handling and Validation
+Ensure consistent validation across all layers:
 
-### 3. TDD Loop Integrity
-- Tests define expected behavior first (Red)
-- Real implementations satisfy tests (Green)
-- Refactoring is safe with real test coverage (Refactor)
+**Expected Flow**:
+1. **Client validation**: Basic format checks (required, length)
+2. **Server action validation**: Parse and validate form data  
+3. **Use case validation**: Business rule enforcement
+4. **Repository validation**: Database constraint handling
 
-### 4. Bug Detection
-- Database constraint violations
-- Transaction rollback issues
-- Performance problems
-- Data consistency issues
-- Audit trail problems
+## Test Execution Strategy
 
-## Migration Checklist
+### Running the Tests
 
-✅ **Created AI Agent Module** - Real DI container setup
-✅ **Created Integration Test Database** - Real database operations  
-✅ **Created Real Test Data Factory** - Real entity creation
-✅ **Converted All Tests** - Zero mocks, all real implementations
-✅ **Added Audit Verification** - Proves audit repository fix works
-✅ **Added Performance Tests** - Real database performance
-✅ **Added Consistency Tests** - Real transaction behavior
-✅ **Added Cleanup Strategy** - Test isolation and cleanup
-
-## Running the Tests
+All integration tests are designed to **FAIL INITIALLY** (Red phase of TDD):
 
 ```bash
-# Run the new real integration tests
-npm test tests/integration/application/ai-agent-management-service.real-integration.test.ts
+# Run integration tests (will fail initially)
+pnpm test:integration
 
-# The tests will:
-# 1. Setup real Supabase connection
-# 2. Create real DI container with all dependencies
-# 3. Execute real database operations
-# 4. Verify actual audit logs and events
-# 5. Clean up all test data
+# Run specific test suites
+pnpm test tests/integration/ui/form-submission-to-use-case.integration.test.ts
+pnpm test tests/integration/ui/api-hooks-real-data.integration.test.ts
+pnpm test tests/integration/ui/end-to-end-form-workflow.integration.test.ts
+pnpm test tests/integration/ui/server-actions-integration.test.ts
 ```
 
-## Conclusion
+### Expected Test Results (Initially)
 
-This transformation eliminates **ALL mocks** from integration testing while maintaining:
-- **Clean Architecture principles** - real layer boundaries
-- **TDD loop integrity** - tests drive real implementations  
-- **Production confidence** - actual database and infrastructure
-- **Audit repository validation** - proves the fix works in production
+❌ **All tests should FAIL** with messages like:
+- `"createModelServerAction not implemented"`
+- `"useModels hook not implemented"` 
+- `"Form submission creates fake ID instead of real model"`
+- `"UI uses mock data instead of real API calls"`
 
-The real integration tests now serve as both **Boundary Filters** (enforcing architectural rules) and **sources of truth** for how the system behaves in production scenarios.
+### Test-Driven Implementation Flow
+
+1. **Red**: Run tests → See failures defining expected behavior
+2. **Green**: Implement minimal code to make tests pass  
+3. **Refactor**: Improve code while keeping tests passing
+4. **Repeat**: For each failing test
+
+## Database Test Environment
+
+### Supabase Configuration
+Tests use real Supabase database with:
+- **Isolated test data**: Unique prefixes prevent collisions
+- **Automatic cleanup**: Test data removed after each test
+- **Real constraints**: Actual database validation and constraints
+- **Transaction support**: Proper rollback on failures
+
+### Environment Variables Required
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+## Success Criteria
+
+### Tests Pass When:
+1. ✅ Forms create real models with UUIDs in database
+2. ✅ UI fetches real data from API routes 
+3. ✅ Server actions handle form submission properly
+4. ✅ Error handling works across all layers
+5. ✅ Data consistency maintained throughout operations
+6. ✅ Real authentication integration works
+7. ✅ Database constraints are properly enforced
+
+### UI Behavior Changes:
+1. ❌ No more fake `'new-' + Date.now()` IDs
+2. ❌ No more `mockWorkflows` static arrays  
+3. ❌ No more disconnected client-side operations
+4. ✅ Real UUID generation via use cases
+5. ✅ Real API calls with proper loading states
+6. ✅ Real database persistence and error feedback
+7. ✅ Consistent validation across client and server
+
+## Architecture Compliance
+
+### Clean Architecture Boundaries Tested:
+- **Presentation Layer**: React components and forms
+- **Interface Adapters**: API routes, server actions, React hooks
+- **Application Layer**: Use cases with business workflows  
+- **Infrastructure Layer**: Repository implementations and database
+
+### Dependency Flow Verification:
+- ✅ UI depends on Interface Adapters (hooks, server actions)
+- ✅ Interface Adapters depend on Application Layer (use cases)
+- ✅ Application Layer depends on Domain (entities, value objects)
+- ✅ Infrastructure implements interfaces defined by inner layers
+
+## Next Steps
+
+1. **Run the integration tests** to see current failing state
+2. **Implement server actions** to replace fake form handling
+3. **Create React hooks** to replace mock data usage  
+4. **Connect forms** to real server actions
+5. **Implement error handling** across all layers
+6. **Verify tests pass** with real end-to-end functionality
+
+This approach ensures that **tests define the expected behavior first**, then implementation follows to make tests pass, creating a robust, well-tested integration between UI and backend systems.
