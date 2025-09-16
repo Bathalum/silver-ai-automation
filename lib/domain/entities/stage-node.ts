@@ -500,7 +500,7 @@ export class StageNode extends Node {
         position: positionResult.value,
         dependencies,
         executionType: obj.parallelExecution ? ExecutionMode.PARALLEL : ExecutionMode.SEQUENTIAL,
-        status: NodeStatus.CONFIGURED,
+        status: NodeStatus.ACTIVE,
         timeout: obj.timeout,
         metadata: obj.metadata || {},
         visualProperties: obj.visualProperties || {},

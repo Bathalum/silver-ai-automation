@@ -14,6 +14,9 @@ import {
   SearchModelsQuery,
   AuditLogQuery,
   ExecuteWorkflowRequest,
+  CreateEdgeRequest,
+  UpdateEdgeRequest,
+  EdgeResponseDto,
   ModelDto,
   NodeDto,
   ActionNodeDto,
@@ -310,6 +313,55 @@ export class FunctionModelApiClient {
     };
   }
 
+  // ===== EDGE MANAGEMENT =====
+
+  /**
+   * Get all edges for a model
+   */
+  async getModelEdges(modelId: string): Promise<EdgeResponseDto[]> {
+    const response = await this.makeRequest<EdgeResponseDto[]>(`/function-models/${modelId}/edges`);
+    return response.data!;
+  }
+
+  /**
+   * Create a new edge between nodes
+   */
+  async createEdge(modelId: string, request: CreateEdgeRequest): Promise<EdgeResponseDto> {
+    const response = await this.makeRequest<EdgeResponseDto>(`/function-models/${modelId}/edges`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+    return response.data!;
+  }
+
+  /**
+   * Get a specific edge by ID
+   */
+  async getEdge(modelId: string, edgeId: string): Promise<EdgeResponseDto> {
+    const response = await this.makeRequest<EdgeResponseDto>(`/function-models/${modelId}/edges/${edgeId}`);
+    return response.data!;
+  }
+
+  /**
+   * Update an existing edge
+   */
+  async updateEdge(modelId: string, edgeId: string, request: UpdateEdgeRequest): Promise<EdgeResponseDto> {
+    const response = await this.makeRequest<EdgeResponseDto>(`/function-models/${modelId}/edges/${edgeId}`, {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    });
+    return response.data!;
+  }
+
+  /**
+   * Delete an edge
+   */
+  async deleteEdge(modelId: string, edgeId: string): Promise<void> {
+    await this.makeRequest(`/function-models/${modelId}/edges/${edgeId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // ===== WORKFLOW EXECUTION =====
 
   /**
@@ -372,6 +424,9 @@ export type {
   CreateModelRequest,
   UpdateModelRequest,
   PublishModelRequest,
+  CreateEdgeRequest,
+  UpdateEdgeRequest,
+  EdgeResponseDto,
   ModelDto,
   NodeDto,
   ActionNodeDto,

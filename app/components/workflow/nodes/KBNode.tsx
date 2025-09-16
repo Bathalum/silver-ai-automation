@@ -70,11 +70,20 @@ function KBNode({ id, data, selected }: KBNodeProps) {
         ${selected ? 'ring-2 ring-blue-200' : ''}
       `}
     >
-      {/* Input Handle */}
+      {/* Top Input Handle - for connections from Stage nodes */}
       <Handle
+        id="top"
+        type="target"
+        position={Position.Top}
+        style={{ background: '#6366f1', width: '12px', height: '12px' }}
+      />
+
+      {/* Left Input Handle */}
+      <Handle
+        id="left"
         type="target"
         position={Position.Left}
-        className="w-3 h-3 !bg-indigo-500 !border-indigo-600"
+        style={{ background: '#6366f1', width: '12px', height: '12px' }}
       />
 
       {/* Header */}
@@ -136,9 +145,10 @@ function KBNode({ id, data, selected }: KBNodeProps) {
 
       {/* Output Handle */}
       <Handle
+        id="right"
         type="source"
         position={Position.Right}
-        className="w-3 h-3 !bg-indigo-500 !border-indigo-600"
+        style={{ background: '#6366f1', width: '12px', height: '12px' }}
       />
     </div>
   );

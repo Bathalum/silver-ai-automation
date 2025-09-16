@@ -203,7 +203,7 @@ describe('UnifiedNodeSystem - Base Node Entity', () => {
         position: mockPosition,
         dependencies: [],
         executionType: ExecutionMode.PARALLEL,
-        status: NodeStatus.CONFIGURED,
+        status: NodeStatus.ACTIVE,
         timeout: 5000,
         metadata: { key: 'value' },
         visualProperties: { width: 200, height: 100 }
@@ -218,7 +218,7 @@ describe('UnifiedNodeSystem - Base Node Entity', () => {
       expect(node.getNodeType()).toBe(NodeType.IO_NODE);
       expect(node.position).toBe(mockPosition);
       expect(node.executionType).toBe(ExecutionMode.PARALLEL);
-      expect(node.status).toBe(NodeStatus.CONFIGURED);
+      expect(node.status).toBe(NodeStatus.ACTIVE);
       expect(node.timeout).toBe(5000);
       expect(node.metadata).toEqual({ key: 'value' });
       expect(node.visualProperties).toEqual({ width: 200, height: 100 });

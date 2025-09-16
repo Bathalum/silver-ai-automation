@@ -238,9 +238,7 @@ export abstract class Node {
     
     switch (currentStatus) {
       case NodeStatus.DRAFT:
-        return [NodeStatus.CONFIGURED, NodeStatus.ACTIVE, NodeStatus.ARCHIVED].includes(newStatus);
-      case NodeStatus.CONFIGURED:
-        return [NodeStatus.ACTIVE, NodeStatus.INACTIVE, NodeStatus.ARCHIVED].includes(newStatus);
+        return [NodeStatus.ACTIVE, NodeStatus.ARCHIVED].includes(newStatus);
       case NodeStatus.ACTIVE:
         return [NodeStatus.INACTIVE, NodeStatus.ARCHIVED, NodeStatus.ERROR].includes(newStatus);
       case NodeStatus.INACTIVE:

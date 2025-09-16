@@ -40,7 +40,6 @@ export enum ExecutionMode {
 
 export enum ActionStatus {
   DRAFT = 'draft',
-  CONFIGURED = 'configured',
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   EXECUTING = 'executing',
@@ -55,7 +54,6 @@ export enum NodeStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   DRAFT = 'draft',
-  CONFIGURED = 'configured',
   ARCHIVED = 'archived',
   ERROR = 'error'
 }

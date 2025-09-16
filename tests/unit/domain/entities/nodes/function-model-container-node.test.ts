@@ -65,7 +65,7 @@ describe('FunctionModelContainerNode', () => {
       actionType: ActionNodeType.FUNCTION_MODEL_CONTAINER,
       executionMode: ExecutionMode.SEQUENTIAL,
       executionOrder: 1,
-      status: ActionStatus.CONFIGURED,
+      status: ActionStatus.ACTIVE,
       priority: 5,
       estimatedDuration: 30,
       retryPolicy: retryPolicy.value,

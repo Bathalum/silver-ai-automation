@@ -134,6 +134,75 @@ class FocusedMockFunctionModelRepository implements IFunctionModelRepository {
   getModel(id: string) {
     return this.models.get(id);
   }
+
+  async addUnifiedNode(modelId: string, node: any): Promise<Result<void>> {
+    const model = this.models.get(modelId);
+    if (!model) {
+      return Result.fail(`Model with id ${modelId} not found`);
+    }
+    // Add the unified node to the model's nodes collection
+    if (!model.nodes) {
+      model.nodes = new Map();
+    }
+    model.nodes.set(node.nodeId.toString(), node);
+    return Result.ok(undefined);
+  }
+
+  async addActionNode(modelId: string, actionNode: any): Promise<Result<void>> {
+    const model = this.models.get(modelId);
+    if (!model) {
+      return Result.fail(`Model with id ${modelId} not found`);
+    }
+    // Add the action node to the model's actionNodes collection
+    if (!model.actionNodes) {
+      model.actionNodes = new Map();
+    }
+    model.actionNodes.set(actionNode.actionId.toString(), actionNode);
+    return Result.ok(undefined);
+  }
+
+  async searchModelsByNodeContent(query: string): Promise<Result<any[]>> {
+    const results = Array.from(this.models.values()).filter(model => {
+      const modelName = typeof model.name === 'string' ? model.name : model.name?.value || model.name?.toString();
+      return modelName?.toLowerCase().includes(query.toLowerCase()) ||
+        model.description?.toLowerCase().includes(query.toLowerCase());
+    });
+    return Result.ok(results);
+  }
+
+  async findModelsWithComplexFilters(filters: any): Promise<Result<any[]>> {
+    let results = Array.from(this.models.values());
+    
+    if (filters.status) {
+      results = results.filter(m => filters.status.includes(m.status));
+    }
+    
+    if (filters.namePattern) {
+      results = results.filter(m => {
+        const modelName = typeof m.name === 'string' ? m.name : m.name?.value || m.name?.toString();
+        return modelName?.toLowerCase().includes(filters.namePattern.toLowerCase());
+      });
+    }
+    
+    if (filters.hasNodes !== undefined) {
+      results = results.filter(m => {
+        const hasNodes = m.nodes && m.nodes.size > 0;
+        return filters.hasNodes ? hasNodes : !hasNodes;
+      });
+    }
+    
+    return Result.ok(results);
+  }
+
+  async saveVersion(modelId: string, version: any): Promise<Result<void>> {
+    // Mock implementation - just return success
+    return Result.ok(undefined);
+  }
+
+  async findVersions(modelId: string): Promise<Result<any[]>> {
+    // Mock implementation - return empty versions
+    return Result.ok([]);
+  }
 }
 
 class FocusedMockAuditLogRepository implements IAuditLogRepository {

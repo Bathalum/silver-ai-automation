@@ -461,7 +461,14 @@ export const ServiceTokens = {
   REALTIME_MODEL_ADAPTER: Symbol('IRealtimeModelAdapter'),
   REALTIME_EXECUTION_ADAPTER: Symbol('IRealtimeExecutionAdapter'),
   REALTIME_STATISTICS_ADAPTER: Symbol('IRealtimeStatisticsAdapter'),
-  COLLABORATION_MANAGER: Symbol('ICollaborationManager')
+  COLLABORATION_MANAGER: Symbol('ICollaborationManager'),
+
+  // Edge-related service tokens
+  EDGE_VALIDATION_SERVICE: Symbol('EdgeValidationService'),
+  CREATE_EDGE_USE_CASE: Symbol('CreateEdgeUseCase'),
+  DELETE_EDGE_USE_CASE: Symbol('DeleteEdgeUseCase'),
+  GET_MODEL_EDGES_QUERY_HANDLER: Symbol('GetModelEdgesQueryHandler'),
+  NODE_LINK_REPOSITORY: Symbol('INodeLinkRepository')
 } as const;
 
 /**

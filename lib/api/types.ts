@@ -352,3 +352,81 @@ export const HttpStatus = {
   INTERNAL_SERVER_ERROR: 500,
   SERVICE_UNAVAILABLE: 503
 } as const;
+
+/**
+ * Edge Server Action Result Types
+ */
+
+// Server Action Result Types for Edge Operations
+export interface EdgeActionResult {
+  success: boolean;
+  edgeId?: string;
+  data?: EdgeDto[];
+  error?: string;
+  validationErrors?: Array<{
+    field: string;
+    message: string;
+  }>;
+}
+
+// Edge DTO for React Flow compatibility
+export interface EdgeDto {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  type?: string;
+  animated?: boolean;
+  style?: Record<string, any>;
+  data?: Record<string, any>;
+  markerEnd?: {
+    type: string;
+    width?: number;
+    height?: number;
+  };
+}
+
+/**
+ * Edge API Request/Response Types
+ */
+
+// Create Edge Request
+export const CreateEdgeRequestSchema = z.object({
+  sourceNodeId: z.string().uuid(),
+  targetNodeId: z.string().uuid(),
+  linkType: z.enum(['dependency', 'data_flow', 'control_flow', 'aggregation', 'composition']).default('dependency'),
+  linkStrength: z.number().min(0).max(1).default(0.5),
+  linkContext: z.record(z.any()).optional(),
+  metadata: z.record(z.any()).optional()
+});
+
+export type CreateEdgeRequest = z.infer<typeof CreateEdgeRequestSchema>;
+
+// Update Edge Request
+export const UpdateEdgeRequestSchema = z.object({
+  linkType: z.enum(['dependency', 'data_flow', 'control_flow', 'aggregation', 'composition']).optional(),
+  linkStrength: z.number().min(0).max(1).optional(),
+  linkContext: z.record(z.any()).optional(),
+  metadata: z.record(z.any()).optional()
+});
+
+export type UpdateEdgeRequest = z.infer<typeof UpdateEdgeRequestSchema>;
+
+// Edge Response DTO
+export interface EdgeResponseDto {
+  linkId: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  linkType: string;
+  linkStrength: number;
+  sourceFeature: string;
+  targetFeature: string;
+  sourceEntityId: string;
+  targetEntityId: string;
+  linkContext: Record<string, any>;
+  isBidirectional: boolean;
+  createdAt: string;
+  updatedAt: string;
+  metadata: Record<string, any>;
+}

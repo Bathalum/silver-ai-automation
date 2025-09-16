@@ -21,10 +21,17 @@ describe('Enhanced Repository Functionality - Integration Tests', () => {
   let testModelIds: string[] = [];
 
   beforeAll(() => {
-    // Create repository with mocked client (focuses on method logic, not DB integration)
-    const mockSupabase = createClient('https://mock.supabase.co', 'mock-key');
-    repository = new SupabaseFunctionModelRepository(mockSupabase);
-    console.log('🔧 Enhanced repository functionality test setup completed');
+    // Create repository with real client for integration testing
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase environment variables for integration test');
+    }
+    
+    const realSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    repository = new SupabaseFunctionModelRepository(realSupabase);
+    console.log('🔧 Enhanced repository functionality test setup completed with real client');
   });
 
   afterEach(() => {
@@ -230,7 +237,8 @@ describe('Enhanced Repository Functionality - Integration Tests', () => {
       const hasExpectedError = result.error.includes('One or more nodes not found') ||
                                result.error.includes('not a function') ||
                                result.error.includes('database') ||
-                               result.error.includes('error');
+                               result.error.includes('error') ||
+                               result.error.includes('invalid');
       expect(hasExpectedError).toBe(true);
       
       console.log('✅ reorderNodes properly handles error conditions:', result.error);

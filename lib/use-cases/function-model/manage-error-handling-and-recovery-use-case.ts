@@ -305,7 +305,7 @@ export class ManageErrorHandlingAndRecoveryUseCase {
 
       // Step 6: System prevents invalid operations
       let finalStatus: 'validation-blocked' | ActionStatus = isValid ? 
-        ActionStatus.CONFIGURED : 'validation-blocked';
+        ActionStatus.ACTIVE : 'validation-blocked';
 
       const executionDuration = Date.now() - startTime;
 

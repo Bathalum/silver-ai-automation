@@ -174,13 +174,18 @@ export class CrossFeatureIntegrationService {
   private dependencies: CrossFeatureIntegrationServiceDependencies;
 
   constructor(
-    linkRepository: any,
-    private eventBus: any,
-    businessRuleService: any,
-    dependencies?: CrossFeatureIntegrationServiceDependencies
+    dependenciesOrLinkRepository: CrossFeatureIntegrationServiceDependencies | any,
+    eventBus?: any,
+    businessRuleService?: any,
+    legacyDependencies?: CrossFeatureIntegrationServiceDependencies
   ) {
-    if (dependencies) {
-      this.dependencies = dependencies;
+    // Handle new-style constructor (dependencies object as first param)
+    if (dependenciesOrLinkRepository && 'crossFeatureIntegrationUseCase' in dependenciesOrLinkRepository) {
+      this.dependencies = dependenciesOrLinkRepository as CrossFeatureIntegrationServiceDependencies;
+    } 
+    // Handle legacy constructor
+    else if (legacyDependencies) {
+      this.dependencies = legacyDependencies;
     } else {
       // Create dependencies internally for legacy constructor
       this.dependencies = {

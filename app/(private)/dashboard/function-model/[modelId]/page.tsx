@@ -15,7 +15,8 @@ import PropertiesPanel from '@/app/components/workflow/PropertiesPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getModelNodesAction, addNodeAction } from '@/app/actions/node-actions';
-import { getModelAction, updateModelAction } from '@/app/actions/model-actions';
+import { getModelAction, updateModelAction, saveModelWithNodesAction } from '@/app/actions/model-actions';
+import { createEdgeAction, deleteEdgeAction, getModelEdgesAction } from '@/app/actions/edge-actions';
 import Link from 'next/link';
 import { ArrowLeft, Edit3 } from 'lucide-react';
 
@@ -45,6 +46,7 @@ function FunctionModelInner({ params }: FunctionModelPageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingName, setEditingName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingModel, setIsSavingModel] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Context menu and properties panel state
@@ -75,10 +77,18 @@ function FunctionModelInner({ params }: FunctionModelPageProps) {
           setModelName(modelResult.data.name);
         }
 
-        // Load model nodes for the canvas
+        // Load model nodes and edges for the canvas
         const nodesResult = await getModelNodesAction(modelId);
         if (nodesResult.success && nodesResult.data) {
           setNodes(nodesResult.data);
+        }
+
+        // Create FormData properly for edge loading
+        const edgesFormData = new FormData();
+        edgesFormData.append('modelId', modelId);
+        const edgesResult = await getModelEdgesAction(edgesFormData);
+        if (edgesResult.success && edgesResult.data) {
+          setEdges(edgesResult.data);
         }
       } catch (error) {
         console.error('Error loading model data:', error);
@@ -88,7 +98,7 @@ function FunctionModelInner({ params }: FunctionModelPageProps) {
     };
     
     loadModelData();
-  }, [modelId, setNodes]);
+  }, [modelId, setNodes, setEdges]);
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -244,6 +254,40 @@ function FunctionModelInner({ params }: FunctionModelPageProps) {
     }
   }, [modelId, nodes.length, setNodes]);
 
+  // Handle manual save of model with node positions
+  const handleManualSave = useCallback(async () => {
+    setIsSavingModel(true);
+    
+    try {
+      // Create FormData with nodes data
+      const formData = new FormData();
+      
+      // Only send essential position data for each node
+      const nodesData = nodes.map(node => ({
+        id: node.id,
+        position: node.position
+      }));
+      
+      formData.append('nodes', JSON.stringify(nodesData));
+      
+      console.log('Manual save - saving node positions:', nodesData);
+      
+      const result = await saveModelWithNodesAction(modelId, formData);
+      
+      if (result.success) {
+        console.log('Manual save successful');
+        // Optionally show a success message to user
+      } else {
+        console.error('Manual save failed:', result.error);
+        // Optionally show error message to user
+      }
+    } catch (error) {
+      console.error('Error during manual save:', error);
+    } finally {
+      setIsSavingModel(false);
+    }
+  }, [modelId, nodes]);
+
   // Handle node context menu
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
     event.preventDefault();
@@ -303,6 +347,72 @@ function FunctionModelInner({ params }: FunctionModelPageProps) {
       )
     );
   }, [setNodes]);
+
+  // Handle edge creation
+  const handleConnect = useCallback(async (params: any) => {
+    console.log('Creating edge:', params);
+    
+    try {
+      const formData = new FormData();
+      formData.append('modelId', modelId);
+      formData.append('source', params.source);
+      formData.append('target', params.target);
+      formData.append('sourceHandle', params.sourceHandle || 'right');
+      formData.append('targetHandle', params.targetHandle || 'left');
+      
+      const result = await createEdgeAction(formData);
+      
+      if (result.success && result.data) {
+        // Optimistically add the edge to local state
+        setEdges((eds) => [...eds, ...result.data]);
+        console.log('Edge created successfully:', result.data);
+      } else {
+        console.error('Failed to create edge:', result.error);
+        // Optionally show user notification
+      }
+    } catch (error) {
+      console.error('Error creating edge:', error);
+    }
+  }, [modelId, setEdges]);
+
+  // Handle edge deletion
+  const handleEdgeDelete = useCallback(async (edgeId: string) => {
+    console.log('Deleting edge:', edgeId);
+    
+    try {
+      const formData = new FormData();
+      formData.append('edgeId', edgeId);
+      formData.append('modelId', modelId);
+      
+      const result = await deleteEdgeAction(formData);
+      
+      if (result.success) {
+        // Remove edge from local state
+        setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
+        console.log('Edge deleted successfully');
+      } else {
+        console.error('Failed to delete edge:', result.error);
+      }
+    } catch (error) {
+      console.error('Error deleting edge:', error);
+    }
+  }, [modelId, setEdges]);
+
+  // Handle edge changes (including deletion)
+  const handleEdgesChange = useCallback((changes: any[]) => {
+    // Handle remove changes for edge deletion
+    const removeChanges = changes.filter(change => change.type === 'remove');
+    
+    if (removeChanges.length > 0) {
+      // Delete edges from server
+      removeChanges.forEach(change => {
+        handleEdgeDelete(change.id);
+      });
+    } else {
+      // For other changes, use default behavior
+      onEdgesChange(changes);
+    }
+  }, [handleEdgeDelete, onEdgesChange]);
 
   // Handle node delete
   const handleNodeDelete = useCallback((nodeId: string) => {
@@ -370,7 +480,8 @@ function FunctionModelInner({ params }: FunctionModelPageProps) {
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={handleConnect}
           onNodeContextMenu={handleNodeContextMenu}
           onNodeClick={handleNodeClick}
           onPaneContextMenu={handleCanvasContextMenu}
@@ -380,7 +491,9 @@ function FunctionModelInner({ params }: FunctionModelPageProps) {
         {/* Floating Toolbar - Positioned within Canvas */}
         <FloatingToolbar 
           onNodeAdd={handleNodeAdd}
+          onSave={handleManualSave}
           disabled={isLoadingModel}
+          isSaving={isSavingModel}
         />
       </div>
 

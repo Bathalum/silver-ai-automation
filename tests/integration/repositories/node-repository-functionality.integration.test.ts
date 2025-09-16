@@ -30,11 +30,18 @@ describe('Node Repository Functionality - Integration Tests', () => {
   let testNodeIds: string[] = [];
 
   beforeAll(() => {
-    // Create repository with mocked client for testing logic implementation
-    const mockSupabase = createClient('https://mock.supabase.co', 'mock-key');
-    repository = new SupabaseNodeRepository(mockSupabase);
+    // Create repository with real client for integration testing
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase environment variables for integration test');
+    }
+    
+    const realSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    repository = new SupabaseNodeRepository(realSupabase);
     testModelId = 'test-model-' + Date.now();
-    console.log('🔧 Node repository functionality test setup completed');
+    console.log('🔧 Node repository functionality test setup completed with real client');
   });
 
   afterEach(() => {

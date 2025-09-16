@@ -1,24 +1,31 @@
-# UI Components/Presentation Layer Documentation
+# Presentation Layer: React Flow Edge Integration Implementation Plan
 
-**Version:** 1.0  
-**Created:** September 6, 2025  
-**Status:** Draft  
+**Version:** 2.0  
+**Created:** September 12, 2025  
+**Status:** Implementation Plan  
 
-## Table of Contents
+## 🎯 **OBJECTIVE**
+Implement React Flow edge persistence following Clean Architecture and TDD principles, connecting the sophisticated domain layer `NodeLink` entities with the React Flow UI handle system.
 
-1. [Overview](#overview)
-2. [Clean Architecture Context](#clean-architecture-context)
-3. [Component Categories](#component-categories)
-4. [Data Flow Patterns](#data-flow-patterns)
-5. [Integration Patterns](#integration-patterns)
-6. [React Flow Integration](#react-flow-integration)
-7. [Real-time Features](#real-time-features)
-8. [Error Handling](#error-handling)
-9. [Testing Strategy](#testing-strategy)
-10. [Mock Elimination Plan](#mock-elimination-plan)
-11. [Performance Optimization](#performance-optimization)
-12. [Edge Cases](#edge-cases)
-13. [Implementation Guidelines](#implementation-guidelines)
+---
+
+## 🏗️ **ARCHITECTURE OVERVIEW**
+
+### **Current State Analysis**
+- ✅ **Domain Layer**: `NodeLink` entity with comprehensive business rules
+- ✅ **Infrastructure Layer**: `SupabaseNodeLinkRepository` with full CRUD operations
+- ❌ **Application Layer**: Missing edge use cases
+- ❌ **Interface Adapters**: No edge server actions
+- ❌ **UI Layer**: React Flow edges only in local state
+
+### **Target Architecture**
+```
+React Flow Handles → Edge Server Actions → Edge Use Cases → NodeLink Domain → Repository → Database
+```
+
+---
+
+## 📋 **IMPLEMENTATION PLAN - CLEAN ARCHITECTURE TDD LOOP**
 
 ---
 

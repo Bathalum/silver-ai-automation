@@ -217,8 +217,8 @@ export async function createAIAgentContainer(supabaseClient: SupabaseClient): Pr
   container.registerInstance(ServiceTokens.SUPABASE_CLIENT, supabaseClient);
   
   // Register the AI Agent module
-  const module = new AIAgentModule();
-  module.register(container);
+  const aiAgentModule = new AIAgentModule();
+  aiAgentModule.register(container);
   
   return container;
 }

@@ -261,7 +261,7 @@ export class IONode extends Node {
       position: positionResult.value,
       dependencies,
       executionType: obj.executionType || ExecutionMode.SEQUENTIAL,
-      status: obj.status || NodeStatus.CONFIGURED,
+      status: obj.status || NodeStatus.ACTIVE,
       timeout: obj.timeout,
       metadata: obj.metadata || {},
       visualProperties: obj.visualProperties || {},

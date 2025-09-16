@@ -18,6 +18,7 @@ interface NodeLinkRow {
   link_type: string;
   link_strength: number;
   link_context?: Record<string, any>;
+  visual_properties: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
@@ -521,6 +522,49 @@ export class SupabaseNodeLinkRepository extends BaseRepository implements NodeLi
     }
   }
 
+  async findByModelId(modelId: string): Promise<Result<NodeLink[]>> {
+    try {
+      // Step 1: Get all node IDs that belong to the specified model
+      const { data: nodesData, error: nodesError } = await this.supabase
+        .from('function_model_nodes')
+        .select('node_id')
+        .eq('model_id', modelId);
+
+      if (nodesError) {
+        return Result.fail<NodeLink[]>(this.handleDatabaseError(nodesError));
+      }
+
+      const nodeIds = (nodesData || []).map(row => row.node_id);
+      
+      if (nodeIds.length === 0) {
+        return Result.ok<NodeLink[]>([]);
+      }
+
+      // Step 2: Find all node links where either source_node_id or target_node_id is in our list
+      const { data, error } = await this.supabase
+        .from(this.NODE_LINKS_TABLE)
+        .select('*')
+        .or(`source_node_id.in.(${nodeIds.join(',')}),target_node_id.in.(${nodeIds.join(',')})`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return Result.fail<NodeLink[]>(this.handleDatabaseError(error));
+      }
+
+      const links: NodeLink[] = [];
+      for (const row of data || []) {
+        const domainResult = this.toDomain(row);
+        if (domainResult.isSuccess) {
+          links.push(domainResult.value);
+        }
+      }
+
+      return Result.ok<NodeLink[]>(links);
+    } catch (error) {
+      return Result.fail<NodeLink[]>(this.handleDatabaseError(error));
+    }
+  }
+
   // Advanced features for link strength calculation and cycle detection
 
   async calculateLinkStrength(linkId: string): Promise<Result<number>> {
@@ -702,6 +746,7 @@ export class SupabaseNodeLinkRepository extends BaseRepository implements NodeLi
       link_type: entity.linkType,
       link_strength: entity.linkStrength,
       link_context: entity.linkContext,
+      visual_properties: entity.linkContext || {}, // Map link context to visual properties for now
       created_at: entity.createdAt.toISOString(),
       updated_at: entity.updatedAt.toISOString(),
     };

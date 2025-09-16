@@ -16,13 +16,6 @@ interface AuditLogRow {
   new_data?: any;
   changed_by?: string | null;
   changed_at?: string | null;
-  // Enhanced interface fields
-  entity_type?: string | null;
-  entity_id?: string | null;
-  action?: string | null;
-  user_id?: string | null;
-  timestamp?: string | null;
-  details?: any;
 }
 
 /**
@@ -38,7 +31,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
       const row = this.fromDomain(auditLog);
       
       // Handle different client implementations
-      const tableBuilder = this.supabase.from('audit_logs');
+      const tableBuilder = this.supabase.from('audit_log');
       let error = null;
       
       if (typeof tableBuilder.insert === 'function') {
@@ -62,7 +55,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findById(id: string): Promise<Result<AuditLog>> {
     try {
       const { data, error } = await this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .eq('audit_id', id)
         .single();
@@ -85,7 +78,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async exists(id: string): Promise<Result<boolean>> {
     try {
       const { data, error } = await this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('audit_id')
         .eq('audit_id', id)
         .single();
@@ -106,7 +99,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findAll(): Promise<Result<AuditLog[]>> {
     try {
       const { data, error } = await this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false });
 
@@ -135,12 +128,12 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findByEntityId(entityId: string): Promise<Result<AuditLog[]>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false });
 
-      // Check both new and legacy fields
-      query = query.or(`entity_id.eq.${entityId},record_id.eq.${entityId}`);
+      // Use only legacy fields
+      query = query.eq('record_id', entityId);
 
       const { data, error } = await query;
 
@@ -169,12 +162,12 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findByRecordId(recordId: string): Promise<Result<AuditLog[]>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false });
 
-      // Check both new and legacy fields
-      query = query.or(`record_id.eq.${recordId},entity_id.eq.${recordId}`);
+      // Use only legacy fields
+      query = query.eq('record_id', recordId);
 
       const { data, error } = await query;
 
@@ -203,12 +196,12 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findByTableName(tableName: string): Promise<Result<AuditLog[]>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false });
 
-      // Check both new and legacy fields
-      query = query.or(`table_name.eq.${tableName},entity_type.eq.${tableName}`);
+      // Use only legacy fields
+      query = query.eq('table_name', tableName);
 
       const { data, error } = await query;
 
@@ -237,12 +230,12 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findByOperation(operation: 'create' | 'update' | 'delete'): Promise<Result<AuditLog[]>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false });
 
-      // Check both new and legacy fields
-      query = query.or(`operation.eq.${operation},action.eq.${operation}`);
+      // Use only legacy fields
+      query = query.eq('operation', operation);
 
       const { data, error } = await query;
 
@@ -271,12 +264,12 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findByUser(userId: string): Promise<Result<AuditLog[]>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false });
 
-      // Check both new and legacy fields
-      query = query.or(`changed_by.eq.${userId},user_id.eq.${userId}`);
+      // Use only legacy fields
+      query = query.eq('changed_by', userId);
 
       const { data, error } = await query;
 
@@ -306,7 +299,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
     try {
       // Use the appropriate date field - prefer timestamp over changed_at
       const { data, error } = await this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .gte('changed_at', startDate.toISOString())
         .lte('changed_at', endDate.toISOString())
@@ -337,7 +330,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findRecent(limit: number): Promise<Result<AuditLog[]>> {
     try {
       const { data, error } = await this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false })
         .limit(limit);
@@ -367,17 +360,12 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async findByTableAndRecord(tableName: string, recordId: string): Promise<Result<AuditLog[]>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('*')
         .order('changed_at', { ascending: false });
 
-      // Handle both legacy and new field combinations
-      query = query.or(
-        `and(table_name.eq.${tableName},record_id.eq.${recordId}),` +
-        `and(entity_type.eq.${tableName},entity_id.eq.${recordId}),` +
-        `and(table_name.eq.${tableName},entity_id.eq.${recordId}),` +
-        `and(entity_type.eq.${tableName},record_id.eq.${recordId})`
-      );
+      // Use only legacy fields
+      query = query.eq('table_name', tableName).eq('record_id', recordId);
 
       const { data, error } = await query;
 
@@ -406,11 +394,11 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async countByOperation(operation: 'create' | 'update' | 'delete'): Promise<Result<number>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('audit_id', { count: 'exact' });
 
-      // Check both new and legacy fields
-      query = query.or(`operation.eq.${operation},action.eq.${operation}`);
+      // Use only legacy fields
+      query = query.eq('operation', operation);
 
       const { count, error } = await query;
 
@@ -427,11 +415,11 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async countByUser(userId: string): Promise<Result<number>> {
     try {
       let query = this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('audit_id', { count: 'exact' });
 
-      // Check both new and legacy fields
-      query = query.or(`changed_by.eq.${userId},user_id.eq.${userId}`);
+      // Use only legacy fields
+      query = query.eq('changed_by', userId);
 
       const { count, error } = await query;
 
@@ -448,7 +436,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   async countByDateRange(startDate: Date, endDate: Date): Promise<Result<number>> {
     try {
       const { count, error } = await this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .select('audit_id', { count: 'exact' })
         .gte('changed_at', startDate.toISOString())
         .lte('changed_at', endDate.toISOString());
@@ -473,7 +461,7 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
 
       // Delete entries
       const { error } = await this.supabase
-        .from('audit_logs')
+        .from('audit_log')
         .delete()
         .lt('changed_at', beforeDate.toISOString());
 
@@ -490,24 +478,16 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   // Implementation of base class abstract methods
   protected toDomain(row: AuditLogRow): Result<AuditLog> {
     try {
-      // Create audit log using the enhanced interface if available, fallback to legacy
+      // Create audit log using only the legacy fields that exist in the database
       const auditLogProps = {
         auditId: row.audit_id,
-        // Legacy fields
         tableName: row.table_name || undefined,
         operation: row.operation || undefined,
         recordId: row.record_id || undefined,
         oldData: row.old_data,
         newData: row.new_data,
         changedBy: row.changed_by || undefined,
-        changedAt: row.changed_at ? new Date(row.changed_at) : undefined,
-        // Enhanced fields
-        entityType: row.entity_type || undefined,
-        entityId: row.entity_id || undefined,
-        action: row.action || undefined,
-        userId: row.user_id || undefined,
-        timestamp: row.timestamp ? new Date(row.timestamp) : undefined,
-        details: row.details
+        changedAt: row.changed_at ? new Date(row.changed_at) : undefined
       };
 
       return AuditLog.create(auditLogProps);
@@ -519,21 +499,14 @@ export class SupabaseAuditLogRepository extends BaseRepository implements IAudit
   protected fromDomain(auditLog: AuditLog): AuditLogRow {
     return {
       audit_id: auditLog.auditId,
-      // Legacy fields - maintain backward compatibility
+      // Only use legacy fields that exist in the actual database table
       table_name: auditLog.tableName || auditLog.entityType || null,
       operation: (auditLog.operation as 'create' | 'update' | 'delete') || (auditLog.action as 'create' | 'update' | 'delete') || null,
       record_id: auditLog.recordId || auditLog.entityId || null,
       old_data: auditLog.oldData,
       new_data: auditLog.newData,
       changed_by: auditLog.changedBy || auditLog.userId || null,
-      changed_at: auditLog.changedAt ? auditLog.changedAt.toISOString() : auditLog.timestamp?.toISOString() || new Date().toISOString(),
-      // Enhanced fields
-      entity_type: auditLog.entityType || auditLog.tableName || null,
-      entity_id: auditLog.entityId || auditLog.recordId || null,
-      action: auditLog.action || auditLog.operation || null,
-      user_id: auditLog.userId || auditLog.changedBy || null,
-      timestamp: auditLog.timestamp ? auditLog.timestamp.toISOString() : auditLog.changedAt?.toISOString() || new Date().toISOString(),
-      details: auditLog.details
+      changed_at: auditLog.changedAt ? auditLog.changedAt.toISOString() : auditLog.timestamp?.toISOString() || new Date().toISOString()
     };
   }
 }

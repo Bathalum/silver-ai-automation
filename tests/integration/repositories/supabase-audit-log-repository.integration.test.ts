@@ -24,76 +24,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IAuditLogRepository } from '../../../lib/domain/interfaces/audit-log-repository';
 import { AuditLog } from '../../../lib/domain/entities/audit-log';
 import { Result } from '../../../lib/domain/shared/result';
+import { SupabaseAuditLogRepository } from '../../../lib/infrastructure/repositories/supabase-audit-log-repository';
 import { TestFactories, FunctionModelBuilder, IONodeBuilder } from '../../utils/test-fixtures';
-
-// This class doesn't exist yet - intentional for TDD
-class SupabaseAuditLogRepository implements IAuditLogRepository {
-  constructor(private supabase: SupabaseClient) {}
-
-  async save(auditLog: AuditLog): Promise<Result<void>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findById(id: string): Promise<Result<AuditLog>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findByEntityId(entityId: string): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findByRecordId(recordId: string): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findByTableName(tableName: string): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findByOperation(operation: 'create' | 'update' | 'delete'): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findByUser(userId: string): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findByDateRange(startDate: Date, endDate: Date): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findRecent(limit: number): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findByTableAndRecord(tableName: string, recordId: string): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async countByOperation(operation: 'create' | 'update' | 'delete'): Promise<Result<number>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async countByUser(userId: string): Promise<Result<number>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async countByDateRange(startDate: Date, endDate: Date): Promise<Result<number>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async deleteOldEntries(beforeDate: Date): Promise<Result<number>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async exists(id: string): Promise<Result<boolean>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-
-  async findAll(): Promise<Result<AuditLog[]>> {
-    throw new Error('Not implemented yet - TDD failing test');
-  }
-}
 
 describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
   let supabase: SupabaseClient;
@@ -118,7 +50,7 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
   afterEach(async () => {
     // Clean up test data from all tables
     if (testAuditLogIds.length > 0) {
-      await supabase.from('audit_log').delete().in('log_id', testAuditLogIds);
+      await supabase.from('audit_log').delete().in('audit_id', testAuditLogIds);
     }
     if (testNodeIds.length > 0) {
       await supabase.from('function_model_nodes').delete().in('node_id', testNodeIds);
@@ -143,30 +75,72 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
         });
         testModelIds.push(testModel.modelId);
 
-        // Note: AuditLog entity might not exist yet, so this test will fail early
-        // This is intentional for TDD - we'll implement AuditLog entity first
-        try {
-          testAuditLogs = await createAuditLogTestFixtures();
-          if (testAuditLogs.length > 0) {
-            const testLog = testAuditLogs[0];
-            testAuditLogIds.push(testLog.logId);
-            
-            // Act & Assert - Should fail until implementation exists
-            await expect(repository.save(testLog)).rejects.toThrow('Not implemented yet');
-          }
-        } catch (error) {
-          // Expected - AuditLog entity doesn't exist yet
-          console.log('❌ AuditLog entity not implemented - TDD RED state maintained');
+        // Create test fixtures using real AuditLog entity
+        testAuditLogs = await createAuditLogTestFixtures();
+        expect(testAuditLogs.length).toBeGreaterThan(0);
+        
+        const testLog = testAuditLogs[0];
+        
+        // Act - Save the audit log
+        const saveResult = await repository.save(testLog);
+        
+        // Assert - Save should succeed
+        if (saveResult.isFailure) {
+          console.error('Save failed:', saveResult.error);
+          throw new Error(`Save should have succeeded: ${saveResult.error}`);
+        }
+        expect(saveResult.isSuccess).toBe(true);
+        
+        // Verify the audit log was actually saved
+        const findResult = await repository.findById(testLog.auditId);
+        expect(findResult.isSuccess).toBe(true);
+        if (findResult.isSuccess) {
+          expect(findResult.value.auditId).toBe(testLog.auditId);
+          expect(findResult.value.entityType).toBe(testLog.entityType);
+          expect(findResult.value.action).toBe(testLog.action);
         }
         
-        console.log('❌ SupabaseAuditLogRepository.save not implemented - TDD RED state maintained');
+        console.log('✅ SupabaseAuditLogRepository.save working correctly');
       });
 
       it('should_Serialize_Data_Changes_As_JSON', async () => {
         console.log('🧪 Testing data changes JSON serialization...');
         
-        // This test will fail until JSON serialization is implemented
-        expect(true).toBe(false); // Intentional failure to drive TDD
+        // Arrange - Create audit log with complex data
+        const complexData = {
+          nested: { value: 'test', number: 42 },
+          array: [1, 2, 3],
+          boolean: true
+        };
+        
+        const auditLogResult = AuditLog.create({
+          auditId: crypto.randomUUID(),
+          entityType: 'function_models',
+          entityId: 'test-entity-' + crypto.randomUUID(),
+          action: 'update',
+          userId: '75636522-311b-4e58-9735-0b32fda9b3c6', // Use existing user ID
+          oldData: { simple: 'old' },
+          newData: complexData
+        });
+        
+        expect(auditLogResult.isSuccess).toBe(true);
+        if (auditLogResult.isSuccess) {
+          testAuditLogIds.push(auditLogResult.value.auditId);
+          
+          // Act - Save and retrieve
+          const saveResult = await repository.save(auditLogResult.value);
+          expect(saveResult.isSuccess).toBe(true);
+          
+          const retrievedResult = await repository.findById(auditLogResult.value.auditId);
+          expect(retrievedResult.isSuccess).toBe(true);
+          
+          if (retrievedResult.isSuccess) {
+            // Assert - Complex data should be preserved through JSON serialization
+            expect(retrievedResult.value.newData).toEqual(complexData);
+            expect(retrievedResult.value.newData.nested.value).toBe('test');
+            expect(retrievedResult.value.newData.array).toEqual([1, 2, 3]);
+          }
+        }
       });
 
       it('should_Capture_User_Context_And_Session_Information', async () => {
@@ -209,9 +183,25 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
       it('should_Return_Audit_Log_When_Found_By_LogId', async () => {
         console.log('🧪 Testing findById integration...');
         
-        // Act & Assert - Should fail until implementation exists
-        await expect(repository.findById('test-log-id'))
-          .rejects.toThrow('Not implemented yet');
+        // Arrange - Create and save test audit log
+        const testAuditLogs = await createAuditLogTestFixtures();
+        const testLog = testAuditLogs[0];
+        
+        const saveResult = await repository.save(testLog);
+        expect(saveResult.isSuccess).toBe(true);
+        
+        // Act - Find by ID
+        const findResult = await repository.findById(testLog.auditId);
+        
+        // Assert - Should find the audit log
+        expect(findResult.isSuccess).toBe(true);
+        if (findResult.isSuccess) {
+          expect(findResult.value.auditId).toBe(testLog.auditId);
+          expect(findResult.value.entityType).toBe(testLog.entityType);
+          expect(findResult.value.entityId).toBe(testLog.entityId);
+          expect(findResult.value.action).toBe(testLog.action);
+          expect(findResult.value.userId).toBe(testLog.userId);
+        }
       });
 
       it('should_Deserialize_JSON_Data_Changes_To_Domain_Objects', async () => {
@@ -247,16 +237,31 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
       it('should_Return_True_For_Existing_Log_Entry', async () => {
         console.log('🧪 Testing log entry existence check...');
         
-        // Act & Assert - Should fail until implementation exists
-        await expect(repository.exists('existing-log-id'))
-          .rejects.toThrow('Not implemented yet');
+        // Arrange - Create and save test audit log
+        const testAuditLogs = await createAuditLogTestFixtures();
+        const testLog = testAuditLogs[0];
+        
+        const saveResult = await repository.save(testLog);
+        expect(saveResult.isSuccess).toBe(true);
+        
+        // Act & Assert - Should return true for existing log
+        const existsResult = await repository.exists(testLog.auditId);
+        expect(existsResult.isSuccess).toBe(true);
+        if (existsResult.isSuccess) {
+          expect(existsResult.value).toBe(true);
+        }
       });
 
       it('should_Return_False_For_Non_Existent_Log_Entry', async () => {
         console.log('🧪 Testing non-existent log detection...');
         
-        // This test will fail until existence checking is implemented
-        expect(true).toBe(false); // Intentional failure to drive TDD
+        // Act & Assert - Should return false for non-existent log using UUID format
+        const nonExistentId = crypto.randomUUID(); // Use proper UUID format
+        const existsResult = await repository.exists(nonExistentId);
+        expect(existsResult.isSuccess).toBe(true);
+        if (existsResult.isSuccess) {
+          expect(existsResult.value).toBe(false);
+        }
       });
 
       it('should_Handle_Database_Connectivity_Issues', async () => {
@@ -271,8 +276,28 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
       it('should_Return_All_Audit_Log_Entries_With_Pagination', async () => {
         console.log('🧪 Testing findAll with pagination...');
         
-        // Act & Assert - Should fail until implementation exists
-        await expect(repository.findAll()).rejects.toThrow('Not implemented yet');
+        // Arrange - Create multiple test audit logs
+        const testAuditLogs = await createAuditLogTestFixtures();
+        for (const log of testAuditLogs) {
+          const saveResult = await repository.save(log);
+          expect(saveResult.isSuccess).toBe(true);
+        }
+        
+        // Act - Find all audit logs
+        const findAllResult = await repository.findAll();
+        
+        // Assert - Should return all saved logs
+        expect(findAllResult.isSuccess).toBe(true);
+        if (findAllResult.isSuccess) {
+          expect(findAllResult.value.length).toBeGreaterThanOrEqual(testAuditLogs.length);
+          
+          // Check that our test logs are included
+          const testLogIds = testAuditLogs.map(log => log.auditId);
+          const foundLogIds = findAllResult.value.map(log => log.auditId);
+          for (const testId of testLogIds) {
+            expect(foundLogIds).toContain(testId);
+          }
+        }
       });
 
       it('should_Order_By_Timestamp_Descending_By_Default', async () => {
@@ -303,9 +328,27 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
       it('should_Return_All_Audit_Logs_For_Given_Entity', async () => {
         console.log('🧪 Testing entity-based audit log discovery...');
         
-        // Act & Assert - Should fail until implementation exists
-        await expect(repository.findByEntityId('entity-123'))
-          .rejects.toThrow('Not implemented yet');
+        // Arrange - Create test audit logs for specific entity
+        const testAuditLogs = await createAuditLogTestFixtures();
+        const targetEntityId = testAuditLogs[0].entityId;
+        
+        for (const log of testAuditLogs) {
+          const saveResult = await repository.save(log);
+          expect(saveResult.isSuccess).toBe(true);
+        }
+        
+        // Act - Find by entity ID
+        const findResult = await repository.findByEntityId(targetEntityId);
+        
+        // Assert - Should find logs for the entity
+        expect(findResult.isSuccess).toBe(true);
+        if (findResult.isSuccess) {
+          expect(findResult.value.length).toBeGreaterThan(0);
+          // All returned logs should be for the target entity
+          for (const log of findResult.value) {
+            expect(log.entityId).toBe(targetEntityId);
+          }
+        }
       });
 
       it('should_Include_Cross_Table_References_For_Entity', async () => {
@@ -415,9 +458,25 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
       it('should_Return_All_Create_Operations', async () => {
         console.log('🧪 Testing create operation filtering...');
         
-        // Act & Assert - Should fail until implementation exists
-        await expect(repository.findByOperation('create'))
-          .rejects.toThrow('Not implemented yet');
+        // Arrange - Create test audit logs with create operations
+        const testAuditLogs = await createAuditLogTestFixtures();
+        for (const log of testAuditLogs) {
+          const saveResult = await repository.save(log);
+          expect(saveResult.isSuccess).toBe(true);
+        }
+        
+        // Act - Find create operations
+        const findResult = await repository.findByOperation('create');
+        
+        // Assert - Should find create operations
+        expect(findResult.isSuccess).toBe(true);
+        if (findResult.isSuccess) {
+          expect(findResult.value.length).toBeGreaterThan(0);
+          // All returned logs should be create operations
+          for (const log of findResult.value) {
+            expect(log.action).toBe('create');
+          }
+        }
       });
 
       it('should_Return_All_Update_Operations_With_Change_Details', async () => {
@@ -497,9 +556,27 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
       it('should_Return_All_Audit_Logs_For_Specific_User', async () => {
         console.log('🧪 Testing user-specific audit log discovery...');
         
-        // Act & Assert - Should fail until implementation exists
-        await expect(repository.findByUser('user-123'))
-          .rejects.toThrow('Not implemented yet');
+        // Arrange - Create test audit logs for specific user
+        const testAuditLogs = await createAuditLogTestFixtures();
+        const targetUserId = testAuditLogs[0].userId;
+        
+        for (const log of testAuditLogs) {
+          const saveResult = await repository.save(log);
+          expect(saveResult.isSuccess).toBe(true);
+        }
+        
+        // Act - Find by user ID
+        const findResult = await repository.findByUser(targetUserId);
+        
+        // Assert - Should find logs for the user
+        expect(findResult.isSuccess).toBe(true);
+        if (findResult.isSuccess) {
+          expect(findResult.value.length).toBeGreaterThan(0);
+          // All returned logs should be for the target user
+          for (const log of findResult.value) {
+            expect(log.userId).toBe(targetUserId);
+          }
+        }
       });
 
       it('should_Include_User_Session_Context', async () => {
@@ -910,40 +987,58 @@ describe('SupabaseAuditLogRepository - TDD Integration Tests', () => {
 
     testNodeIds.push(testNode.nodeId.value);
 
-    // For now, throw error because AuditLog entity doesn't exist yet
-    throw new Error('AuditLog entity not implemented yet - TDD failing state');
-
-    // This code will be uncommented when AuditLog entity exists:
-    // const auditLogs: AuditLog[] = [];
-    // 
-    // // Create test audit log 1 - Model creation
-    // const auditLog1 = AuditLog.create({
-    //   logId: 'audit-log-1',
-    //   entityId: testModel.modelId,
-    //   recordId: testModel.modelId,
-    //   tableName: 'function_models',
-    //   operation: 'create',
-    //   userId: 'test-user-1',
-    //   sessionId: 'session-123',
-    //   timestamp: new Date(),
-    //   oldData: null,
-    //   newData: {
-    //     name: testModel.name.value,
-    //     description: testModel.description,
-    //     status: testModel.status
-    //   },
-    //   metadata: {
-    //     source: 'integration-test',
-    //     userAgent: 'test-runner'
-    //   }
-    // });
-    // 
-    // if (auditLog1.isSuccess) {
-    //   auditLogs.push(auditLog1.value);
-    //   testAuditLogIds.push(auditLog1.value.logId);
-    // }
-    // 
-    // return auditLogs;
+    const auditLogs: AuditLog[] = [];
+    
+    // Create test audit log 1 - Model creation
+    const auditLog1Result = AuditLog.create({
+      auditId: crypto.randomUUID(),
+      entityType: 'function_models',
+      entityId: testModel.modelId,
+      action: 'create',
+      userId: '75636522-311b-4e58-9735-0b32fda9b3c6', // Use existing user ID
+      oldData: null,
+      newData: {
+        name: testModel.name.value,
+        description: testModel.description,
+        status: testModel.status
+      },
+      details: {
+        source: 'integration-test',
+        userAgent: 'test-runner'
+      }
+    });
+    
+    if (auditLog1Result.isSuccess) {
+      auditLogs.push(auditLog1Result.value);
+      testAuditLogIds.push(auditLog1Result.value.auditId);
+    }
+    
+    // Create test audit log 2 - Node creation
+    const auditLog2Result = AuditLog.create({
+      auditId: crypto.randomUUID(),
+      entityType: 'function_model_nodes',
+      entityId: testNode.nodeId.value,
+      action: 'create',
+      userId: '75636522-311b-4e58-9735-0b32fda9b3c6', // Use existing user ID
+      oldData: null,
+      newData: {
+        nodeId: testNode.nodeId.value,
+        modelId: testModel.modelId,
+        name: testNode.name,
+        type: testNode.type
+      },
+      details: {
+        source: 'integration-test',
+        operation: 'node-creation'
+      }
+    });
+    
+    if (auditLog2Result.isSuccess) {
+      auditLogs.push(auditLog2Result.value);
+      testAuditLogIds.push(auditLog2Result.value.auditId);
+    }
+    
+    return auditLogs;
   }
 });
 

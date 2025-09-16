@@ -56,11 +56,20 @@ function TetherNode({ id, data, selected }: TetherNodeProps) {
         ${selected ? 'ring-2 ring-blue-200' : ''}
       `}
     >
-      {/* Input Handle */}
+      {/* Top Input Handle - for connections from Stage nodes */}
       <Handle
+        id="top"
+        type="target"
+        position={Position.Top}
+        style={{ background: '#a855f7', width: '12px', height: '12px' }}
+      />
+
+      {/* Left Input Handle */}
+      <Handle
+        id="left"
         type="target"
         position={Position.Left}
-        className="w-3 h-3 !bg-purple-500 !border-purple-600"
+        style={{ background: '#a855f7', width: '12px', height: '12px' }}
       />
 
       {/* Header */}
@@ -111,9 +120,10 @@ function TetherNode({ id, data, selected }: TetherNodeProps) {
 
       {/* Output Handle */}
       <Handle
+        id="right"
         type="source"
         position={Position.Right}
-        className="w-3 h-3 !bg-purple-500 !border-purple-600"
+        style={{ background: '#a855f7', width: '12px', height: '12px' }}
       />
     </div>
   );

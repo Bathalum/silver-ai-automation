@@ -29,6 +29,11 @@ import { ContextValidationService } from '../../domain/services/context-validati
 import { CrossFeatureValidationService } from '../../domain/services/cross-feature-validation-service';
 import { ValidateWorkflowStructureUseCase } from '../../use-cases/function-model/validate-workflow-structure-use-case';
 import { CreateUnifiedNodeUseCase } from '../../use-cases/function-model/create-unified-node-use-case';
+import { EdgeValidationService } from '../../domain/services/edge-validation-service';
+import { CreateEdgeUseCase } from '../../use-cases/edges/create-edge-use-case';
+import { DeleteEdgeUseCase } from '../../use-cases/edges/delete-edge-use-case';
+import { GetModelEdgesQueryHandler } from '../../use-cases/queries/get-model-edges-query';
+import { SupabaseNodeLinkRepository } from '../repositories/supabase-node-link-repository';
 
 /**
  * Service module for Function Model feature registration
@@ -168,6 +173,18 @@ export class FunctionModelModule implements ServiceModule {
         return new SupabaseAuditLogRepository(supabaseClientResult.value);
       }
     ));
+
+    // Register node link repository (for edge operations)
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.NODE_LINK_REPOSITORY,
+      async (c) => {
+        const supabaseClientResult = await c.resolve(ServiceTokens.SUPABASE_CLIENT);
+        if (supabaseClientResult.isFailure) {
+          throw new Error(`Failed to resolve Supabase client: ${supabaseClientResult.error}`);
+        }
+        return new SupabaseNodeLinkRepository(supabaseClientResult.value);
+      }
+    ));
   }
 
   private registerExternalServices(container: Container): void {
@@ -292,6 +309,14 @@ export class FunctionModelModule implements ServiceModule {
       ServiceTokens.CROSS_FEATURE_VALIDATION_SERVICE,
       async (c) => {
         return new CrossFeatureValidationService();
+      }
+    ));
+
+    // Register edge validation service
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.EDGE_VALIDATION_SERVICE,
+      async (c) => {
+        return new EdgeValidationService();
       }
     ));
   }
@@ -505,6 +530,52 @@ export class FunctionModelModule implements ServiceModule {
         return new CreateUnifiedNodeUseCase(repositoryResult.value, eventBusResult.value);
       }
     ));
+
+    // Register edge use cases
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.CREATE_EDGE_USE_CASE,
+      async (c) => {
+        const edgeValidationServiceResult = await c.resolve(ServiceTokens.EDGE_VALIDATION_SERVICE);
+        const nodeLinkRepositoryResult = await c.resolve(ServiceTokens.NODE_LINK_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
+        
+        if (edgeValidationServiceResult.isFailure) {
+          throw new Error(`Failed to resolve edge validation service: ${edgeValidationServiceResult.error}`);
+        }
+        if (nodeLinkRepositoryResult.isFailure) {
+          throw new Error(`Failed to resolve node link repository: ${nodeLinkRepositoryResult.error}`);
+        }
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
+        }
+        
+        return new CreateEdgeUseCase(
+          edgeValidationServiceResult.value,
+          nodeLinkRepositoryResult.value,
+          eventBusResult.value
+        );
+      }
+    ));
+
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.DELETE_EDGE_USE_CASE,
+      async (c) => {
+        const nodeLinkRepositoryResult = await c.resolve(ServiceTokens.NODE_LINK_REPOSITORY);
+        const eventBusResult = await c.resolve(ServiceTokens.EVENT_BUS);
+        
+        if (nodeLinkRepositoryResult.isFailure) {
+          throw new Error(`Failed to resolve node link repository: ${nodeLinkRepositoryResult.error}`);
+        }
+        if (eventBusResult.isFailure) {
+          throw new Error(`Failed to resolve event bus: ${eventBusResult.error}`);
+        }
+        
+        return new DeleteEdgeUseCase(
+          nodeLinkRepositoryResult.value,
+          eventBusResult.value
+        );
+      }
+    ));
   }
 
   private registerQueryHandlers(container: Container): void {
@@ -549,6 +620,20 @@ export class FunctionModelModule implements ServiceModule {
         return new GetModelNodesQueryHandler(repositoryResult.value);
       }
     ));
+
+    // Register get model edges query handler
+    container.register(ServiceRegistration.transient(
+      ServiceTokens.GET_MODEL_EDGES_QUERY_HANDLER,
+      async (c) => {
+        const nodeLinkRepositoryResult = await c.resolve(ServiceTokens.NODE_LINK_REPOSITORY);
+        
+        if (nodeLinkRepositoryResult.isFailure) {
+          throw new Error(`Failed to resolve node link repository: ${nodeLinkRepositoryResult.error}`);
+        }
+        
+        return new GetModelEdgesQueryHandler(nodeLinkRepositoryResult.value);
+      }
+    ));
   }
 }
 
@@ -562,10 +647,36 @@ export async function createFunctionModelContainer(supabaseClient: SupabaseClien
   container.registerInstance(ServiceTokens.SUPABASE_CLIENT, supabaseClient);
   
   // Register the Function Model module
-  const module = new FunctionModelModule();
-  module.register(container);
+  const functionModelModule = new FunctionModelModule();
+  functionModelModule.register(container);
   
   return container;
+}
+
+/**
+ * Setup DI container with proper Supabase client for both production and test environments
+ * This function can be used by server actions and tests
+ */
+export async function setupContainer(): Promise<Container> {
+  try {
+    // Try to create server client first (for production)
+    const { createClient } = await import('../../supabase/server');
+    const supabase = await createClient();
+    return await createFunctionModelContainer(supabase);
+  } catch (error) {
+    // In test environment, create a client with environment variables
+    if (process.env.NODE_ENV === 'test' || (error instanceof Error && error.message.includes('cookies'))) {
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-key'
+      );
+      return await createFunctionModelContainer(supabase);
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
 }
 
 /**

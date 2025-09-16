@@ -42,7 +42,7 @@ describe('Database Constraints Integration Tests', () => {
 
   beforeEach(async () => {
     if (!SupabaseTestClient.isIntegrationTestMode()) {
-      pending('Not in integration test mode');
+      test.skip('Not in integration test mode');
       return;
     }
 

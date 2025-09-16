@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { createFunctionModelContainer } from '@/lib/infrastructure/di/function-model-module'
+import { createFunctionModelContainer, setupContainer } from '@/lib/infrastructure/di/function-model-module'
 import { ServiceTokens } from '@/lib/infrastructure/di/container'
 import { CreateModelCommand, UpdateModelCommand, DeleteModelCommand, PublishModelCommand, ArchiveModelCommand } from '@/lib/use-cases/commands/model-commands';
 import { GetFunctionModelQuery } from '@/lib/use-cases/queries/model-queries'
@@ -48,26 +48,6 @@ function validateFormData(formData: FormData): { isValid: boolean; errors: Array
   };
 }
 
-/**
- * Setup DI container with proper Supabase client for both production and test environments
- */
-async function setupContainer() {
-  try {
-    const supabase = await createClient();
-    return await createFunctionModelContainer(supabase);
-  } catch (error) {
-    // In test environment, create a mock Supabase client
-    if (process.env.NODE_ENV === 'test' || (error instanceof Error && error.message.includes('cookies'))) {
-      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-      const supabase = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-key'
-      );
-      return await createFunctionModelContainer(supabase);
-    }
-    throw error;
-  }
-}
 
 /**
  * Get authenticated user from session
@@ -649,6 +629,113 @@ export async function createModelActionWithState(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create model'
+    };
+  }
+}
+
+/**
+ * Bulk save model with node positions
+ * Saves all node positions in a single transaction
+ */
+export async function saveModelWithNodesAction(modelId: string, formData: FormData): Promise<ServerActionResult> {
+  let scope: any = null;
+  
+  try {
+    // Authenticate user
+    const user = await getAuthenticatedUser();
+    
+    // Parse the nodes data from FormData
+    const nodesDataString = formData.get('nodes')?.toString();
+    if (!nodesDataString) {
+      return {
+        success: false,
+        error: 'No nodes data provided'
+      };
+    }
+    
+    let nodesData;
+    try {
+      nodesData = JSON.parse(nodesDataString);
+    } catch (parseError) {
+      return {
+        success: false,
+        error: 'Invalid nodes data format'
+      };
+    }
+    
+    // Validate nodes data structure
+    if (!Array.isArray(nodesData)) {
+      return {
+        success: false,
+        error: 'Nodes data must be an array'
+      };
+    }
+    
+    // Setup DI container
+    const container = await setupContainer();
+    scope = container.createScope();
+    
+    // Resolve the manage workflow nodes use case
+    const manageNodesUseCaseResult = await scope.resolve(ServiceTokens.MANAGE_WORKFLOW_NODES_USE_CASE);
+    if (manageNodesUseCaseResult.isFailure) {
+      return {
+        success: false,
+        error: 'Failed to initialize workflow nodes management service'
+      };
+    }
+    
+    const manageNodesUseCase = manageNodesUseCaseResult.value;
+    
+    // Validate and prepare position updates for batch operation
+    const positionUpdates = [];
+    for (const node of nodesData) {
+      if (!node.id || !node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
+        return {
+          success: false,
+          error: `Invalid node data for node ${node.id}`
+        };
+      }
+      
+      positionUpdates.push({
+        nodeId: node.id,
+        position: {
+          x: node.position.x,
+          y: node.position.y
+        }
+      });
+    }
+    
+    // Execute batch position update
+    const batchUpdateResult = await manageNodesUseCase.batchUpdatePositions(modelId, positionUpdates, user.id);
+    if (batchUpdateResult.isFailure) {
+      return {
+        success: false,
+        error: `Failed to update node positions: ${batchUpdateResult.error}`
+      };
+    }
+    
+    // Clean up scope
+    await scope.dispose();
+    
+    // Revalidate relevant pages
+    revalidatePath(`/dashboard/function-model/${modelId}`);
+    
+    return {
+      success: true,
+      modelId
+    };
+    
+  } catch (error) {
+    // Clean up scope on error
+    try {
+      if (scope) await scope.dispose();
+    } catch (disposeError) {
+      // Ignore dispose errors
+    }
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to save model with nodes'
     };
   }
 }

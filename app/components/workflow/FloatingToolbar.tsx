@@ -14,7 +14,8 @@ import {
   Link, 
   BookOpen, 
   Box,
-  ChevronUp
+  ChevronUp,
+  Save
 } from 'lucide-react';
 
 interface NodeTypeOption {
@@ -67,10 +68,12 @@ const nodeTypes: NodeTypeOption[] = [
 
 interface FloatingToolbarProps {
   onNodeAdd: (nodeType: string) => void;
+  onSave?: () => void;
   disabled?: boolean;
+  isSaving?: boolean;
 }
 
-export default function FloatingToolbar({ onNodeAdd, disabled = false }: FloatingToolbarProps) {
+export default function FloatingToolbar({ onNodeAdd, onSave, disabled = false, isSaving = false }: FloatingToolbarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleNodeSelect = (nodeType: string) => {
@@ -148,23 +151,44 @@ export default function FloatingToolbar({ onNodeAdd, disabled = false }: Floatin
         </div>
       )}
 
-      {/* Main Add Button */}
-      <Button
-        onClick={() => setIsExpanded(!isExpanded)}
-        disabled={disabled}
-        size="lg"
-        className={`rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200 flex-shrink-0 ${
-          isExpanded 
-            ? 'bg-gray-600 hover:bg-gray-700' 
-            : 'bg-blue-600 hover:bg-blue-700'
-        }`}
-      >
-        {isExpanded ? (
-          <ChevronUp className="w-6 h-6 text-white" />
-        ) : (
-          <Plus className="w-6 h-6 text-white" />
+      {/* Button Container */}
+      <div className="flex flex-row gap-2">
+        {/* Save Button - Only show if onSave is provided */}
+        {onSave && (
+          <Button
+            onClick={onSave}
+            disabled={disabled || isSaving}
+            size="lg"
+            className="rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200 flex-shrink-0 bg-green-600 hover:bg-green-700 disabled:opacity-50"
+            title="Save model"
+          >
+            {isSaving ? (
+              <div className="w-5 h-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Save className="w-6 h-6 text-white" />
+            )}
+          </Button>
         )}
-      </Button>
+
+        {/* Main Add Button */}
+        <Button
+          onClick={() => setIsExpanded(!isExpanded)}
+          disabled={disabled}
+          size="lg"
+          className={`rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-200 flex-shrink-0 ${
+            isExpanded 
+              ? 'bg-gray-600 hover:bg-gray-700' 
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+          title="Add node"
+        >
+          {isExpanded ? (
+            <ChevronUp className="w-6 h-6 text-white" />
+          ) : (
+            <Plus className="w-6 h-6 text-white" />
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

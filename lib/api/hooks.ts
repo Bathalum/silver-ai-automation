@@ -10,15 +10,21 @@ import {
   CreateModelRequest,
   UpdateModelRequest,
   PublishModelRequest,
-  AddNodeRequest,
-  AddActionRequest,
   SearchModelsQuery,
+  CreateEdgeRequest,
+  UpdateEdgeRequest,
+  EdgeResponseDto,
   ModelDto,
   NodeDto,
   ActionNodeDto,
   ModelStatisticsDto,
   PaginationMeta
 } from './client';
+import { 
+  ApiErrorCode, 
+  AddNodeRequest, 
+  AddActionRequest 
+} from './types';
 
 // Hook state interfaces
 interface AsyncState<T> {
@@ -74,7 +80,7 @@ export function useModels(params: {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
     }
   }, [client, JSON.stringify(params)]);
@@ -126,7 +132,7 @@ export function useModel(modelId: string | null, options: {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
     }
   }, [client, modelId, JSON.stringify(options)]);
@@ -160,7 +166,7 @@ export function useModelOperations() {
       setLoading(false);
       return model;
     } catch (error) {
-      const apiError = error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500);
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
       setError(apiError);
       setLoading(false);
       return null;
@@ -176,7 +182,7 @@ export function useModelOperations() {
       setLoading(false);
       return model;
     } catch (error) {
-      const apiError = error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500);
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
       setError(apiError);
       setLoading(false);
       return null;
@@ -192,7 +198,7 @@ export function useModelOperations() {
       setLoading(false);
       return true;
     } catch (error) {
-      const apiError = error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500);
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
       setError(apiError);
       setLoading(false);
       return false;
@@ -208,7 +214,7 @@ export function useModelOperations() {
       setLoading(false);
       return model;
     } catch (error) {
-      const apiError = error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500);
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
       setError(apiError);
       setLoading(false);
       return null;
@@ -255,7 +261,7 @@ export function useModelNodes(modelId: string | null) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
     }
   }, [client, modelId]);
@@ -271,7 +277,7 @@ export function useModelNodes(modelId: string | null) {
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
       return null;
     }
@@ -320,7 +326,7 @@ export function useModelActions(modelId: string | null, parentNodeId?: string) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
     }
   }, [client, modelId, parentNodeId]);
@@ -336,7 +342,7 @@ export function useModelActions(modelId: string | null, parentNodeId?: string) {
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
       return null;
     }
@@ -382,7 +388,7 @@ export function useModelSearch() {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
     }
   }, [client]);
@@ -426,7 +432,7 @@ export function useModelStatistics(modelId: string | null) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof ApiError ? error : new ApiError('INTERNAL_ERROR', 'Unknown error', 500)
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
       }));
     }
   }, [client, modelId]);
@@ -440,6 +446,137 @@ export function useModelStatistics(modelId: string | null) {
     loading: state.loading,
     error: state.error,
     refetch: fetchStatistics
+  };
+}
+
+// ===== EDGE MANAGEMENT HOOKS =====
+
+/**
+ * Hook for managing model edges
+ */
+export function useModelEdges(modelId: string | null) {
+  const client = useApiClient();
+  const [state, setState] = useState<AsyncState<EdgeResponseDto[]>>({
+    data: null,
+    loading: false,
+    error: null
+  });
+
+  const fetchEdges = useCallback(async () => {
+    if (!modelId) {
+      setState({ data: null, loading: false, error: null });
+      return;
+    }
+
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      const edges = await client.getModelEdges(modelId);
+      setState({
+        data: edges,
+        loading: false,
+        error: null
+      });
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500)
+      }));
+    }
+  }, [client, modelId]);
+
+  useEffect(() => {
+    fetchEdges();
+  }, [fetchEdges]);
+
+  return {
+    edges: state.data,
+    loading: state.loading,
+    error: state.error,
+    refetch: fetchEdges
+  };
+}
+
+/**
+ * Hook for edge operations (create, update, delete)
+ */
+export function useEdgeOperations() {
+  const client = useApiClient();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const createEdge = useCallback(async (modelId: string, request: CreateEdgeRequest): Promise<EdgeResponseDto | null> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const edge = await client.createEdge(modelId, request);
+      setLoading(false);
+      return edge;
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
+      setError(apiError);
+      setLoading(false);
+      return null;
+    }
+  }, [client]);
+
+  const updateEdge = useCallback(async (modelId: string, edgeId: string, request: UpdateEdgeRequest): Promise<EdgeResponseDto | null> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const edge = await client.updateEdge(modelId, edgeId, request);
+      setLoading(false);
+      return edge;
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
+      setError(apiError);
+      setLoading(false);
+      return null;
+    }
+  }, [client]);
+
+  const deleteEdge = useCallback(async (modelId: string, edgeId: string): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await client.deleteEdge(modelId, edgeId);
+      setLoading(false);
+      return true;
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
+      setError(apiError);
+      setLoading(false);
+      return false;
+    }
+  }, [client]);
+
+  const getEdge = useCallback(async (modelId: string, edgeId: string): Promise<EdgeResponseDto | null> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const edge = await client.getEdge(modelId, edgeId);
+      setLoading(false);
+      return edge;
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unknown error', 500);
+      setError(apiError);
+      setLoading(false);
+      return null;
+    }
+  }, [client]);
+
+  return {
+    createEdge,
+    updateEdge,
+    deleteEdge,
+    getEdge,
+    loading,
+    error
   };
 }
 

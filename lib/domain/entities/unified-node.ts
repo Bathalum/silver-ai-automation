@@ -303,6 +303,13 @@ export class UnifiedNode {
     return this.ioData!;
   }
 
+  public getStageData(): StageNodeData {
+    if (!this.isStageNode()) {
+      throw new Error(`Operation not supported for node type: ${this.nodeType}`);
+    }
+    return this.stageData!;
+  }
+
   public getStageConfiguration(): any {
     if (!this.isStageNode()) {
       throw new Error(`Operation not supported for node type: ${this.nodeType}`);
@@ -441,12 +448,17 @@ export class NodeFactory {
       position: Position;
       userId: string;
       typeSpecificData?: Record<string, any>;
+      status?: NodeStatus;
+      metadata?: Record<string, any>;
+      visualProperties?: Record<string, any>;
+      executionType?: ExecutionMode;
+      timeout?: number;
     }
   ): Result<UnifiedNode> {
     // Generate nodeId if not provided
     const nodeId = data.nodeId || NodeId.generate();
 
-    // Build base props
+    // Build base props - use passed data or defaults
     const nodeProps: UnifiedNodeProps = {
       nodeId,
       modelId: data.modelId,
@@ -454,13 +466,15 @@ export class NodeFactory {
       nodeType,
       position: data.position,
       dependencies: [],
-      executionType: ExecutionMode.SEQUENTIAL,
-      status: NodeStatus.DRAFT,
+      executionType: data.executionType || ExecutionMode.SEQUENTIAL,
+      status: data.status || NodeStatus.DRAFT,
+      timeout: data.timeout,
       metadata: {
+        ...(data.metadata || {}),
         createdBy: data.userId,
         createdAt: new Date(),
       },
-      visualProperties: {}
+      visualProperties: data.visualProperties || {}
     };
 
     // Add type-specific data based on nodeType and typeSpecificData
@@ -468,13 +482,13 @@ export class NodeFactory {
       case NodeType.IO_NODE:
         nodeProps.ioData = {
           boundaryType: data.typeSpecificData?.boundaryType || 'input',
-          inputDataContract: data.typeSpecificData?.dataContract?.inputSchema,
-          outputDataContract: data.typeSpecificData?.dataContract?.outputSchema
+          inputDataContract: data.typeSpecificData?.inputDataContract || data.typeSpecificData?.dataContract?.inputSchema,
+          outputDataContract: data.typeSpecificData?.outputDataContract || data.typeSpecificData?.dataContract?.outputSchema
         };
         break;
       case NodeType.STAGE_NODE:
         nodeProps.stageData = {
-          processingConfig: data.typeSpecificData || {}
+          processingConfig: data.typeSpecificData?.processingConfig || data.typeSpecificData || {}
         };
         break;
       case NodeType.TETHER_NODE:
@@ -484,7 +498,7 @@ export class NodeFactory {
         break;
       case NodeType.KB_NODE:
         nodeProps.kbData = {
-          knowledgeSourceConfig: data.typeSpecificData || {}
+          knowledgeSourceConfig: data.typeSpecificData?.knowledgeSourceConfig || data.typeSpecificData || {}
         };
         break;
       case NodeType.FUNCTION_MODEL_CONTAINER:

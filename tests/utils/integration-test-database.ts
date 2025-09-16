@@ -14,7 +14,7 @@
  * NO MOCKS - Uses real Supabase database with test data management
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseFunctionModelRepository } from '@/lib/infrastructure/repositories/supabase-function-model-repository';
 import { FunctionModel } from '@/lib/domain/entities/function-model';
@@ -49,7 +49,16 @@ export interface TestModelFactory {
  * Each test gets its own unique prefix to avoid data collisions
  */
 export async function createIntegrationTestContext(): Promise<IntegrationTestContext> {
-  const supabase = await createClient();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  // Use service role key for integration tests (full database access)
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const repository = new SupabaseFunctionModelRepository(supabase);
   const testPrefix = `test-${Date.now()}-${Math.random().toString(36).substring(7)}`;
   const testUserId = `${testPrefix}-user`;

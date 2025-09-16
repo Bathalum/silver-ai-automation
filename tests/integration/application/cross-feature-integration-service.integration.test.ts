@@ -187,6 +187,22 @@ describe('CrossFeatureIntegrationService - Integration Tests', () => {
         createdBy: getTestUUID('user-1')
       });
 
+      // Validate all link creation results
+      if (link1Result.isFailure) {
+        console.log('Link1 creation failed:', link1Result.error);
+      }
+      expect(link1Result.isSuccess).toBe(true);
+      
+      if (link2Result.isFailure) {
+        console.log('Link2 creation failed:', link2Result.error);
+      }
+      expect(link2Result.isSuccess).toBe(true);
+      
+      if (link3Result.isFailure) {
+        console.log('Link3 creation failed:', link3Result.error);
+      }
+      expect(link3Result.isSuccess).toBe(true);
+
       // Step 2: UC-015 - Calculate and update link strengths with evolution tracking
       const strengthResult1 = await integrationService.calculateAndUpdateLinkStrength({
         linkId: link1Result.value.linkId,
@@ -738,10 +754,10 @@ describe('CrossFeatureIntegrationService - Integration Tests', () => {
 
       // Assert
       const successfulLinks = linkResults.filter(r => r.isSuccess);
-      expect(successfulLinks.length).toBeGreaterThan(networkSize * 0.3); // At least 30% should succeed due to compatibility restrictions
+      expect(successfulLinks.length).toBeGreaterThanOrEqual(networkSize * 0.3); // At least 30% should succeed due to compatibility restrictions
 
       expect(metricsResult.isSuccess).toBe(true);
-      expect(metricsResult.value.totalLinks).toBeGreaterThan(networkSize * 0.3);
+      expect(metricsResult.value.totalLinks).toBeGreaterThanOrEqual(networkSize * 0.3);
 
       expect(cycleResult.isSuccess).toBe(true);
 

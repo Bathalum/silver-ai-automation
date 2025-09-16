@@ -173,10 +173,10 @@ describe('Structural Integrity Compliance Tests', () => {
   });
 
   describe('NodeStatus Enum Completeness', () => {
-    it('should include CONFIGURED status for outer layer compatibility', () => {
-      // STRUCTURAL REQUIREMENT: Outer layers expect CONFIGURED status
-      expect(NodeStatus).toHaveProperty('CONFIGURED');
-      expect(NodeStatus.CONFIGURED).toBe('configured');
+    it('should include ACTIVE status for outer layer compatibility', () => {
+      // STRUCTURAL REQUIREMENT: Outer layers expect ACTIVE status  
+      expect(NodeStatus).toHaveProperty('ACTIVE');
+      expect(NodeStatus.ACTIVE).toBe('active');
     });
 
     it('should include all required status values for complete workflow states', () => {
@@ -185,7 +185,6 @@ describe('Structural Integrity Compliance Tests', () => {
         'active',
         'inactive', 
         'draft',
-        'configured',
         'archived',
         'error'
       ];

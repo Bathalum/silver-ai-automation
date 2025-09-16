@@ -23,4 +23,5 @@ export interface NodeLinkRepository {
   bulkDelete(ids: NodeId[]): Promise<Result<void>>;
   countByLinkType(linkType: LinkType): Promise<Result<number>>;
   countCrossFeatureLinks(): Promise<Result<number>>;
+  findByModelId(modelId: string): Promise<Result<NodeLink[]>>;
 }

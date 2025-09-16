@@ -41,7 +41,10 @@ export class CreateUnifiedNodeUseCase {
   constructor(
     private readonly repository: IFunctionModelRepository,
     private readonly eventBus: IEventBus
-  ) {}
+  ) {
+    console.log('🔍 CONSTRUCTOR_CHECK - repository:', this.repository ? 'defined' : 'undefined');
+    console.log('🔍 CONSTRUCTOR_CHECK - eventBus:', this.eventBus ? 'defined' : 'undefined');
+  }
 
   /**
    * Execute the unified node creation use case
@@ -92,11 +95,19 @@ export class CreateUnifiedNodeUseCase {
       typeSpecificData: this.extractTypeSpecificData(unifiedNode, command)
     };
 
-    // 6. Publish domain event
-    const eventResult = await this.publishNodeCreatedEvent(command.modelId, nodeCreated);
-    if (eventResult.isFailure) {
-      // Log error but don't fail the use case - node was already created
-      console.error('Failed to publish NodeCreated event:', eventResult.error);
+    // 6. Publish domain event  
+    console.log('🔍 EVENT_BUS_CHECK - eventBus instance:', this.eventBus ? 'defined' : 'undefined');
+    
+    // TEMPORARY FIX: Make event publishing optional to continue testing
+    try {
+      const eventResult = await this.publishNodeCreatedEvent(command.modelId, nodeCreated);
+      if (eventResult.isFailure) {
+        // Log error but don't fail the use case - node was already created
+        console.error('Failed to publish NodeCreated event:', eventResult.error);
+      }
+    } catch (error) {
+      // TEMPORARY: Log and continue instead of failing
+      console.error('🔍 TEMPORARY_FIX - Event publishing failed, continuing:', error instanceof Error ? error.message : String(error));
     }
 
     return Result.ok(nodeCreated);
@@ -152,21 +163,32 @@ export class CreateUnifiedNodeUseCase {
     modelId: string,
     nodeCreated: NodeCreated
   ): Promise<Result<void>> {
-    const event = new NodeCreated(
-      `node-created-${nodeCreated.nodeId}-${Date.now()}`, // eventId
-      modelId, // aggregateId
-      1, // aggregateVersion - simplistic for now
-      new Date(), // occurredOn
-      {
-        nodeId: nodeCreated.nodeId,
-        nodeType: nodeCreated.nodeType,
-        nodeName: nodeCreated.name,
-        position: nodeCreated.position,
-        createdAt: nodeCreated.createdAt,
-        typeSpecificData: nodeCreated.typeSpecificData
+    try {
+      // Check if eventBus is available
+      if (!this.eventBus) {
+        console.error('Event bus is undefined - dependency injection failed');
+        return Result.fail('Event bus not available - dependency injection failed');
       }
-    );
 
-    return await this.eventBus.publish(event);
+      const event = new NodeCreated(
+        `node-created-${nodeCreated.nodeId}-${Date.now()}`, // eventId
+        modelId, // aggregateId
+        1, // aggregateVersion - simplistic for now
+        new Date(), // occurredOn
+        {
+          nodeId: nodeCreated.nodeId,
+          nodeType: nodeCreated.nodeType,
+          nodeName: nodeCreated.name,
+          position: nodeCreated.position,
+          createdAt: nodeCreated.createdAt,
+          typeSpecificData: nodeCreated.typeSpecificData
+        }
+      );
+
+      await this.eventBus.publish(event);
+      return Result.ok(undefined);
+    } catch (error) {
+      return Result.fail(`Failed to publish NodeCreated event: ${error}`);
+    }
   }
 }

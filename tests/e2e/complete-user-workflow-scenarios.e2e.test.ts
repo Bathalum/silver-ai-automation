@@ -201,6 +201,63 @@ class MockFunctionModelRepository implements IFunctionModelRepository {
   getModelVersions(modelId: string) {
     return this.versions.get(modelId) || [];
   }
+
+  async addUnifiedNode(modelId: string, node: any): Promise<Result<void>> {
+    const model = this.models.get(modelId);
+    if (!model) {
+      return Result.fail(`Model with id ${modelId} not found`);
+    }
+    // Add the unified node to the model's nodes collection
+    if (!model.nodes) {
+      model.nodes = new Map();
+    }
+    model.nodes.set(node.nodeId.toString(), node);
+    return Result.ok(undefined);
+  }
+
+  async addActionNode(modelId: string, actionNode: any): Promise<Result<void>> {
+    const model = this.models.get(modelId);
+    if (!model) {
+      return Result.fail(`Model with id ${modelId} not found`);
+    }
+    // Add the action node to the model's actionNodes collection
+    if (!model.actionNodes) {
+      model.actionNodes = new Map();
+    }
+    model.actionNodes.set(actionNode.actionId.toString(), actionNode);
+    return Result.ok(undefined);
+  }
+
+  async searchModelsByNodeContent(query: string): Promise<Result<any[]>> {
+    const results = Array.from(this.models.values()).filter(model => 
+      model.name.toString().toLowerCase().includes(query.toLowerCase()) ||
+      model.description?.toLowerCase().includes(query.toLowerCase())
+    );
+    return Result.ok(results);
+  }
+
+  async findModelsWithComplexFilters(filters: any): Promise<Result<any[]>> {
+    let results = Array.from(this.models.values());
+    
+    if (filters.status) {
+      results = results.filter(m => filters.status.includes(m.status));
+    }
+    
+    if (filters.namePattern) {
+      results = results.filter(m => 
+        m.name.toString().toLowerCase().includes(filters.namePattern.toLowerCase())
+      );
+    }
+    
+    if (filters.hasNodes !== undefined) {
+      results = results.filter(m => {
+        const hasNodes = m.nodes && m.nodes.size > 0;
+        return filters.hasNodes ? hasNodes : !hasNodes;
+      });
+    }
+    
+    return Result.ok(results);
+  }
 }
 
 class MockAIAgentRepository implements IAIAgentRepository {

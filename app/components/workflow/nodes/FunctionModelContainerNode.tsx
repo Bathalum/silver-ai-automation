@@ -82,11 +82,20 @@ function FunctionModelContainerNode({ id, data, selected }: FunctionModelContain
         ${selected ? 'ring-2 ring-blue-200' : ''}
       `}
     >
-      {/* Input Handle */}
+      {/* Top Input Handle - for connections from Stage nodes */}
       <Handle
+        id="top"
+        type="target"
+        position={Position.Top}
+        style={{ background: '#f97316', width: '12px', height: '12px' }}
+      />
+
+      {/* Left Input Handle */}
+      <Handle
+        id="left"
         type="target"
         position={Position.Left}
-        className="w-3 h-3 !bg-orange-500 !border-orange-600"
+        style={{ background: '#f97316', width: '12px', height: '12px' }}
       />
 
       {/* Header */}
@@ -152,9 +161,10 @@ function FunctionModelContainerNode({ id, data, selected }: FunctionModelContain
 
       {/* Output Handle */}
       <Handle
+        id="right"
         type="source"
         position={Position.Right}
-        className="w-3 h-3 !bg-orange-500 !border-orange-600"
+        style={{ background: '#f97316', width: '12px', height: '12px' }}
       />
     </div>
   );

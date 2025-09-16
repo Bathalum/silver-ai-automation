@@ -62,6 +62,7 @@ export {
 export { 
   FunctionModelModule,
   createFunctionModelContainer,
+  setupContainer,
   FunctionModelContainerExtensions
 } from './di/function-model-module';
 

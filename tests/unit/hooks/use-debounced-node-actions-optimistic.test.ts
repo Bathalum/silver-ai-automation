@@ -1,4 +1,8 @@
 /**
+ * @jest-environment jsdom
+ */
+
+/**
  * PHASE 2 TDD: Enhanced useDebouncedNodeActions with Optimistic Batch Operations
  * 
  * These tests define the expected behavior for Phase 2 batch operations:
@@ -28,11 +32,13 @@ jest.mock('@/app/actions/node-actions', () => ({
 }))
 
 // Mock React 19's useOptimistic hook for batch operations
-const mockUseOptimistic = jest.fn()
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
-  useOptimistic: mockUseOptimistic
+  useOptimistic: jest.fn()
 }))
+
+import React from 'react'
+const mockUseOptimistic = React.useOptimistic as jest.MockedFunction<typeof React.useOptimistic>
 
 describe('Phase 2: Enhanced useDebouncedNodeActions with Optimistic Batching', () => {
   const mockModelId = 'batch-test-model'

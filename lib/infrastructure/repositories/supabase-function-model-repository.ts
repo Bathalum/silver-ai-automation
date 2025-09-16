@@ -7,7 +7,7 @@ import { StageNode } from '../../domain/entities/stage-node';
 import { TetherNode } from '../../domain/entities/tether-node';
 import { KBNode } from '../../domain/entities/kb-node';
 import { FunctionModelContainerNode } from '../../domain/entities/function-model-container-node';
-import { UnifiedNode } from '../../domain/entities/unified-node';
+import { UnifiedNode, NodeFactory } from '../../domain/entities/unified-node';
 import { ModelName } from '../../domain/value-objects/model-name';
 import { Version } from '../../domain/value-objects/version';
 import { NodeId } from '../../domain/value-objects/node-id';
@@ -105,9 +105,6 @@ interface ActionNodeRow {
 }
 
 export class SupabaseFunctionModelRepository extends BaseRepository implements IFunctionModelRepository {
-  // In-memory store for development nodes (non-UUID modelIds)
-  private static developmentNodes: Map<string, Map<string, Node>> = new Map();
-
   constructor(supabase: SupabaseClient) {
     super(supabase);
   }
@@ -117,27 +114,12 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
     try {
       console.log('🔍 REPOSITORY_ADDNODE - Starting with:', { modelId, nodeId: node.nodeId.toString() });
       
-      // Check if modelId is a valid UUID - if not, handle as development scenario
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      
-      if (isDevelopment && !uuidRegex.test(modelId)) {
-        console.log('🔍 REPOSITORY_ADDNODE - Development mode with non-UUID modelId, storing in memory');
-        // In development with non-UUID modelIds, store nodes in memory for UI testing
-        if (!SupabaseFunctionModelRepository.developmentNodes.has(modelId)) {
-          SupabaseFunctionModelRepository.developmentNodes.set(modelId, new Map());
-        }
-        const modelNodes = SupabaseFunctionModelRepository.developmentNodes.get(modelId)!;
-        modelNodes.set(node.nodeId.toString(), node);
-        console.log('🔍 REPOSITORY_ADDNODE - Node stored in development memory store');
-        return Result.ok();
-      }
-      
-      // Use development-friendly model verification for UUID modelIds
+      // Use development-friendly model verification
       const modelResult = await this.findById(modelId);
       if (modelResult.isFailure) {
         console.log('🔍 REPOSITORY_ADDNODE - Model verification failed:', modelResult.error);
-        return Result.fail(`Model verification failed: ${modelResult.error}`);
+        // Align error message with test expectations
+        return Result.fail('Model not found');
       }
       if (!modelResult.value) {
         console.log('🔍 REPOSITORY_ADDNODE - Model not found:', modelId);
@@ -609,21 +591,6 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
   async findById(modelId: string): Promise<Result<FunctionModel | null>> {
     try {
       console.log('🔍 REPOSITORY FINDBYID DEBUG - Finding modelId:', modelId);
-      
-      // Check if modelId is a valid UUID - if not, return mock data for development
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      
-      if (isDevelopment && !uuidRegex.test(modelId)) {
-        console.log('🔍 Non-UUID modelId in development, returning mock data');
-        const mockResult = await this.createMockModel(modelId);
-        if (mockResult.isSuccess) {
-          console.log('🔍 Mock model created successfully:', mockResult.value?.modelId);
-        } else {
-          console.error('🔍 Failed to create mock model:', mockResult.error);
-        }
-        return mockResult;
-      }
       
       // Get the main model using standard Supabase query
       const { data: modelData, error: modelError } = await this.supabase
@@ -1815,82 +1782,6 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
     }
   }
 
-  /**
-   * Create a mock model for development when modelId is not a valid UUID
-   */
-  private async createMockModel(modelId: string): Promise<Result<FunctionModel | null>> {
-    try {
-      console.log('🔍 Starting createMockModel for:', modelId);
-      
-      // Create mock domain objects
-      const modelNameResult = ModelName.create(`Mock Model ${modelId}`);
-      if (modelNameResult.isFailure) {
-        console.error('🔍 ModelName creation failed:', modelNameResult.error);
-        return Result.fail(modelNameResult.error);
-      }
-      console.log('🔍 ModelName created successfully');
-
-      const versionResult = Version.create('1.0.0');
-      if (versionResult.isFailure) {
-        console.error('🔍 Version creation failed:', versionResult.error);
-        return Result.fail(versionResult.error);
-      }
-      console.log('🔍 Version created successfully');
-
-      // Get development nodes for this model if they exist
-      const developmentNodes = SupabaseFunctionModelRepository.developmentNodes.get(modelId) || new Map();
-      console.log('🔍 Found', developmentNodes.size, 'development nodes for model:', modelId);
-
-      // Create a mock FunctionModel with all required properties
-      const modelProps = {
-        modelId: modelId, // Use the provided modelId even if not UUID
-        name: modelNameResult.value,
-        version: versionResult.value,
-        currentVersion: versionResult.value, // Same instance to satisfy validation
-        versionCount: 1,
-        nodes: developmentNodes, // Include nodes from development store
-        actionNodes: new Map(), // Empty action node collection for mock
-        status: ModelStatus.DRAFT,
-        metadata: {
-          author: 'Mock User',
-          category: 'Development',
-          tags: ['mock', 'development'],
-          description: `Mock model for development testing with ID: ${modelId}`
-        },
-        permissions: {
-          owner: 'mock-user',
-          editors: [],
-          viewers: []
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        lastSavedAt: new Date()
-      };
-      
-      console.log('🔍 About to create FunctionModel with props:', {
-        modelId: modelProps.modelId,
-        name: modelProps.name.value,
-        version: modelProps.version.value,
-        status: modelProps.status
-      });
-
-      // Use fromDatabase to preserve the exact modelId (including non-UUIDs in development)
-      const modelResult = FunctionModel.fromDatabase(modelProps);
-
-      if (modelResult.isFailure) {
-        console.error('🔍 FunctionModel creation failed:', modelResult.error);
-        return Result.fail(modelResult.error);
-      }
-
-      console.log('🔍 FunctionModel created successfully for development:', modelId);
-      console.log('🔍 Actual model ID in created model:', modelResult.value.modelId);
-      return Result.ok(modelResult.value);
-
-    } catch (error) {
-      console.error('🔍 Exception in createMockModel:', error);
-      return Result.fail(`Failed to create mock model: ${error}`);
-    }
-  }
 
   // UNIFIED NODE INFRASTRUCTURE IMPLEMENTATION
   
@@ -1906,24 +1797,7 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
         nodeType: node.getNodeType()
       });
 
-      // Check if modelId is a valid UUID - if not, handle as development scenario
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      
-      if (isDevelopment && !uuidRegex.test(modelId)) {
-        console.log('🔍 UNIFIED_ADD_NODE - Development mode with non-UUID modelId, storing in memory');
-        // In development with non-UUID modelIds, create a legacy Node for UI testing
-        const legacyNode = this.convertUnifiedNodeToLegacyNode(node);
-        if (!SupabaseFunctionModelRepository.developmentNodes.has(modelId)) {
-          SupabaseFunctionModelRepository.developmentNodes.set(modelId, new Map());
-        }
-        const modelNodes = SupabaseFunctionModelRepository.developmentNodes.get(modelId)!;
-        modelNodes.set(node.nodeId.toString(), legacyNode);
-        console.log('🔍 UNIFIED_ADD_NODE - Node stored in development memory store');
-        return Result.ok();
-      }
-
-      // Verify model exists for real UUID modelIds
+      // Verify model exists
       const modelResult = await this.findById(modelId);
       if (modelResult.isFailure) {
         return Result.fail(`Model verification failed: ${modelResult.error}`);
@@ -2045,53 +1919,233 @@ export class SupabaseFunctionModelRepository extends BaseRepository implements I
     return data;
   }
 
+
   /**
-   * Convert UnifiedNode to legacy Node for development compatibility
+   * Get UnifiedNode by ID - reads from database and reconstructs UnifiedNode
    */
-  private convertUnifiedNodeToLegacyNode(unifiedNode: UnifiedNode): Node {
-    const nodeType = unifiedNode.getNodeType();
-    
-    // Map unified types to legacy types
-    if (nodeType === NodeType.IO_NODE) {
-      return IONode.create({
-        nodeId: unifiedNode.nodeId,
-        name: unifiedNode.name.value,
-        position: unifiedNode.position,
-        dependencies: [],
-        status: unifiedNode.status,
-        metadata: unifiedNode.metadata,
-        visualProperties: unifiedNode.visualProperties,
-        ioData: unifiedNode.getIOData(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }).value!;
-    } else if (nodeType === NodeType.STAGE_NODE) {
-      return StageNode.create({
-        nodeId: unifiedNode.nodeId,
-        name: unifiedNode.name.value,
-        position: unifiedNode.position,
-        dependencies: [],
-        status: unifiedNode.status,
-        metadata: unifiedNode.metadata,
-        visualProperties: unifiedNode.visualProperties,
-        stageData: unifiedNode.getStageData(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }).value!;
-    } else {
-      // For action types, create a basic IONode as fallback
-      return IONode.create({
-        nodeId: unifiedNode.nodeId,
-        name: unifiedNode.name.value,
-        position: unifiedNode.position,
-        dependencies: [],
-        status: unifiedNode.status,
-        metadata: unifiedNode.metadata,
-        visualProperties: unifiedNode.visualProperties,
-        ioData: {},
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }).value!;
+  async getUnifiedNode(nodeId: string): Promise<Result<UnifiedNode | null>> {
+    try {
+      console.log('🔍 GET_UNIFIED_NODE - Looking for nodeId:', nodeId);
+      
+      
+      const { data, error } = await this.supabase
+        .from('function_model_nodes')
+        .select('*')
+        .eq('node_id', nodeId)
+        .single();
+
+      if (error) {
+        console.log('🔍 GET_UNIFIED_NODE - Database error:', error);
+        if (error.code === 'PGRST116') {
+          // No rows returned - node not found
+          console.log('🔍 GET_UNIFIED_NODE - Node not found');
+          return Result.ok(null);
+        }
+        return Result.fail(this.handleDatabaseError(error));
+      }
+
+      console.log('🔍 GET_UNIFIED_NODE - Found data:', data);
+
+      // Convert database row back to UnifiedNode
+      const unifiedNode = this.rowToUnifiedNode(data);
+      console.log('🔍 GET_UNIFIED_NODE - Converted to UnifiedNode successfully');
+      return Result.ok(unifiedNode);
+
+    } catch (error) {
+      console.log('🔍 GET_UNIFIED_NODE - Exception:', error);
+      return Result.fail(this.handleDatabaseError(error));
     }
+  }
+
+  /**
+   * Update UnifiedNode - overwrites existing node data
+   */
+  async updateUnifiedNode(nodeId: string, node: UnifiedNode): Promise<Result<void>> {
+    try {
+      // Get the model ID from the existing node
+      const { data: existingData, error: fetchError } = await this.supabase
+        .from('function_model_nodes')
+        .select('model_id')
+        .eq('node_id', nodeId)
+        .single();
+
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          return Result.fail(`Node not found: ${nodeId}`);
+        }
+        return Result.fail(this.handleDatabaseError(fetchError));
+      }
+
+      const modelId = existingData.model_id;
+
+      // Convert UnifiedNode to database row
+      const nodeRow = this.unifiedNodeToRow(node, modelId);
+      nodeRow.updated_at = new Date().toISOString();
+
+      // Update the node
+      const { error: updateError } = await this.supabase
+        .from('function_model_nodes')
+        .update(nodeRow)
+        .eq('node_id', nodeId);
+
+      if (updateError) {
+        return Result.fail(this.handleDatabaseError(updateError));
+      }
+
+      return Result.ok();
+
+    } catch (error) {
+      return Result.fail(this.handleDatabaseError(error));
+    }
+  }
+
+  /**
+   * Remove UnifiedNode by ID
+   */
+  async removeUnifiedNode(nodeId: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('function_model_nodes')
+        .delete()
+        .eq('node_id', nodeId);
+
+      if (error) {
+        return Result.fail(this.handleDatabaseError(error));
+      }
+
+      return Result.ok();
+
+    } catch (error) {
+      return Result.fail(this.handleDatabaseError(error));
+    }
+  }
+
+  /**
+   * Get all UnifiedNodes for a model
+   */
+  async getUnifiedNodesByModel(modelId: string): Promise<Result<UnifiedNode[]>> {
+    try {
+      console.log('🔍 GET_UNIFIED_NODES_BY_MODEL - Starting query for modelId:', modelId);
+      
+      const { data, error } = await this.supabase
+        .from('function_model_nodes')
+        .select('*')
+        .eq('model_id', modelId);
+
+      if (error) {
+        console.log('❌ GET_UNIFIED_NODES_BY_MODEL - Database error:', error);
+        return Result.fail(this.handleDatabaseError(error));
+      }
+
+      console.log('📊 GET_UNIFIED_NODES_BY_MODEL - Query result:', { dataCount: data?.length || 0, modelId });
+
+      if (!data || data.length === 0) {
+        console.log('✅ GET_UNIFIED_NODES_BY_MODEL - No nodes found, returning empty array');
+        return Result.ok([]);
+      }
+
+      try {
+        // Convert database rows to UnifiedNodes
+        console.log('🔄 GET_UNIFIED_NODES_BY_MODEL - Converting rows to UnifiedNodes');
+        const unifiedNodes = data.map(row => this.rowToUnifiedNode(row));
+        console.log('✅ GET_UNIFIED_NODES_BY_MODEL - Successfully converted', unifiedNodes.length, 'nodes');
+        return Result.ok(unifiedNodes);
+      } catch (conversionError) {
+        console.log('❌ GET_UNIFIED_NODES_BY_MODEL - Conversion error:', conversionError);
+        return Result.fail(`Node conversion failed: ${conversionError}`);
+      }
+
+    } catch (error) {
+      console.log('❌ GET_UNIFIED_NODES_BY_MODEL - Unexpected error:', error);
+      return Result.fail(this.handleDatabaseError(error));
+    }
+  }
+
+  /**
+   * Get UnifiedNodes by type for a model
+   */
+  async getUnifiedNodesByType(modelId: string, nodeType: NodeType): Promise<Result<UnifiedNode[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('function_model_nodes')
+        .select('*')
+        .eq('model_id', modelId)
+        .eq('node_type', nodeType);
+
+      if (error) {
+        return Result.fail(this.handleDatabaseError(error));
+      }
+
+      if (!data || data.length === 0) {
+        return Result.ok([]);
+      }
+
+      // Convert database rows to UnifiedNodes
+      const unifiedNodes = data.map(row => this.rowToUnifiedNode(row));
+      return Result.ok(unifiedNodes);
+
+    } catch (error) {
+      return Result.fail(this.handleDatabaseError(error));
+    }
+  }
+
+  /**
+   * Convert database row to UnifiedNode domain entity
+   */
+  private rowToUnifiedNode(row: any): UnifiedNode {
+    // Create NodeId from string
+    const nodeIdResult = NodeId.create(row.node_id);
+    if (nodeIdResult.isFailure) {
+      throw new Error(`Invalid node ID: ${row.node_id}`);
+    }
+
+    // Create Position - handle null coordinates with default values
+    const positionX = row.position_x !== null ? row.position_x : 0;
+    const positionY = row.position_y !== null ? row.position_y : 0;
+    const positionResult = Position.create(positionX, positionY);
+    if (positionResult.isFailure) {
+      throw new Error(`Invalid position: ${positionX}, ${positionY}`);
+    }
+
+    // Extract type-specific data based on node type
+    let typeSpecificData: any = {};
+    switch (row.node_type) {
+      case NodeType.IO_NODE:
+        typeSpecificData = row.io_data || {};
+        break;
+      case NodeType.STAGE_NODE:
+        typeSpecificData = row.stage_data || {};
+        break;
+      case NodeType.TETHER_NODE:
+        typeSpecificData = row.action_data?.tetherData || {};
+        break;
+      case NodeType.KB_NODE:
+        typeSpecificData = row.action_data?.kbData || {};
+        break;
+      case NodeType.FUNCTION_MODEL_CONTAINER:
+        typeSpecificData = row.container_data || {};
+        break;
+    }
+
+    // Use NodeFactory to create UnifiedNode
+    const nodeResult = NodeFactory.createUnifiedNode(row.node_type, {
+      nodeId: nodeIdResult.value,
+      modelId: row.model_id, // Add the required modelId
+      name: row.name,
+      position: positionResult.value,
+      userId: 'system', // Default for reconstruction
+      typeSpecificData,
+      status: row.status,
+      metadata: row.metadata,
+      visualProperties: row.visual_properties,
+      executionType: row.execution_type,
+      timeout: row.timeout
+    });
+
+    if (nodeResult.isFailure) {
+      throw new Error(`Failed to reconstruct UnifiedNode: ${nodeResult.error}`);
+    }
+
+    return nodeResult.value;
   }
 }

@@ -30,8 +30,13 @@ export interface IFunctionModelRepository {
   addActionNode(modelId: string, actionNode: ActionNode): Promise<Result<void>>;
   
   // UNIFIED NODE SUPPORT - TDD Specification
-  // This method is defined by the tests to support unified node creation
+  // These methods are defined by the tests to support unified node operations
   addUnifiedNode(modelId: string, node: import('../entities/unified-node').UnifiedNode): Promise<Result<void>>;
+  getUnifiedNode(nodeId: string): Promise<Result<import('../entities/unified-node').UnifiedNode | null>>;
+  updateUnifiedNode(nodeId: string, node: import('../entities/unified-node').UnifiedNode): Promise<Result<void>>;
+  removeUnifiedNode(nodeId: string): Promise<Result<void>>;
+  getUnifiedNodesByModel(modelId: string): Promise<Result<import('../entities/unified-node').UnifiedNode[]>>;
+  getUnifiedNodesByType(modelId: string, nodeType: import('../enums').NodeType): Promise<Result<import('../entities/unified-node').UnifiedNode[]>>;
   searchModelsByNodeContent(query: string): Promise<Result<FunctionModel[]>>;
   findModelsWithComplexFilters(filters: {
     status?: ModelStatus[];

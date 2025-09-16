@@ -33,6 +33,8 @@ export class CrossFeatureLinkingService {
   private featureConnections: Map<string, Set<string>> = new Map();
   private linkStrengthCache: Map<string, number> = new Map();
 
+  constructor() {}
+
   /**
    * Create and validate a cross-feature link
    */
